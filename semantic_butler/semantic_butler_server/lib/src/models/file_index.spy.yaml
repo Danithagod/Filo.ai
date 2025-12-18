@@ -1,0 +1,34 @@
+### FileIndex model - stores indexed documents with embeddings
+class: FileIndex
+table: file_index
+fields:
+  ### File path on the file system
+  path: String
+  ### File name without path
+  fileName: String
+  ### SHA-256 hash of file content for change detection
+  contentHash: String
+  ### File size in bytes
+  fileSizeBytes: int
+  ### MIME type of the file
+  mimeType: String?
+  ### Preview of the document content (first 500 chars)
+  contentPreview: String?
+  ### JSON encoded auto-generated tags
+  tagsJson: String?
+  ### Status: pending, indexing, indexed, failed, skipped
+  status: String
+  ### Error message if status is failed
+  errorMessage: String?
+  ### Name of the embedding model used
+  embeddingModel: String?
+  ### When the file was indexed
+  indexedAt: DateTime?
+indexes:
+  file_index_path_unique:
+    fields: path
+    unique: true
+  file_index_content_hash:
+    fields: contentHash
+  file_index_status:
+    fields: status

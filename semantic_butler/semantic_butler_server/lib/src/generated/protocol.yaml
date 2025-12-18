@@ -1,0 +1,12 @@
+agent:
+  - chat:
+butler:
+  - semanticSearch:
+  - startIndexing:
+  - getIndexingStatus:
+  - getDatabaseStats:
+  - getSearchHistory:
+  - getAIUsageStats:
+  - clearIndex:
+greeting:
+  - hello:

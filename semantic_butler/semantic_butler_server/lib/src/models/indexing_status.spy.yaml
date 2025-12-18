@@ -1,0 +1,17 @@
+### IndexingStatus DTO - current indexing status
+class: IndexingStatus
+fields:
+  ### Total documents in database
+  totalDocuments: int
+  ### Successfully indexed documents
+  indexedDocuments: int
+  ### Documents pending indexing
+  pendingDocuments: int
+  ### Failed documents
+  failedDocuments: int
+  ### Currently running jobs
+  activeJobs: int
+  ### Database size in megabytes
+  databaseSizeMb: double
+  ### Last indexing activity timestamp
+  lastActivity: DateTime?

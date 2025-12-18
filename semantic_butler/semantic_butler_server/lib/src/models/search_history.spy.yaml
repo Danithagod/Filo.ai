@@ -1,0 +1,17 @@
+### SearchHistory model - stores user search queries
+class: SearchHistory
+table: search_history
+fields:
+  ### The search query text
+  query: String
+  ### Number of results returned
+  resultCount: int
+  ### ID of the top result (if any)
+  topResultId: int?
+  ### Time taken to execute the query in milliseconds
+  queryTimeMs: int
+  ### When the search was executed
+  searchedAt: DateTime
+indexes:
+  search_history_queried_at:
+    fields: searchedAt
