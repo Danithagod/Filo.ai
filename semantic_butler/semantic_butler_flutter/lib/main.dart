@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:semantic_butler_client/semantic_butler_client.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,28 +7,72 @@ import 'package:serverpod_flutter/serverpod_flutter.dart';
 import 'config/app_config.dart';
 import 'screens/home_screen.dart';
 import 'theme/app_theme.dart';
+import 'utils/app_logger.dart';
 
 /// Global Serverpod client
 late final Client client;
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  // Catch all Flutter errors
+  FlutterError.onError = (details) {
+    AppLogger.error(
+      'Flutter Error: ${details.exceptionAsString()}',
+      tag: 'FlutterError',
+      error: details.exception,
+      stackTrace: details.stack,
+    );
+  };
 
-  // Load configuration
-  const serverUrlFromEnv = String.fromEnvironment('SERVER_URL');
-  final config = await AppConfig.loadConfig();
-  final serverUrl = serverUrlFromEnv.isEmpty
-      ? config.apiUrl ?? 'http://$localhost:8080/'
-      : serverUrlFromEnv;
+  // Catch async errors
+  runZonedGuarded(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
+      AppLogger.lifecycle('App starting...');
 
-  // Initialize Serverpod client
-  client = Client(serverUrl)
-    ..connectivityMonitor = FlutterConnectivityMonitor();
+      // Load configuration
+      const serverUrlFromEnv = String.fromEnvironment('SERVER_URL');
+      final config = await AppConfig.loadConfig();
+      final serverUrl = serverUrlFromEnv.isEmpty
+          ? config.apiUrl ?? 'http://$localhost:8080/'
+          : serverUrlFromEnv;
 
-  runApp(
-    const ProviderScope(
-      child: SemanticButlerApp(),
-    ),
+      AppLogger.info('Connecting to server: $serverUrl', tag: 'Init');
+
+      // Initialize Serverpod client
+      client = Client(
+        serverUrl,
+        onFailedCall: (context, error, stackTrace) {
+          AppLogger.error(
+            'API call failed: ${context.methodName}',
+            tag: 'API',
+            error: error,
+            stackTrace: stackTrace,
+          );
+        },
+        onSucceededCall: (context) {
+          AppLogger.debug(
+            'API call succeeded: ${context.methodName}',
+            tag: 'API',
+          );
+        },
+      )..connectivityMonitor = FlutterConnectivityMonitor();
+
+      AppLogger.lifecycle('Client initialized');
+
+      runApp(
+        const ProviderScope(
+          child: SemanticButlerApp(),
+        ),
+      );
+    },
+    (error, stackTrace) {
+      AppLogger.error(
+        'Uncaught error',
+        tag: 'Zone',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    },
   );
 }
 
@@ -36,6 +81,7 @@ class SemanticButlerApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppLogger.lifecycle('Building SemanticButlerApp');
     return MaterialApp(
       title: 'Semantic Butler',
       debugShowCheckedModeBanner: false,
@@ -43,6 +89,26 @@ class SemanticButlerApp extends StatelessWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.dark,
       home: const HomeScreen(),
+      navigatorObservers: [_LoggingNavigatorObserver()],
+    );
+  }
+}
+
+/// Navigator observer for logging route changes
+class _LoggingNavigatorObserver extends NavigatorObserver {
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    AppLogger.debug(
+      'Navigate to: ${route.settings.name ?? route.runtimeType}',
+      tag: 'Navigation',
+    );
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    AppLogger.debug(
+      'Pop: ${route.settings.name ?? route.runtimeType}',
+      tag: 'Navigation',
     );
   }
 }

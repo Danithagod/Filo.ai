@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import '../main.dart';
+import '../utils/app_logger.dart';
 import '../widgets/search_bar_widget.dart';
 import '../widgets/stats_card.dart';
 import '../widgets/recent_searches.dart';
@@ -226,31 +227,118 @@ class _SearchDashboardState extends State<SearchDashboard> {
   }
 }
 
-/// Indexing screen with Material 3 styling
-class IndexingScreen extends StatelessWidget {
+/// Indexing screen with Material 3 styling and real-time progress
+class IndexingScreen extends StatefulWidget {
   const IndexingScreen({super.key});
 
-  Future<void> _pickFolder(BuildContext context) async {
+  @override
+  State<IndexingScreen> createState() => _IndexingScreenState();
+}
+
+class _IndexingScreenState extends State<IndexingScreen> {
+  bool _isIndexing = false;
+  int _totalDocuments = 0;
+  int _indexedDocuments = 0;
+  int _pendingDocuments = 0;
+  int _failedDocuments = 0;
+  String? _currentFolder;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadIndexingStatus();
+  }
+
+  Future<void> _loadIndexingStatus() async {
+    AppLogger.debug('Loading indexing status...', tag: 'Indexing');
+    try {
+      final status = await client.butler.getIndexingStatus();
+      AppLogger.info(
+        'Status: ${status.indexedDocuments}/${status.totalDocuments} indexed, ${status.activeJobs} active jobs',
+        tag: 'Indexing',
+      );
+      if (mounted) {
+        setState(() {
+          _totalDocuments = status.totalDocuments;
+          _indexedDocuments = status.indexedDocuments;
+          _pendingDocuments = status.pendingDocuments;
+          _failedDocuments = status.failedDocuments;
+          _isIndexing = status.activeJobs > 0;
+        });
+
+        // If indexing is active, poll for updates
+        if (_isIndexing) {
+          _pollIndexingStatus();
+        }
+      }
+    } catch (e, stackTrace) {
+      AppLogger.error(
+        'Failed to load indexing status',
+        tag: 'Indexing',
+        error: e,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  Future<void> _pollIndexingStatus() async {
+    while (_isIndexing && mounted) {
+      await Future.delayed(const Duration(seconds: 2));
+      try {
+        final status = await client.butler.getIndexingStatus();
+        if (mounted) {
+          setState(() {
+            _totalDocuments = status.totalDocuments;
+            _indexedDocuments = status.indexedDocuments;
+            _pendingDocuments = status.pendingDocuments;
+            _failedDocuments = status.failedDocuments;
+            _isIndexing = status.activeJobs > 0;
+          });
+        }
+      } catch (e) {
+        // Continue polling even on error
+      }
+    }
+  }
+
+  Future<void> _pickFolder() async {
+    AppLogger.info('Opening folder picker...', tag: 'Indexing');
     try {
       String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
 
-      if (selectedDirectory != null && context.mounted) {
-        // Start indexing
+      if (selectedDirectory != null && mounted) {
+        AppLogger.info('Selected folder: $selectedDirectory', tag: 'Indexing');
+        setState(() {
+          _isIndexing = true;
+          _currentFolder = selectedDirectory;
+        });
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Starting to index: $selectedDirectory'),
-            action: SnackBarAction(
-              label: 'View',
-              onPressed: () {},
-            ),
+            duration: const Duration(seconds: 2),
           ),
         );
 
         // Call the server to start indexing
+        AppLogger.info('Calling startIndexing API...', tag: 'Indexing');
         await client.butler.startIndexing(selectedDirectory);
+        AppLogger.info('startIndexing API call completed', tag: 'Indexing');
+
+        // Start polling for status
+        _pollIndexingStatus();
+      } else {
+        AppLogger.debug('Folder picker cancelled', tag: 'Indexing');
       }
-    } catch (e) {
-      if (context.mounted) {
+    } catch (e, stackTrace) {
+      AppLogger.error(
+        'Failed to start indexing',
+        tag: 'Indexing',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      if (mounted) {
+        setState(() => _isIndexing = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e')),
         );
@@ -258,12 +346,17 @@ class IndexingScreen extends StatelessWidget {
     }
   }
 
+  double get _progress {
+    if (_totalDocuments == 0) return 0;
+    return _indexedDocuments / _totalDocuments;
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -285,56 +378,218 @@ class IndexingScreen extends StatelessWidget {
 
           // Add folder button - Material 3 filled button
           FilledButton.icon(
-            onPressed: () => _pickFolder(context),
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Add Folder'),
+            onPressed: _isIndexing ? null : _pickFolder,
+            icon: _isIndexing
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.add_rounded),
+            label: Text(_isIndexing ? 'Indexing...' : 'Add Folder'),
           ),
 
           const SizedBox(height: 24),
 
-          // Empty state card
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.folder_open_outlined,
-                      color: colorScheme.onPrimaryContainer,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+          // Progress section - show when indexing or has indexed documents
+          if (_isIndexing || _totalDocuments > 0) ...[
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header with status
+                    Row(
                       children: [
-                        Text(
-                          'No folders indexed yet',
-                          style: textTheme.titleMedium,
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: _isIndexing
+                                ? colorScheme.primaryContainer
+                                : colorScheme.tertiaryContainer,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            _isIndexing ? Icons.sync : Icons.check_circle,
+                            color: _isIndexing
+                                ? colorScheme.onPrimaryContainer
+                                : colorScheme.onTertiaryContainer,
+                            size: 22,
+                          ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _isIndexing
+                                    ? 'Indexing in progress...'
+                                    : 'Indexing complete',
+                                style: textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              if (_currentFolder != null)
+                                Text(
+                                  _currentFolder!,
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                            ],
+                          ),
+                        ),
+                        // Percentage
                         Text(
-                          'Add a folder to start indexing your documents for semantic search.',
-                          style: textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
+                          '${(_progress * 100).toInt()}%',
+                          style: textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: colorScheme.primary,
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ],
+
+                    const SizedBox(height: 20),
+
+                    // Progress bar
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: LinearProgressIndicator(
+                        value: _isIndexing && _totalDocuments == 0
+                            ? null
+                            : _progress,
+                        minHeight: 8,
+                        backgroundColor: colorScheme.surfaceContainerHighest,
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Stats row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _StatItem(
+                          label: 'Total',
+                          value: _totalDocuments.toString(),
+                          icon: Icons.description_outlined,
+                          color: colorScheme.primary,
+                        ),
+                        _StatItem(
+                          label: 'Indexed',
+                          value: _indexedDocuments.toString(),
+                          icon: Icons.check_circle_outline,
+                          color: colorScheme.tertiary,
+                        ),
+                        _StatItem(
+                          label: 'Pending',
+                          value: _pendingDocuments.toString(),
+                          icon: Icons.pending_outlined,
+                          color: colorScheme.secondary,
+                        ),
+                        if (_failedDocuments > 0)
+                          _StatItem(
+                            label: 'Failed',
+                            value: _failedDocuments.toString(),
+                            icon: Icons.error_outline,
+                            color: colorScheme.error,
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
+          ] else ...[
+            // Empty state card
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.folder_open_outlined,
+                        color: colorScheme.onPrimaryContainer,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'No folders indexed yet',
+                            style: textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Add a folder to start indexing your documents for semantic search.',
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
+    );
+  }
+}
+
+/// Small stat item for the progress card
+class _StatItem extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  const _StatItem({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Column(
+      children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        Text(
+          label,
+          style: textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
     );
   }
 }

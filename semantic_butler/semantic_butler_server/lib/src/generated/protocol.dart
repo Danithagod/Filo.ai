@@ -12,20 +12,24 @@
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod/serverpod.dart' as _i1;
 import 'package:serverpod/protocol.dart' as _i2;
-import 'database_stats.dart' as _i3;
-import 'document_embedding.dart' as _i4;
-import 'file_index.dart' as _i5;
-import 'greetings/greeting.dart' as _i6;
-import 'indexing_job.dart' as _i7;
-import 'indexing_status.dart' as _i8;
-import 'search_history.dart' as _i9;
-import 'search_result.dart' as _i10;
-import 'package:semantic_butler_server/src/endpoints/agent_endpoint.dart'
-    as _i11;
-import 'package:semantic_butler_server/src/generated/search_result.dart'
-    as _i12;
-import 'package:semantic_butler_server/src/generated/search_history.dart'
+import 'agent_message.dart' as _i3;
+import 'agent_response.dart' as _i4;
+import 'database_stats.dart' as _i5;
+import 'document_embedding.dart' as _i6;
+import 'file_index.dart' as _i7;
+import 'greetings/greeting.dart' as _i8;
+import 'indexing_job.dart' as _i9;
+import 'indexing_status.dart' as _i10;
+import 'search_history.dart' as _i11;
+import 'search_result.dart' as _i12;
+import 'package:semantic_butler_server/src/generated/agent_message.dart'
     as _i13;
+import 'package:semantic_butler_server/src/generated/search_result.dart'
+    as _i14;
+import 'package:semantic_butler_server/src/generated/search_history.dart'
+    as _i15;
+export 'agent_message.dart';
+export 'agent_response.dart';
 export 'database_stats.dart';
 export 'document_embedding.dart';
 export 'file_index.dart';
@@ -489,80 +493,92 @@ class Protocol extends _i1.SerializationManagerServer {
       }
     }
 
-    if (t == _i3.DatabaseStats) {
-      return _i3.DatabaseStats.fromJson(data) as T;
+    if (t == _i3.AgentMessage) {
+      return _i3.AgentMessage.fromJson(data) as T;
     }
-    if (t == _i4.DocumentEmbedding) {
-      return _i4.DocumentEmbedding.fromJson(data) as T;
+    if (t == _i4.AgentResponse) {
+      return _i4.AgentResponse.fromJson(data) as T;
     }
-    if (t == _i5.FileIndex) {
-      return _i5.FileIndex.fromJson(data) as T;
+    if (t == _i5.DatabaseStats) {
+      return _i5.DatabaseStats.fromJson(data) as T;
     }
-    if (t == _i6.Greeting) {
-      return _i6.Greeting.fromJson(data) as T;
+    if (t == _i6.DocumentEmbedding) {
+      return _i6.DocumentEmbedding.fromJson(data) as T;
     }
-    if (t == _i7.IndexingJob) {
-      return _i7.IndexingJob.fromJson(data) as T;
+    if (t == _i7.FileIndex) {
+      return _i7.FileIndex.fromJson(data) as T;
     }
-    if (t == _i8.IndexingStatus) {
-      return _i8.IndexingStatus.fromJson(data) as T;
+    if (t == _i8.Greeting) {
+      return _i8.Greeting.fromJson(data) as T;
     }
-    if (t == _i9.SearchHistory) {
-      return _i9.SearchHistory.fromJson(data) as T;
+    if (t == _i9.IndexingJob) {
+      return _i9.IndexingJob.fromJson(data) as T;
     }
-    if (t == _i10.SearchResult) {
-      return _i10.SearchResult.fromJson(data) as T;
+    if (t == _i10.IndexingStatus) {
+      return _i10.IndexingStatus.fromJson(data) as T;
     }
-    if (t == _i1.getType<_i3.DatabaseStats?>()) {
-      return (data != null ? _i3.DatabaseStats.fromJson(data) : null) as T;
+    if (t == _i11.SearchHistory) {
+      return _i11.SearchHistory.fromJson(data) as T;
     }
-    if (t == _i1.getType<_i4.DocumentEmbedding?>()) {
-      return (data != null ? _i4.DocumentEmbedding.fromJson(data) : null) as T;
+    if (t == _i12.SearchResult) {
+      return _i12.SearchResult.fromJson(data) as T;
     }
-    if (t == _i1.getType<_i5.FileIndex?>()) {
-      return (data != null ? _i5.FileIndex.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i3.AgentMessage?>()) {
+      return (data != null ? _i3.AgentMessage.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i6.Greeting?>()) {
-      return (data != null ? _i6.Greeting.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i4.AgentResponse?>()) {
+      return (data != null ? _i4.AgentResponse.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i7.IndexingJob?>()) {
-      return (data != null ? _i7.IndexingJob.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i5.DatabaseStats?>()) {
+      return (data != null ? _i5.DatabaseStats.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i8.IndexingStatus?>()) {
-      return (data != null ? _i8.IndexingStatus.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i6.DocumentEmbedding?>()) {
+      return (data != null ? _i6.DocumentEmbedding.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i9.SearchHistory?>()) {
-      return (data != null ? _i9.SearchHistory.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i7.FileIndex?>()) {
+      return (data != null ? _i7.FileIndex.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i10.SearchResult?>()) {
-      return (data != null ? _i10.SearchResult.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i8.Greeting?>()) {
+      return (data != null ? _i8.Greeting.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i9.IndexingJob?>()) {
+      return (data != null ? _i9.IndexingJob.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i10.IndexingStatus?>()) {
+      return (data != null ? _i10.IndexingStatus.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i11.SearchHistory?>()) {
+      return (data != null ? _i11.SearchHistory.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i12.SearchResult?>()) {
+      return (data != null ? _i12.SearchResult.fromJson(data) : null) as T;
     }
     if (t == List<String>) {
       return (data as List).map((e) => deserialize<String>(e)).toList() as T;
     }
-    if (t == List<_i11.AgentMessage>) {
+    if (t == List<_i13.AgentMessage>) {
       return (data as List)
-              .map((e) => deserialize<_i11.AgentMessage>(e))
+              .map((e) => deserialize<_i13.AgentMessage>(e))
               .toList()
           as T;
     }
-    if (t == _i1.getType<List<_i11.AgentMessage>?>()) {
+    if (t == _i1.getType<List<_i13.AgentMessage>?>()) {
       return (data != null
               ? (data as List)
-                    .map((e) => deserialize<_i11.AgentMessage>(e))
+                    .map((e) => deserialize<_i13.AgentMessage>(e))
                     .toList()
               : null)
           as T;
     }
-    if (t == List<_i12.SearchResult>) {
+    if (t == List<_i14.SearchResult>) {
       return (data as List)
-              .map((e) => deserialize<_i12.SearchResult>(e))
+              .map((e) => deserialize<_i14.SearchResult>(e))
               .toList()
           as T;
     }
-    if (t == List<_i13.SearchHistory>) {
+    if (t == List<_i15.SearchHistory>) {
       return (data as List)
-              .map((e) => deserialize<_i13.SearchHistory>(e))
+              .map((e) => deserialize<_i15.SearchHistory>(e))
               .toList()
           as T;
     }
@@ -580,14 +596,16 @@ class Protocol extends _i1.SerializationManagerServer {
 
   static String? getClassNameForType(Type type) {
     return switch (type) {
-      _i3.DatabaseStats => 'DatabaseStats',
-      _i4.DocumentEmbedding => 'DocumentEmbedding',
-      _i5.FileIndex => 'FileIndex',
-      _i6.Greeting => 'Greeting',
-      _i7.IndexingJob => 'IndexingJob',
-      _i8.IndexingStatus => 'IndexingStatus',
-      _i9.SearchHistory => 'SearchHistory',
-      _i10.SearchResult => 'SearchResult',
+      _i3.AgentMessage => 'AgentMessage',
+      _i4.AgentResponse => 'AgentResponse',
+      _i5.DatabaseStats => 'DatabaseStats',
+      _i6.DocumentEmbedding => 'DocumentEmbedding',
+      _i7.FileIndex => 'FileIndex',
+      _i8.Greeting => 'Greeting',
+      _i9.IndexingJob => 'IndexingJob',
+      _i10.IndexingStatus => 'IndexingStatus',
+      _i11.SearchHistory => 'SearchHistory',
+      _i12.SearchResult => 'SearchResult',
       _ => null,
     };
   }
@@ -605,21 +623,25 @@ class Protocol extends _i1.SerializationManagerServer {
     }
 
     switch (data) {
-      case _i3.DatabaseStats():
+      case _i3.AgentMessage():
+        return 'AgentMessage';
+      case _i4.AgentResponse():
+        return 'AgentResponse';
+      case _i5.DatabaseStats():
         return 'DatabaseStats';
-      case _i4.DocumentEmbedding():
+      case _i6.DocumentEmbedding():
         return 'DocumentEmbedding';
-      case _i5.FileIndex():
+      case _i7.FileIndex():
         return 'FileIndex';
-      case _i6.Greeting():
+      case _i8.Greeting():
         return 'Greeting';
-      case _i7.IndexingJob():
+      case _i9.IndexingJob():
         return 'IndexingJob';
-      case _i8.IndexingStatus():
+      case _i10.IndexingStatus():
         return 'IndexingStatus';
-      case _i9.SearchHistory():
+      case _i11.SearchHistory():
         return 'SearchHistory';
-      case _i10.SearchResult():
+      case _i12.SearchResult():
         return 'SearchResult';
     }
     className = _i2.Protocol().getClassNameForObject(data);
@@ -635,29 +657,35 @@ class Protocol extends _i1.SerializationManagerServer {
     if (dataClassName is! String) {
       return super.deserializeByClassName(data);
     }
+    if (dataClassName == 'AgentMessage') {
+      return deserialize<_i3.AgentMessage>(data['data']);
+    }
+    if (dataClassName == 'AgentResponse') {
+      return deserialize<_i4.AgentResponse>(data['data']);
+    }
     if (dataClassName == 'DatabaseStats') {
-      return deserialize<_i3.DatabaseStats>(data['data']);
+      return deserialize<_i5.DatabaseStats>(data['data']);
     }
     if (dataClassName == 'DocumentEmbedding') {
-      return deserialize<_i4.DocumentEmbedding>(data['data']);
+      return deserialize<_i6.DocumentEmbedding>(data['data']);
     }
     if (dataClassName == 'FileIndex') {
-      return deserialize<_i5.FileIndex>(data['data']);
+      return deserialize<_i7.FileIndex>(data['data']);
     }
     if (dataClassName == 'Greeting') {
-      return deserialize<_i6.Greeting>(data['data']);
+      return deserialize<_i8.Greeting>(data['data']);
     }
     if (dataClassName == 'IndexingJob') {
-      return deserialize<_i7.IndexingJob>(data['data']);
+      return deserialize<_i9.IndexingJob>(data['data']);
     }
     if (dataClassName == 'IndexingStatus') {
-      return deserialize<_i8.IndexingStatus>(data['data']);
+      return deserialize<_i10.IndexingStatus>(data['data']);
     }
     if (dataClassName == 'SearchHistory') {
-      return deserialize<_i9.SearchHistory>(data['data']);
+      return deserialize<_i11.SearchHistory>(data['data']);
     }
     if (dataClassName == 'SearchResult') {
-      return deserialize<_i10.SearchResult>(data['data']);
+      return deserialize<_i12.SearchResult>(data['data']);
     }
     if (dataClassName.startsWith('serverpod.')) {
       data['className'] = dataClassName.substring(10);
@@ -675,14 +703,14 @@ class Protocol extends _i1.SerializationManagerServer {
       }
     }
     switch (t) {
-      case _i4.DocumentEmbedding:
-        return _i4.DocumentEmbedding.t;
-      case _i5.FileIndex:
-        return _i5.FileIndex.t;
-      case _i7.IndexingJob:
-        return _i7.IndexingJob.t;
-      case _i9.SearchHistory:
-        return _i9.SearchHistory.t;
+      case _i6.DocumentEmbedding:
+        return _i6.DocumentEmbedding.t;
+      case _i7.FileIndex:
+        return _i7.FileIndex.t;
+      case _i9.IndexingJob:
+        return _i9.IndexingJob.t;
+      case _i11.SearchHistory:
+        return _i11.SearchHistory.t;
     }
     return null;
   }

@@ -36,8 +36,8 @@ class AIService {
     EmbeddingQuality quality = EmbeddingQuality.fast,
   }) async {
     final model = quality == EmbeddingQuality.fast
-        ? AIModels.embeddingFast
-        : AIModels.embeddingQuality;
+        ? AIModels.embeddingGemini
+        : AIModels.embeddingOpenAILarge;
 
     final response = await _client.createEmbeddings(
       model: model,
@@ -54,8 +54,8 @@ class AIService {
     EmbeddingQuality quality = EmbeddingQuality.fast,
   }) async {
     final model = quality == EmbeddingQuality.fast
-        ? AIModels.embeddingFast
-        : AIModels.embeddingQuality;
+        ? AIModels.embeddingGemini
+        : AIModels.embeddingOpenAILarge;
 
     // Process in batches to avoid rate limits
     final allEmbeddings = <List<double>>[];
@@ -84,9 +84,9 @@ class AIService {
     EmbeddingQuality quality = EmbeddingQuality.fast,
   }) {
     final model = quality == EmbeddingQuality.fast
-        ? AIModels.embeddingFast
-        : AIModels.embeddingQuality;
-    return AIModels.embeddingDimensions[model] ?? 1536;
+        ? AIModels.embeddingGemini
+        : AIModels.embeddingOpenAILarge;
+    return AIModels.embeddingDimensions[model] ?? 768;
   }
 
   // ==========================================================================

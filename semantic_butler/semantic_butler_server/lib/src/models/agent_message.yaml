@@ -1,0 +1,8 @@
+### AgentMessage - Message in conversation history
+
+class: AgentMessage
+fields:
+  ### Role of the message sender - 'user' or 'assistant'
+  role: String
+  ### Content of the message
+  content: String

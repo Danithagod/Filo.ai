@@ -417,33 +417,3 @@ When responding:
     };
   }
 }
-
-/// Agent response DTO
-class AgentResponse {
-  final String message;
-  final int toolsUsed;
-  final int tokensUsed;
-
-  AgentResponse({
-    required this.message,
-    required this.toolsUsed,
-    required this.tokensUsed,
-  });
-
-  Map<String, dynamic> toJson() => {
-    'message': message,
-    'toolsUsed': toolsUsed,
-    'tokensUsed': tokensUsed,
-  };
-}
-
-/// Agent message for conversation history
-class AgentMessage {
-  final String role; // 'user' or 'assistant'
-  final String content;
-
-  AgentMessage({
-    required this.role,
-    required this.content,
-  });
-}
