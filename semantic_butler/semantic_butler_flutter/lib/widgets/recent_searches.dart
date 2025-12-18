@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
+import '../utils/app_logger.dart';
 
 /// Recent searches list widget with Material 3 styling
 class RecentSearches extends StatefulWidget {
@@ -25,8 +26,20 @@ class _RecentSearchesState extends State<RecentSearches> {
   }
 
   Future<void> _loadSearchHistory() async {
+    AppLogger.debug('Loading search history...', tag: 'RecentSearches');
     try {
       final history = await client.butler.getSearchHistory(limit: 10);
+      AppLogger.debug(
+        'Loaded ${history.length} search history items',
+        tag: 'RecentSearches',
+      );
+      if (!mounted) {
+        AppLogger.warning(
+          'Widget disposed before setState',
+          tag: 'RecentSearches',
+        );
+        return;
+      }
       setState(() {
         _searches = history
             .map(
@@ -39,7 +52,14 @@ class _RecentSearchesState extends State<RecentSearches> {
             .toList();
         _isLoading = false;
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
+      AppLogger.error(
+        'Failed to load search history',
+        tag: 'RecentSearches',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      if (!mounted) return;
       setState(() {
         _searches = [];
         _isLoading = false;

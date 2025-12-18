@@ -7,19 +7,24 @@ class AIModels {
   // EMBEDDING MODELS
   // ==========================================================================
 
-  /// Fast, cost-effective embedding model (1536 dimensions)
+  /// Google Gemini Embedding - High quality, cost-effective (768 dimensions)
+  /// Cost: ~$0.00 per 1M tokens (free tier available)
+  static const String embeddingGemini = 'google/gemini-embedding-001';
+
+  /// OpenAI fast embedding model (1536 dimensions)
   /// Cost: ~$0.02 per 1M tokens
-  static const String embeddingFast = 'openai/text-embedding-3-small';
+  static const String embeddingOpenAISmall = 'openai/text-embedding-3-small';
 
-  /// High-quality embedding model (3072 dimensions)
+  /// OpenAI high-quality embedding model (3072 dimensions)
   /// Cost: ~$0.13 per 1M tokens
-  static const String embeddingQuality = 'openai/text-embedding-3-large';
+  static const String embeddingOpenAILarge = 'openai/text-embedding-3-large';
 
-  /// Default embedding model
-  static const String embeddingDefault = embeddingFast;
+  /// Default embedding model - Google Gemini
+  static const String embeddingDefault = embeddingGemini;
 
   /// Embedding dimensions by model
   static const Map<String, int> embeddingDimensions = {
+    'google/gemini-embedding-001': 768,
     'openai/text-embedding-3-small': 1536,
     'openai/text-embedding-3-large': 3072,
     'openai/text-embedding-ada-002': 1536,
@@ -142,8 +147,9 @@ class AIModels {
     chatClaudeOpus: ModelCost(input: 15.00, output: 75.00),
     chatLlama70b: ModelCost(input: 0.59, output: 0.79),
     chatMixtral: ModelCost(input: 0.24, output: 0.24),
-    embeddingFast: ModelCost(input: 0.02, output: 0.0),
-    embeddingQuality: ModelCost(input: 0.13, output: 0.0),
+    embeddingGemini: ModelCost(input: 0.0, output: 0.0),
+    embeddingOpenAISmall: ModelCost(input: 0.02, output: 0.0),
+    embeddingOpenAILarge: ModelCost(input: 0.13, output: 0.0),
   };
 
   /// Estimate cost for a request

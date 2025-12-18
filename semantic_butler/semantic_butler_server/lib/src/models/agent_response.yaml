@@ -1,0 +1,10 @@
+### AgentResponse - Response from the AI agent
+
+class: AgentResponse
+fields:
+  ### The agent's text response message
+  message: String
+  ### Number of tools used to generate response
+  toolsUsed: int
+  ### Total tokens used for this interaction
+  tokensUsed: int
