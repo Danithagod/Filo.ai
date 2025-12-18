@@ -1,0 +1,27 @@
+### IndexingJob model - tracks indexing jobs/tasks
+class: IndexingJob
+table: indexing_job
+fields:
+  ### Folder path being indexed
+  folderPath: String
+  ### Job status: queued, running, completed, failed, cancelled
+  status: String
+  ### Total files found in folder
+  totalFiles: int
+  ### Number of files processed
+  processedFiles: int
+  ### Number of files that failed
+  failedFiles: int
+  ### Number of files skipped (unsupported format)
+  skippedFiles: int
+  ### When the job started
+  startedAt: DateTime?
+  ### When the job completed
+  completedAt: DateTime?
+  ### Error message if job failed
+  errorMessage: String?
+indexes:
+  indexing_job_status:
+    fields: status
+  indexing_job_folder:
+    fields: folderPath

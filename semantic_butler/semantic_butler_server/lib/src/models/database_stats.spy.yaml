@@ -1,0 +1,13 @@
+### DatabaseStats DTO - database statistics
+class: DatabaseStats
+fields:
+  ### Total size in megabytes
+  totalSizeMb: double
+  ### Number of indexed files
+  fileCount: int
+  ### Number of embeddings stored
+  embeddingCount: int
+  ### Average embedding generation time in milliseconds
+  avgEmbeddingTimeMs: double
+  ### Last updated timestamp
+  lastUpdated: DateTime

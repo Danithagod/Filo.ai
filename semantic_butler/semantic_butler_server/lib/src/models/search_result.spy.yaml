@@ -1,0 +1,21 @@
+### SearchResult DTO - returned from semantic search
+class: SearchResult
+fields:
+  ### Document ID from file_index
+  id: int
+  ### File path
+  path: String
+  ### File name
+  fileName: String
+  ### Relevance score (0.0 to 1.0)
+  relevanceScore: double
+  ### Content preview snippet
+  contentPreview: String?
+  ### Parsed tags as list of strings
+  tags: List<String>
+  ### When the file was indexed
+  indexedAt: DateTime?
+  ### File size in bytes  
+  fileSizeBytes: int
+  ### MIME type
+  mimeType: String?
