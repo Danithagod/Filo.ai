@@ -208,20 +208,22 @@ class ButlerEndpoint extends Endpoint {
       job.totalFiles = files.length;
       await IndexingJob.db.updateRow(session, job);
 
-      // Process each file
-      for (final filePath in files) {
-        try {
-          await _indexFile(session, filePath);
-          job.processedFiles++;
-        } catch (e) {
-          job.failedFiles++;
-          session.log('Failed to index $filePath: $e', level: LogLevel.warning);
-        }
+      // Process files in batches
+      const batchSize = 10;
+      for (var i = 0; i < files.length; i += batchSize) {
+        final batch = files.sublist(
+          i,
+          i + batchSize > files.length ? files.length : i + batchSize,
+        );
 
-        // Update progress periodically
-        if (job.processedFiles % 10 == 0) {
-          await IndexingJob.db.updateRow(session, job);
-        }
+        final results = await _processBatch(session, batch);
+
+        job.processedFiles += results.indexedCount;
+        job.failedFiles += results.failedCount;
+        job.skippedFiles += results.skippedCount;
+
+        // Update progress
+        await IndexingJob.db.updateRow(session, job);
       }
 
       // Mark job as completed
@@ -236,80 +238,175 @@ class ButlerEndpoint extends Endpoint {
     }
   }
 
-  /// Index a single file
-  Future<void> _indexFile(Session session, String filePath) async {
-    // Check if file already indexed with same hash
-    final existing = await FileIndex.db.findFirstRow(
-      session,
-      where: (t) => t.path.equals(filePath),
-    );
+  /// Process a batch of files
+  Future<_BatchResult> _processBatch(
+    Session session,
+    List<String> filePaths,
+  ) async {
+    int indexed = 0;
+    int failed = 0;
+    int skipped = 0;
 
-    // Extract file content
-    final extraction = await _extractionService.extractText(filePath);
+    // 1. Extract content and filter already indexed files
+    final itemsToProcess = <_BatchItem>[];
 
-    // Skip if content hash matches (file unchanged)
-    if (existing != null && existing.contentHash == extraction.contentHash) {
-      return;
+    for (final path in filePaths) {
+      try {
+        final existing = await FileIndex.db.findFirstRow(
+          session,
+          where: (t) => t.path.equals(path),
+        );
+
+        // Retry extraction up to 3 times
+        final extraction = await _retry(
+          () => _extractionService.extractText(path),
+          maxAttempts: 3,
+        );
+
+        // Skip if content unchanged
+        if (existing != null && existing.contentHash == extraction.contentHash) {
+          skipped++;
+          continue;
+        }
+
+        itemsToProcess.add(_BatchItem(path: path, extraction: extraction, existingIndex: existing));
+      } catch (e) {
+        failed++;
+        session.log('Failed to extract $path: $e', level: LogLevel.warning);
+      }
     }
 
-    // Generate embedding using OpenRouter
-    final embedding = await aiService.generateEmbedding(extraction.content);
-
-    // Generate tags using OpenRouter
-    final tags = await aiService.generateTags(
-      extraction.content,
-      fileName: extraction.fileName,
-    );
-
-    // Create or update FileIndex record
-    final fileIndex = FileIndex(
-      id: existing?.id,
-      path: filePath,
-      fileName: extraction.fileName,
-      contentHash: extraction.contentHash,
-      fileSizeBytes: extraction.fileSizeBytes,
-      mimeType: extraction.mimeType,
-      contentPreview: extraction.preview,
-      tagsJson: tags.toJson(),
-      status: 'indexed',
-      embeddingModel: AIModels.embeddingDefault,
-      indexedAt: DateTime.now(),
-    );
-
-    FileIndex savedIndex;
-    if (existing != null) {
-      savedIndex = await FileIndex.db.updateRow(session, fileIndex);
-
-      // Delete old embeddings
-      await DocumentEmbedding.db.deleteWhere(
-        session,
-        where: (t) => t.fileIndexId.equals(existing.id!),
-      );
-    } else {
-      savedIndex = await FileIndex.db.insertRow(session, fileIndex);
+    if (itemsToProcess.isEmpty) {
+      return _BatchResult(indexed, failed, skipped);
     }
 
-    // Store embedding
-    final embeddingRecord = await DocumentEmbedding.db.insertRow(
-      session,
-      DocumentEmbedding(
-        fileIndexId: savedIndex.id!,
-        chunkIndex: 0,
-        chunkText: extraction.preview,
-        embeddingJson: jsonEncode(embedding),
-        dimensions: aiService.getEmbeddingDimensions(),
-      ),
-    );
-
-    // Update vector column directly (for pgvector support)
+    // 2. Generate embeddings in batch (optimization)
+    List<List<double>> embeddings;
     try {
-      await session.db.query(
-        'UPDATE document_embedding SET embedding = \'${jsonEncode(embedding)}\'::vector WHERE id = ${embeddingRecord.id}',
+      embeddings = await _retry(
+        () => aiService.generateEmbeddings(
+          itemsToProcess.map((item) => item.extraction.content).toList(),
+        ),
+        maxAttempts: 3,
       );
     } catch (e) {
-      session.log('Failed to update vector column: $e', level: LogLevel.error);
+      session.log('Failed to generate embeddings for batch: $e', level: LogLevel.error);
+      return _BatchResult(indexed, failed + itemsToProcess.length, skipped);
+    }
+
+    // 3. Process each file with its embedding
+    for (var i = 0; i < itemsToProcess.length; i++) {
+      final item = itemsToProcess[i];
+      final embedding = embeddings[i];
+
+      try {
+        // Generate tags
+        final tags = await _retry(
+          () => aiService.generateTags(
+            item.extraction.content,
+            fileName: item.extraction.fileName,
+          ),
+          maxAttempts: 2,
+        );
+
+        // Create/Update FileIndex record
+        final fileIndex = FileIndex(
+          id: item.existingIndex?.id,
+          path: item.path,
+          fileName: item.extraction.fileName,
+          contentHash: item.extraction.contentHash,
+          fileSizeBytes: item.extraction.fileSizeBytes,
+          mimeType: item.extraction.mimeType,
+          contentPreview: item.extraction.preview,
+          tagsJson: tags.toJson(),
+          status: 'indexed',
+          embeddingModel: AIModels.embeddingDefault,
+          indexedAt: DateTime.now(),
+        );
+
+        FileIndex savedIndex;
+        if (item.existingIndex != null) {
+          savedIndex = await FileIndex.db.updateRow(session, fileIndex);
+
+          // Delete old embeddings
+          await DocumentEmbedding.db.deleteWhere(
+            session,
+            where: (t) => t.fileIndexId.equals(item.existingIndex!.id!),
+          );
+        } else {
+          savedIndex = await FileIndex.db.insertRow(session, fileIndex);
+        }
+
+        // Store embedding
+        final embeddingRecord = await DocumentEmbedding.db.insertRow(
+          session,
+          DocumentEmbedding(
+            fileIndexId: savedIndex.id!,
+            chunkIndex: 0,
+            chunkText: item.extraction.preview,
+            embeddingJson: jsonEncode(embedding),
+            dimensions: aiService.getEmbeddingDimensions(),
+          ),
+        );
+
+        // Update vector column directly
+        try {
+          await session.db.query(
+            'UPDATE document_embedding SET embedding = \'${jsonEncode(embedding)}\'::vector WHERE id = ${embeddingRecord.id}',
+          );
+        } catch (e) {
+          session.log('Failed to update vector column: $e', level: LogLevel.error);
+        }
+
+        indexed++;
+      } catch (e) {
+        failed++;
+        session.log('Failed to index ${item.path}: $e', level: LogLevel.warning);
+      }
+    }
+
+    return _BatchResult(indexed, failed, skipped);
+  }
+
+  /// Generic retry helper
+  Future<T> _retry<T>(
+    Future<T> Function() action, {
+    int maxAttempts = 3,
+    Duration delay = const Duration(seconds: 1),
+  }) async {
+    int attempts = 0;
+    while (true) {
+      try {
+        attempts++;
+        return await action();
+      } catch (e) {
+        if (attempts >= maxAttempts) rethrow;
+        await Future.delayed(delay * attempts); // Exponential-ish backoff
+      }
     }
   }
+}
+
+/// Helper for batch processing
+class _BatchItem {
+  final String path;
+  final ExtractionResult extraction;
+  final FileIndex? existingIndex;
+
+  _BatchItem({
+    required this.path,
+    required this.extraction,
+    this.existingIndex,
+  });
+}
+
+/// Result of batch processing
+class _BatchResult {
+  final int indexedCount;
+  final int failedCount;
+  final int skippedCount;
+
+  _BatchResult(this.indexedCount, this.failedCount, this.skippedCount);
 
   // ==========================================================================
   // STATUS & STATISTICS
