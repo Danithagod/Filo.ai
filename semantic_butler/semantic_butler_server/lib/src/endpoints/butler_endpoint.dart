@@ -61,6 +61,35 @@ class ButlerEndpoint extends Endpoint {
     final stopwatch = Stopwatch()..start();
 
     try {
+      // 0. Handle empty query: Return recently indexed documents
+      if (query.trim().isEmpty) {
+        final recentDocs = await FileIndex.db.find(
+          session,
+          where: (t) => t.status.equals('indexed'),
+          orderBy: (t) => t.indexedAt,
+          orderDescending: true,
+          limit: limit,
+        );
+
+        return recentDocs.map((doc) {
+          final tags = doc.tagsJson != null
+              ? _parseTagList(doc.tagsJson!)
+              : <String>[];
+
+          return SearchResult(
+            id: doc.id!,
+            path: doc.path,
+            fileName: doc.fileName,
+            relevanceScore: 1.0, // Treat as highly relevant (recent)
+            contentPreview: doc.contentPreview,
+            tags: tags,
+            indexedAt: doc.indexedAt,
+            fileSizeBytes: doc.fileSizeBytes,
+            mimeType: doc.mimeType,
+          );
+        }).toList();
+      }
+
       // 1. Generate embedding for the query using OpenRouter
       final queryEmbedding = await aiService.generateEmbedding(query);
 
@@ -273,6 +302,7 @@ class ButlerEndpoint extends Endpoint {
       } catch (e) {
         failed++;
         session.log('Failed to extract $path: $e', level: LogLevel.warning);
+        await _recordIndexingError(session, path, 'Extraction failed: $e');
       }
     }
 
@@ -362,10 +392,48 @@ class ButlerEndpoint extends Endpoint {
       } catch (e) {
         failed++;
         session.log('Failed to index ${item.path}: $e', level: LogLevel.warning);
+        await _recordIndexingError(session, item.path, 'Indexing failed: $e');
       }
     }
 
     return _BatchResult(indexed, failed, skipped);
+  }
+
+  /// Record indexing error to database
+  Future<void> _recordIndexingError(
+    Session session,
+    String path,
+    String errorMessage,
+  ) async {
+    try {
+      final existing = await FileIndex.db.findFirstRow(
+        session,
+        where: (t) => t.path.equals(path),
+      );
+
+      if (existing != null) {
+        existing.status = 'failed';
+        existing.errorMessage = errorMessage;
+        await FileIndex.db.updateRow(session, existing);
+      } else {
+        await FileIndex.db.insertRow(
+          session,
+          FileIndex(
+            path: path,
+            fileName: path.split(Platform.pathSeparator).last,
+            contentHash: '',
+            fileSizeBytes: 0,
+            status: 'failed',
+            errorMessage: errorMessage,
+            indexedAt: DateTime.now(),
+            embeddingModel: AIModels.embeddingDefault,
+            tagsJson: null,
+          ),
+        );
+      }
+    } catch (e) {
+      session.log('Failed to record indexing error for $path: $e', level: LogLevel.error);
+    }
   }
 
   /// Generic retry helper
