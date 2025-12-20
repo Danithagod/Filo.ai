@@ -192,6 +192,8 @@ Always respond with valid JSON matching this exact schema:
   "document_type": "string (one of: Code, Documentation, Notes, Report, Config, Script, Other)",
   "keywords": ["keyword1", "keyword2", "keyword3"],
   "entities": ["named entities like people, companies, projects, technologies"],
+  "date_year": "string (YYYY) or null if not found",
+  "date_month": "string (MM) or null if not found",
   "language": "programming language if code, or 'natural' for text documents",
   "confidence": 0.0 to 1.0
 }
@@ -310,6 +312,8 @@ class DocumentTags {
   final String documentType;
   final List<String> keywords;
   final List<String> entities;
+  final String? dateYear;
+  final String? dateMonth;
   final String? language;
   final double confidence;
 
@@ -318,6 +322,8 @@ class DocumentTags {
     required this.documentType,
     required this.keywords,
     required this.entities,
+    this.dateYear,
+    this.dateMonth,
     this.language,
     required this.confidence,
   });
@@ -328,6 +334,8 @@ class DocumentTags {
       documentType: map['document_type'] as String? ?? 'Document',
       keywords: _parseStringList(map['keywords']),
       entities: _parseStringList(map['entities']),
+      dateYear: map['date_year']?.toString(),
+      dateMonth: map['date_month']?.toString(),
       language: map['language'] as String?,
       confidence: (map['confidence'] as num?)?.toDouble() ?? 0.5,
     );
@@ -352,6 +360,16 @@ class DocumentTags {
   /// Convert to a flat list of tag strings for display
   List<String> toTagList() {
     final tags = <String>[primaryTopic, documentType];
+
+    // Add date tag if available
+    if (dateYear != null) {
+      if (dateMonth != null) {
+        tags.add('$dateYear-$dateMonth');
+      } else {
+        tags.add(dateYear!);
+      }
+    }
+
     tags.addAll(keywords.take(3));
     tags.addAll(entities.take(2));
     if (language != null && language != 'natural') {
@@ -366,6 +384,8 @@ class DocumentTags {
       'document_type': documentType,
       'keywords': keywords,
       'entities': entities,
+      'date_year': dateYear,
+      'date_month': dateMonth,
       'language': language,
       'confidence': confidence,
     };
