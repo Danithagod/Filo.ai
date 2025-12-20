@@ -453,28 +453,6 @@ class ButlerEndpoint extends Endpoint {
       }
     }
   }
-}
-
-/// Helper for batch processing
-class _BatchItem {
-  final String path;
-  final ExtractionResult extraction;
-  final FileIndex? existingIndex;
-
-  _BatchItem({
-    required this.path,
-    required this.extraction,
-    this.existingIndex,
-  });
-}
-
-/// Result of batch processing
-class _BatchResult {
-  final int indexedCount;
-  final int failedCount;
-  final int skippedCount;
-
-  _BatchResult(this.indexedCount, this.failedCount, this.skippedCount);
 
   // ==========================================================================
   // STATUS & STATISTICS
@@ -658,6 +636,28 @@ class _BatchResult {
 
     return totalMs / recentSearches.length;
   }
+}
+
+/// Helper class for batch processing
+class _BatchItem {
+  final String path;
+  final ExtractionResult extraction;
+  final FileIndex? existingIndex;
+
+  _BatchItem({
+    required this.path,
+    required this.extraction,
+    this.existingIndex,
+  });
+}
+
+/// Result of batch processing
+class _BatchResult {
+  final int indexedCount;
+  final int failedCount;
+  final int skippedCount;
+
+  _BatchResult(this.indexedCount, this.failedCount, this.skippedCount);
 }
 
 /// Helper class for sorting search results by score

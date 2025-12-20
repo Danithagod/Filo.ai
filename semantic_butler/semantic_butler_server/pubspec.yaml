@@ -12,7 +12,6 @@ dependencies:
   path: ^1.9.1
   pdf: ^3.11.3
   serverpod: 3.1.0
-  syncfusion_flutter_pdf: ^32.1.19
 
 dev_dependencies:
   lints: '>=3.0.0 <7.0.0'
