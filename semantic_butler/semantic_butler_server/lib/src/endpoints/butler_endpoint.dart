@@ -64,41 +64,70 @@ class ButlerEndpoint extends Endpoint {
       // 1. Generate embedding for the query using OpenRouter
       final queryEmbedding = await aiService.generateEmbedding(query);
 
-      // 2. Get all indexed documents with embeddings
-      final allDocs = await FileIndex.db.find(
-        session,
-        where: (t) => t.status.equals('indexed'),
-      );
-
-      // 3. Calculate similarity scores
+      // 2. Perform vector search using pgvector
+      final queryEmbeddingJson = jsonEncode(queryEmbedding);
       final results = <_ScoredResult>[];
 
-      for (final doc in allDocs) {
-        // Get embeddings for this document
-        final embeddings = await DocumentEmbedding.db.find(
+      try {
+        // Use vector cosine similarity operator (<=>)
+        // 1 - (a <=> b) gives cosine similarity
+        final query = '''
+          SELECT
+            "fileIndexId",
+            1 - (embedding <=> '$queryEmbeddingJson'::vector) as similarity
+          FROM document_embedding
+          WHERE 1 - (embedding <=> '$queryEmbeddingJson'::vector) > $threshold
+          ORDER BY embedding <=> '$queryEmbeddingJson'::vector
+          LIMIT $limit
+        ''';
+
+        final rows = await session.db.query(query);
+
+        // 3. Map results to FileIndex objects
+        for (final row in rows) {
+          final fileIndexId = row[0] as int;
+          final similarity = row[1] as double;
+
+          final doc = await FileIndex.db.findById(session, fileIndexId);
+          if (doc != null) {
+            results.add(_ScoredResult(doc: doc, score: similarity));
+          }
+        }
+      } catch (e) {
+        // Fallback to Dart-based search if pgvector fails (e.g. extension not installed)
+        session.log('pgvector search failed, falling back to Dart implementation: $e', level: LogLevel.warning);
+
+        // Original implementation as fallback
+        final allDocs = await FileIndex.db.find(
           session,
-          where: (t) => t.fileIndexId.equals(doc.id!),
+          where: (t) => t.status.equals('indexed'),
         );
 
-        if (embeddings.isEmpty) continue;
+        for (final doc in allDocs) {
+          final embeddings = await DocumentEmbedding.db.find(
+            session,
+            where: (t) => t.fileIndexId.equals(doc.id!),
+          );
 
-        // Calculate max similarity across all chunks
-        double maxSimilarity = 0.0;
-        for (final emb in embeddings) {
-          final docEmbedding = _parseEmbedding(emb.embeddingJson);
-          final similarity = _cosineSimilarity(queryEmbedding, docEmbedding);
-          if (similarity > maxSimilarity) {
-            maxSimilarity = similarity;
+          if (embeddings.isEmpty) continue;
+
+          double maxSimilarity = 0.0;
+          for (final emb in embeddings) {
+            final docEmbedding = _parseEmbedding(emb.embeddingJson);
+            final similarity = _cosineSimilarity(queryEmbedding, docEmbedding);
+            if (similarity > maxSimilarity) {
+              maxSimilarity = similarity;
+            }
+          }
+
+          if (maxSimilarity >= threshold) {
+            results.add(_ScoredResult(doc: doc, score: maxSimilarity));
           }
         }
 
-        if (maxSimilarity >= threshold) {
-          results.add(_ScoredResult(doc: doc, score: maxSimilarity));
-        }
+        results.sort((a, b) => b.score.compareTo(a.score));
       }
 
-      // 4. Sort by score and limit results
-      results.sort((a, b) => b.score.compareTo(a.score));
       final topResults = results.take(limit).toList();
 
       // 5. Log search history
@@ -261,7 +290,7 @@ class ButlerEndpoint extends Endpoint {
     }
 
     // Store embedding
-    await DocumentEmbedding.db.insertRow(
+    final embeddingRecord = await DocumentEmbedding.db.insertRow(
       session,
       DocumentEmbedding(
         fileIndexId: savedIndex.id!,
@@ -271,6 +300,15 @@ class ButlerEndpoint extends Endpoint {
         dimensions: aiService.getEmbeddingDimensions(),
       ),
     );
+
+    // Update vector column directly (for pgvector support)
+    try {
+      await session.db.query(
+        'UPDATE document_embedding SET embedding = \'${jsonEncode(embedding)}\'::vector WHERE id = ${embeddingRecord.id}',
+      );
+    } catch (e) {
+      session.log('Failed to update vector column: $e', level: LogLevel.error);
+    }
   }
 
   // ==========================================================================
