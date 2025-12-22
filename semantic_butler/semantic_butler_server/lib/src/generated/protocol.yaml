@@ -1,4 +1,5 @@
 agent:
+  - streamChat:
   - chat:
 butler:
   - semanticSearch:
@@ -8,5 +9,22 @@ butler:
   - getSearchHistory:
   - getAIUsageStats:
   - clearIndex:
+  - enableSmartIndexing:
+  - disableSmartIndexing:
+  - getWatchedFolders:
+  - toggleSmartIndexing:
+  - addIgnorePattern:
+  - removeIgnorePattern:
+  - listIgnorePatterns:
+  - getIgnorePatternStrings:
+  - removeFromIndex:
+  - removeMultipleFromIndex:
+fileSystem:
+  - listDirectory:
+  - getDrives:
+  - rename:
+  - move:
+  - delete:
+  - createFolder:
 greeting:
   - hello:

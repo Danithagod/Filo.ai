@@ -14,8 +14,20 @@ fields:
   mimeType: String?
   ### Preview of the document content (first 500 chars)
   contentPreview: String?
+  ### AI-generated summary for embedding (200-300 words)
+  summary: String?
   ### JSON encoded auto-generated tags
   tagsJson: String?
+  ### Document category: code, document, config, data, media_metadata
+  documentCategory: String?
+  ### Original file creation date from file system
+  fileCreatedAt: DateTime?
+  ### Original file modification date from file system
+  fileModifiedAt: DateTime?
+  ### Number of words in the document
+  wordCount: int?
+  ### Whether this file contains readable text content
+  isTextContent: bool
   ### Status: pending, indexing, indexed, failed, skipped
   status: String
   ### Error message if status is failed
@@ -32,3 +44,5 @@ indexes:
     fields: contentHash
   file_index_status:
     fields: status
+  file_index_category:
+    fields: documentCategory

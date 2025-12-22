@@ -1,0 +1,9 @@
+class: FileSystemEntry
+fields:
+  name: String
+  path: String
+  isDirectory: bool
+  size: int
+  modifiedAt: DateTime
+  fileExtension: String?
+  isIndexed: bool

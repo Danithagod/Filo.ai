@@ -1,0 +1,16 @@
+### IgnorePattern model - stores patterns to exclude from indexing
+class: IgnorePattern
+table: ignore_pattern
+fields:
+  ### Glob pattern like "*.log", "node_modules/**", or specific paths
+  pattern: String
+  ### Pattern type: file, directory, or both
+  patternType: String
+  ### Optional description for the pattern
+  description: String?
+  ### When the pattern was created
+  createdAt: DateTime
+indexes:
+  ignore_pattern_unique:
+    fields: pattern
+    unique: true

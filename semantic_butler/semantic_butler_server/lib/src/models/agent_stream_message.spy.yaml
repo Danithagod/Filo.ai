@@ -1,0 +1,7 @@
+class: AgentStreamMessage
+fields:
+  type: String        # 'thinking', 'text', 'tool_start', 'tool_result', 'error', 'complete'
+  content: String?    # Text content or status message
+  tool: String?       # Tool name (for tool_start)
+  result: String?     # JSON result (for tool_result)
+  tokenCount: int?    # Running token count

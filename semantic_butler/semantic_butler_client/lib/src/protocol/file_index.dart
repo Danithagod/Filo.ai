@@ -22,7 +22,13 @@ abstract class FileIndex implements _i1.SerializableModel {
     required this.fileSizeBytes,
     this.mimeType,
     this.contentPreview,
+    this.summary,
     this.tagsJson,
+    this.documentCategory,
+    this.fileCreatedAt,
+    this.fileModifiedAt,
+    this.wordCount,
+    required this.isTextContent,
     required this.status,
     this.errorMessage,
     this.embeddingModel,
@@ -37,7 +43,13 @@ abstract class FileIndex implements _i1.SerializableModel {
     required int fileSizeBytes,
     String? mimeType,
     String? contentPreview,
+    String? summary,
     String? tagsJson,
+    String? documentCategory,
+    DateTime? fileCreatedAt,
+    DateTime? fileModifiedAt,
+    int? wordCount,
+    required bool isTextContent,
     required String status,
     String? errorMessage,
     String? embeddingModel,
@@ -53,7 +65,21 @@ abstract class FileIndex implements _i1.SerializableModel {
       fileSizeBytes: jsonSerialization['fileSizeBytes'] as int,
       mimeType: jsonSerialization['mimeType'] as String?,
       contentPreview: jsonSerialization['contentPreview'] as String?,
+      summary: jsonSerialization['summary'] as String?,
       tagsJson: jsonSerialization['tagsJson'] as String?,
+      documentCategory: jsonSerialization['documentCategory'] as String?,
+      fileCreatedAt: jsonSerialization['fileCreatedAt'] == null
+          ? null
+          : _i1.DateTimeJsonExtension.fromJson(
+              jsonSerialization['fileCreatedAt'],
+            ),
+      fileModifiedAt: jsonSerialization['fileModifiedAt'] == null
+          ? null
+          : _i1.DateTimeJsonExtension.fromJson(
+              jsonSerialization['fileModifiedAt'],
+            ),
+      wordCount: jsonSerialization['wordCount'] as int?,
+      isTextContent: jsonSerialization['isTextContent'] as bool,
       status: jsonSerialization['status'] as String,
       errorMessage: jsonSerialization['errorMessage'] as String?,
       embeddingModel: jsonSerialization['embeddingModel'] as String?,
@@ -86,8 +112,26 @@ abstract class FileIndex implements _i1.SerializableModel {
   /// Preview of the document content (first 500 chars)
   String? contentPreview;
 
+  /// AI-generated summary for embedding (200-300 words)
+  String? summary;
+
   /// JSON encoded auto-generated tags
   String? tagsJson;
+
+  /// Document category: code, document, config, data, media_metadata
+  String? documentCategory;
+
+  /// Original file creation date from file system
+  DateTime? fileCreatedAt;
+
+  /// Original file modification date from file system
+  DateTime? fileModifiedAt;
+
+  /// Number of words in the document
+  int? wordCount;
+
+  /// Whether this file contains readable text content
+  bool isTextContent;
 
   /// Status: pending, indexing, indexed, failed, skipped
   String status;
@@ -112,7 +156,13 @@ abstract class FileIndex implements _i1.SerializableModel {
     int? fileSizeBytes,
     String? mimeType,
     String? contentPreview,
+    String? summary,
     String? tagsJson,
+    String? documentCategory,
+    DateTime? fileCreatedAt,
+    DateTime? fileModifiedAt,
+    int? wordCount,
+    bool? isTextContent,
     String? status,
     String? errorMessage,
     String? embeddingModel,
@@ -129,7 +179,13 @@ abstract class FileIndex implements _i1.SerializableModel {
       'fileSizeBytes': fileSizeBytes,
       if (mimeType != null) 'mimeType': mimeType,
       if (contentPreview != null) 'contentPreview': contentPreview,
+      if (summary != null) 'summary': summary,
       if (tagsJson != null) 'tagsJson': tagsJson,
+      if (documentCategory != null) 'documentCategory': documentCategory,
+      if (fileCreatedAt != null) 'fileCreatedAt': fileCreatedAt?.toJson(),
+      if (fileModifiedAt != null) 'fileModifiedAt': fileModifiedAt?.toJson(),
+      if (wordCount != null) 'wordCount': wordCount,
+      'isTextContent': isTextContent,
       'status': status,
       if (errorMessage != null) 'errorMessage': errorMessage,
       if (embeddingModel != null) 'embeddingModel': embeddingModel,
@@ -154,7 +210,13 @@ class _FileIndexImpl extends FileIndex {
     required int fileSizeBytes,
     String? mimeType,
     String? contentPreview,
+    String? summary,
     String? tagsJson,
+    String? documentCategory,
+    DateTime? fileCreatedAt,
+    DateTime? fileModifiedAt,
+    int? wordCount,
+    required bool isTextContent,
     required String status,
     String? errorMessage,
     String? embeddingModel,
@@ -167,7 +229,13 @@ class _FileIndexImpl extends FileIndex {
          fileSizeBytes: fileSizeBytes,
          mimeType: mimeType,
          contentPreview: contentPreview,
+         summary: summary,
          tagsJson: tagsJson,
+         documentCategory: documentCategory,
+         fileCreatedAt: fileCreatedAt,
+         fileModifiedAt: fileModifiedAt,
+         wordCount: wordCount,
+         isTextContent: isTextContent,
          status: status,
          errorMessage: errorMessage,
          embeddingModel: embeddingModel,
@@ -186,7 +254,13 @@ class _FileIndexImpl extends FileIndex {
     int? fileSizeBytes,
     Object? mimeType = _Undefined,
     Object? contentPreview = _Undefined,
+    Object? summary = _Undefined,
     Object? tagsJson = _Undefined,
+    Object? documentCategory = _Undefined,
+    Object? fileCreatedAt = _Undefined,
+    Object? fileModifiedAt = _Undefined,
+    Object? wordCount = _Undefined,
+    bool? isTextContent,
     String? status,
     Object? errorMessage = _Undefined,
     Object? embeddingModel = _Undefined,
@@ -202,7 +276,19 @@ class _FileIndexImpl extends FileIndex {
       contentPreview: contentPreview is String?
           ? contentPreview
           : this.contentPreview,
+      summary: summary is String? ? summary : this.summary,
       tagsJson: tagsJson is String? ? tagsJson : this.tagsJson,
+      documentCategory: documentCategory is String?
+          ? documentCategory
+          : this.documentCategory,
+      fileCreatedAt: fileCreatedAt is DateTime?
+          ? fileCreatedAt
+          : this.fileCreatedAt,
+      fileModifiedAt: fileModifiedAt is DateTime?
+          ? fileModifiedAt
+          : this.fileModifiedAt,
+      wordCount: wordCount is int? ? wordCount : this.wordCount,
+      isTextContent: isTextContent ?? this.isTextContent,
       status: status ?? this.status,
       errorMessage: errorMessage is String? ? errorMessage : this.errorMessage,
       embeddingModel: embeddingModel is String?

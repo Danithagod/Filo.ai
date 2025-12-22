@@ -73,7 +73,7 @@ class SettingsScreen extends StatelessWidget {
               _SettingsTile(
                 icon: Icons.smart_toy_outlined,
                 title: 'Chat Model',
-                subtitle: 'gemini-2.5-flash',
+                subtitle: 'gemini-2.0-flash',
               ),
             ],
           ),
@@ -98,25 +98,6 @@ class SettingsScreen extends StatelessWidget {
               ),
             ],
           ),
-
-          const SizedBox(height: 24),
-
-          // About section
-          _SettingsSection(
-            title: 'About',
-            children: [
-              _SettingsTile(
-                icon: Icons.info_outline,
-                title: 'Version',
-                subtitle: '1.0.0',
-              ),
-              _SettingsTile(
-                icon: Icons.code_outlined,
-                title: 'Source Code',
-                subtitle: 'github.com/semantic-butler',
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -127,31 +108,32 @@ class _SettingsSection extends StatelessWidget {
   final String title;
   final List<Widget> children;
 
-  const _SettingsSection({
-    required this.title,
-    required this.children,
-  });
+  const _SettingsSection({required this.title, required this.children});
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: textTheme.titleSmall?.copyWith(
-            color: colorScheme.primary,
-            fontWeight: FontWeight.w500,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Text(
+            title,
+            style: TextStyle(
+              color: colorScheme.primary,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.1,
+            ),
           ),
         ),
-        const SizedBox(height: 12),
         Card(
-          child: Column(
-            children: children,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: colorScheme.outlineVariant),
           ),
+          child: Column(children: children),
         ),
       ],
     );
@@ -175,23 +157,14 @@ class _SettingsTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
     return ListTile(
-      leading: Icon(icon, color: colorScheme.onSurfaceVariant),
-      title: Text(title, style: textTheme.bodyLarge),
+      leading: Icon(icon),
+      title: Text(title),
       subtitle: Text(
         subtitle,
-        style: textTheme.bodyMedium?.copyWith(
-          color: colorScheme.onSurfaceVariant,
-        ),
+        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
       ),
-      trailing:
-          trailing ??
-          (onTap != null
-              ? Icon(Icons.chevron_right, color: colorScheme.onSurfaceVariant)
-              : null),
+      trailing: trailing,
       onTap: onTap,
     );
   }

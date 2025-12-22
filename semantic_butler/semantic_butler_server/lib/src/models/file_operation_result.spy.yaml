@@ -1,0 +1,7 @@
+class: FileOperationResult
+fields:
+  success: bool
+  newPath: String?
+  error: String?
+  command: String
+  output: String?

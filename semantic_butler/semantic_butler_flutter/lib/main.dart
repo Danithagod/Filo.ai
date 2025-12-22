@@ -7,7 +7,9 @@ import 'package:serverpod_flutter/serverpod_flutter.dart';
 import 'config/app_config.dart';
 import 'screens/home_screen.dart';
 import 'theme/app_theme.dart';
+import 'widgets/window_title_bar.dart';
 import 'utils/app_logger.dart';
+import 'package:bitsdojo_window/bitsdojo_window.dart';
 
 /// Global Serverpod client
 late final Client client;
@@ -38,9 +40,12 @@ void main() async {
 
       AppLogger.info('Connecting to server: $serverUrl', tag: 'Init');
 
-      // Initialize Serverpod client
+      // Initialize Serverpod client with longer timeout for AI API calls
       client = Client(
         serverUrl,
+        connectionTimeout: const Duration(
+          seconds: 120,
+        ), // AI calls can take 30-60s
         onFailedCall: (context, error, stackTrace) {
           AppLogger.error(
             'API call failed: ${context.methodName}',
@@ -64,6 +69,16 @@ void main() async {
           child: SemanticButlerApp(),
         ),
       );
+
+      doWhenWindowReady(() {
+        final win = appWindow;
+        const initialSize = Size(1280, 720);
+        win.minSize = const Size(800, 600);
+        win.size = initialSize;
+        win.alignment = Alignment.center;
+        win.title = "Semantic Butler";
+        win.show();
+      });
     },
     (error, stackTrace) {
       AppLogger.error(
@@ -90,6 +105,20 @@ class SemanticButlerApp extends StatelessWidget {
       themeMode: ThemeMode.dark,
       home: const HomeScreen(),
       navigatorObservers: [_LoggingNavigatorObserver()],
+      builder: (context, child) {
+        return Scaffold(
+          body: WindowBorder(
+            color: Colors.transparent,
+            width: 0,
+            child: Column(
+              children: [
+                const WindowTitleBar(),
+                Expanded(child: child ?? const SizedBox()),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

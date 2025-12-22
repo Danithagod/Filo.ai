@@ -11,6 +11,8 @@
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:serverpod/serverpod.dart' as _i1;
+import 'indexing_job.dart' as _i2;
+import 'package:semantic_butler_server/src/generated/protocol.dart' as _i3;
 
 /// IndexingStatus DTO - current indexing status
 abstract class IndexingStatus
@@ -23,6 +25,7 @@ abstract class IndexingStatus
     required this.activeJobs,
     required this.databaseSizeMb,
     this.lastActivity,
+    this.recentJobs,
   });
 
   factory IndexingStatus({
@@ -33,6 +36,7 @@ abstract class IndexingStatus
     required int activeJobs,
     required double databaseSizeMb,
     DateTime? lastActivity,
+    List<_i2.IndexingJob>? recentJobs,
   }) = _IndexingStatusImpl;
 
   factory IndexingStatus.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -47,6 +51,11 @@ abstract class IndexingStatus
           ? null
           : _i1.DateTimeJsonExtension.fromJson(
               jsonSerialization['lastActivity'],
+            ),
+      recentJobs: jsonSerialization['recentJobs'] == null
+          ? null
+          : _i3.Protocol().deserialize<List<_i2.IndexingJob>>(
+              jsonSerialization['recentJobs'],
             ),
     );
   }
@@ -72,6 +81,8 @@ abstract class IndexingStatus
   /// Last indexing activity timestamp
   DateTime? lastActivity;
 
+  List<_i2.IndexingJob>? recentJobs;
+
   /// Returns a shallow copy of this [IndexingStatus]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
@@ -83,6 +94,7 @@ abstract class IndexingStatus
     int? activeJobs,
     double? databaseSizeMb,
     DateTime? lastActivity,
+    List<_i2.IndexingJob>? recentJobs,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -95,6 +107,8 @@ abstract class IndexingStatus
       'activeJobs': activeJobs,
       'databaseSizeMb': databaseSizeMb,
       if (lastActivity != null) 'lastActivity': lastActivity?.toJson(),
+      if (recentJobs != null)
+        'recentJobs': recentJobs?.toJson(valueToJson: (v) => v.toJson()),
     };
   }
 
@@ -109,6 +123,10 @@ abstract class IndexingStatus
       'activeJobs': activeJobs,
       'databaseSizeMb': databaseSizeMb,
       if (lastActivity != null) 'lastActivity': lastActivity?.toJson(),
+      if (recentJobs != null)
+        'recentJobs': recentJobs?.toJson(
+          valueToJson: (v) => v.toJsonForProtocol(),
+        ),
     };
   }
 
@@ -129,6 +147,7 @@ class _IndexingStatusImpl extends IndexingStatus {
     required int activeJobs,
     required double databaseSizeMb,
     DateTime? lastActivity,
+    List<_i2.IndexingJob>? recentJobs,
   }) : super._(
          totalDocuments: totalDocuments,
          indexedDocuments: indexedDocuments,
@@ -137,6 +156,7 @@ class _IndexingStatusImpl extends IndexingStatus {
          activeJobs: activeJobs,
          databaseSizeMb: databaseSizeMb,
          lastActivity: lastActivity,
+         recentJobs: recentJobs,
        );
 
   /// Returns a shallow copy of this [IndexingStatus]
@@ -151,6 +171,7 @@ class _IndexingStatusImpl extends IndexingStatus {
     int? activeJobs,
     double? databaseSizeMb,
     Object? lastActivity = _Undefined,
+    Object? recentJobs = _Undefined,
   }) {
     return IndexingStatus(
       totalDocuments: totalDocuments ?? this.totalDocuments,
@@ -162,6 +183,9 @@ class _IndexingStatusImpl extends IndexingStatus {
       lastActivity: lastActivity is DateTime?
           ? lastActivity
           : this.lastActivity,
+      recentJobs: recentJobs is List<_i2.IndexingJob>?
+          ? recentJobs
+          : this.recentJobs?.map((e0) => e0.copyWith()).toList(),
     );
   }
 }
