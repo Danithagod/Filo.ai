@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../main.dart';
 import '../widgets/search_result_card.dart';
+import '../widgets/app_background.dart';
 
 /// Search results screen
 class SearchResultsScreen extends ConsumerStatefulWidget {
@@ -59,9 +60,11 @@ class _SearchResultsScreenState extends ConsumerState<SearchResultsScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: _buildContent(),
+      body: AppBackground(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: _buildContent(),
+        ),
       ),
     );
   }

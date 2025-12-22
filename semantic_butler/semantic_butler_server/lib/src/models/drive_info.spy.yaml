@@ -1,0 +1,7 @@
+class: DriveInfo
+fields:
+  name: String
+  path: String
+  totalSpace: int?
+  availableSpace: int?
+  driveType: String?

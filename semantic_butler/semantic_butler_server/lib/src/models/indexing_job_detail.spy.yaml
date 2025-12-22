@@ -1,0 +1,23 @@
+### IndexingJobDetail model - tracks individual file progress within an indexing job
+class: IndexingJobDetail
+table: indexing_job_detail
+fields:
+  ### Reference to the parent indexing job
+  jobId: int
+  ### File path being processed
+  filePath: String
+  ### Current status: discovered, extracting, summarizing, embedding, complete, skipped, failed
+  status: String
+  ### When processing started for this file
+  startedAt: DateTime?
+  ### When processing completed for this file
+  completedAt: DateTime?
+  ### Error message if processing failed
+  errorMessage: String?
+indexes:
+  idx_job_detail_job:
+    fields: jobId
+  idx_job_detail_status:
+    fields: status
+  idx_job_detail_path:
+    fields: filePath

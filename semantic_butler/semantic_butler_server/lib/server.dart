@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:dotenv/dotenv.dart';
 import 'package:serverpod/serverpod.dart';
 
 import 'src/generated/endpoints.dart';
@@ -7,8 +8,24 @@ import 'src/generated/protocol.dart';
 import 'src/web/routes/app_config_route.dart';
 import 'src/web/routes/root.dart';
 
+/// Environment variables loaded from .env file
+late DotEnv env;
+
+/// Get environment variable (checks .env first, then system env)
+String getEnv(String key, {String defaultValue = ''}) {
+  return env.getOrElse(key, () => Platform.environment[key] ?? defaultValue);
+}
+
 /// The starting point of the Serverpod server.
 void run(List<String> args) async {
+  // Load environment variables from .env file
+  env = DotEnv(includePlatformEnvironment: true)..load();
+
+  // Log API key status (using stdout for startup messages)
+  stdout.writeln(
+    'Loaded environment: OPENROUTER_API_KEY is ${getEnv('OPENROUTER_API_KEY').isNotEmpty ? 'SET' : 'NOT SET'}',
+  );
+
   // Initialize Serverpod and connect it with your generated code.
   final pod = Serverpod(args, Protocol(), Endpoints());
 

@@ -3,6 +3,15 @@ import 'package:path/path.dart' as path;
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
 
+/// Document categories for classification
+enum DocumentCategory {
+  code,
+  document,
+  config,
+  data,
+  mediaMetadata,
+}
+
 /// Service for extracting text content from various file formats
 class FileExtractionService {
   /// Supported file extensions for text extraction
@@ -22,10 +31,109 @@ class FileExtractionService {
   /// PDF extensions (require special handling)
   static const Set<String> pdfExtensions = {'.pdf'};
 
+  /// Code file extensions
+  static const Set<String> _codeExtensions = {
+    '.dart',
+    '.js',
+    '.ts',
+    '.jsx',
+    '.tsx',
+    '.py',
+    '.java',
+    '.kt',
+    '.swift',
+    '.go',
+    '.rs',
+    '.cpp',
+    '.c',
+    '.h',
+    '.hpp',
+    '.cs',
+    '.rb',
+    '.php',
+    '.sql',
+    '.sh',
+    '.bash',
+    '.zsh',
+    '.ps1',
+    '.bat',
+    '.cmd',
+    '.html',
+    '.css',
+    '.scss',
+    '.sass',
+    '.less',
+  };
+
+  /// Config file extensions
+  static const Set<String> _configExtensions = {
+    '.env',
+    '.gitignore',
+    '.dockerignore',
+    '.editorconfig',
+    '.toml',
+    '.ini',
+    '.cfg',
+    '.conf',
+    '.yaml',
+    '.yml',
+  };
+
+  /// Data file extensions
+  static const Set<String> _dataExtensions = {
+    '.json',
+    '.xml',
+    '.csv',
+  };
+
   /// Check if a file extension is supported
   static bool isSupported(String filePath) {
     final ext = path.extension(filePath).toLowerCase();
     return supportedExtensions.contains(ext) || pdfExtensions.contains(ext);
+  }
+
+  /// Get document category based on file extension
+  static DocumentCategory getDocumentCategory(String filePath) {
+    final ext = path.extension(filePath).toLowerCase();
+
+    if (_codeExtensions.contains(ext)) {
+      return DocumentCategory.code;
+    } else if (_configExtensions.contains(ext)) {
+      return DocumentCategory.config;
+    } else if (_dataExtensions.contains(ext)) {
+      return DocumentCategory.data;
+    } else if (pdfExtensions.contains(ext) ||
+        ext == '.txt' ||
+        ext == '.md' ||
+        ext == '.markdown' ||
+        ext == '.rtf') {
+      return DocumentCategory.document;
+    }
+
+    return DocumentCategory.document; // Default
+  }
+
+  /// Get category string from DocumentCategory enum
+  static String getCategoryString(DocumentCategory category) {
+    switch (category) {
+      case DocumentCategory.code:
+        return 'code';
+      case DocumentCategory.document:
+        return 'document';
+      case DocumentCategory.config:
+        return 'config';
+      case DocumentCategory.data:
+        return 'data';
+      case DocumentCategory.mediaMetadata:
+        return 'media_metadata';
+    }
+  }
+
+  /// Count words in text
+  static int countWords(String text) {
+    if (text.trim().isEmpty) return 0;
+    // Split on whitespace and filter out empty strings
+    return text.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).length;
   }
 
   /// Get MIME type for a file
@@ -60,6 +168,17 @@ class FileExtractionService {
     return mimeTypes[ext] ?? 'application/octet-stream';
   }
 
+  /// Get file metadata (creation and modification dates)
+  Future<FileMetadata> getFileMetadata(String filePath) async {
+    final file = File(filePath);
+    final stat = await file.stat();
+
+    return FileMetadata(
+      createdAt: stat.changed, // Windows: creation time, Unix: last change
+      modifiedAt: stat.modified,
+    );
+  }
+
   /// Extract text content from a file
   Future<ExtractionResult> extractText(String filePath) async {
     final file = File(filePath);
@@ -71,6 +190,10 @@ class FileExtractionService {
     final ext = path.extension(filePath).toLowerCase();
     final fileName = path.basename(filePath);
     final fileSize = await file.length();
+
+    // Get file metadata
+    final metadata = await getFileMetadata(filePath);
+    final category = getDocumentCategory(filePath);
 
     String content;
 
@@ -88,6 +211,9 @@ class FileExtractionService {
     // Generate preview (first 500 characters)
     final preview = content.length > 500 ? content.substring(0, 500) : content;
 
+    // Count words
+    final wordCount = countWords(content);
+
     return ExtractionResult(
       content: content,
       preview: preview,
@@ -95,6 +221,10 @@ class FileExtractionService {
       fileName: fileName,
       fileSizeBytes: fileSize,
       mimeType: getMimeType(filePath),
+      documentCategory: getCategoryString(category),
+      wordCount: wordCount,
+      fileCreatedAt: metadata.createdAt,
+      fileModifiedAt: metadata.modifiedAt,
     );
   }
 
@@ -171,10 +301,74 @@ class FileExtractionService {
     return digest.toString();
   }
 
+  /// Check if a path matches any of the ignore patterns
+  static bool matchesIgnorePattern(
+    String filePath,
+    List<String> ignorePatterns,
+  ) {
+    if (ignorePatterns.isEmpty) return false;
+
+    for (final pattern in ignorePatterns) {
+      // Simple glob matching
+      if (_matchesGlob(filePath, pattern)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Simple glob pattern matching
+  static bool _matchesGlob(String filePath, String pattern) {
+    // Convert glob pattern to regex
+    // * matches any characters except path separator
+    // ** matches any characters including path separator
+    // ? matches single character
+
+    // Normalize path separators
+    final normalizedPath = filePath.replaceAll('\\', '/').toLowerCase();
+    final normalizedPattern = pattern.replaceAll('\\', '/').toLowerCase();
+
+    // Handle directory patterns (ending with /)
+    if (normalizedPattern.endsWith('/')) {
+      final dirPattern = normalizedPattern.substring(
+        0,
+        normalizedPattern.length - 1,
+      );
+      return normalizedPath.contains('/$dirPattern/') ||
+          normalizedPath.startsWith('$dirPattern/');
+    }
+
+    // Handle ** for directory matching
+    if (normalizedPattern.contains('**')) {
+      final parts = normalizedPattern.split('**');
+      if (parts.length == 2) {
+        final prefix = parts[0];
+        final suffix = parts[1];
+        if (prefix.isEmpty) {
+          return normalizedPath.endsWith(suffix) ||
+              normalizedPath.contains(suffix);
+        }
+        return normalizedPath.startsWith(prefix) &&
+            normalizedPath.endsWith(suffix);
+      }
+    }
+
+    // Handle simple wildcard patterns like *.log
+    if (normalizedPattern.startsWith('*.')) {
+      final ext = normalizedPattern.substring(1); // .log
+      return normalizedPath.endsWith(ext);
+    }
+
+    // Handle exact path match
+    return normalizedPath.endsWith(normalizedPattern) ||
+        normalizedPath.contains('/$normalizedPattern');
+  }
+
   /// Scan a directory for indexable files
   Future<List<String>> scanDirectory(
     String directoryPath, {
     bool recursive = true,
+    List<String> ignorePatterns = const [],
   }) async {
     final directory = Directory(directoryPath);
 
@@ -186,6 +380,11 @@ class FileExtractionService {
 
     await for (final entity in directory.list(recursive: recursive)) {
       if (entity is File) {
+        // Check ignore patterns first
+        if (matchesIgnorePattern(entity.path, ignorePatterns)) {
+          continue;
+        }
+
         if (isSupported(entity.path)) {
           files.add(entity.path);
         }
@@ -196,6 +395,17 @@ class FileExtractionService {
   }
 }
 
+/// File metadata from filesystem
+class FileMetadata {
+  final DateTime createdAt;
+  final DateTime modifiedAt;
+
+  FileMetadata({
+    required this.createdAt,
+    required this.modifiedAt,
+  });
+}
+
 /// Result of text extraction from a file
 class ExtractionResult {
   final String content;
@@ -204,6 +414,10 @@ class ExtractionResult {
   final String fileName;
   final int fileSizeBytes;
   final String mimeType;
+  final String documentCategory;
+  final int wordCount;
+  final DateTime fileCreatedAt;
+  final DateTime fileModifiedAt;
 
   ExtractionResult({
     required this.content,
@@ -212,6 +426,10 @@ class ExtractionResult {
     required this.fileName,
     required this.fileSizeBytes,
     required this.mimeType,
+    required this.documentCategory,
+    required this.wordCount,
+    required this.fileCreatedAt,
+    required this.fileModifiedAt,
   });
 }
 

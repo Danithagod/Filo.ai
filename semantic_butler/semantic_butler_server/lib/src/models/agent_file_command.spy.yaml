@@ -1,0 +1,27 @@
+### AgentFileCommand model - tracks file operations for audit/undo
+class: AgentFileCommand
+table: agent_file_command
+fields:
+  ### Operation type: rename, move, delete, create
+  operation: String
+  ### Source file or folder path
+  sourcePath: String
+  ### Destination path (for move/rename operations)
+  destinationPath: String?
+  ### New name (for rename operations)
+  newName: String?
+  ### When the operation was executed
+  executedAt: DateTime
+  ### Whether the operation succeeded
+  success: bool
+  ### Error message if operation failed
+  errorMessage: String?
+  ### Whether this operation can be undone
+  reversible: bool
+  ### Whether this was undone
+  wasUndone: bool
+indexes:
+  idx_file_command_operation:
+    fields: operation
+  idx_file_command_executed:
+    fields: executedAt

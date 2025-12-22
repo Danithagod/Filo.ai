@@ -1,0 +1,12 @@
+### WatchedFolder - Tracks folders being watched for automatic re-indexing
+class: WatchedFolder
+table: watched_folders
+fields:
+  ### The absolute path to the watched folder
+  path: String
+  ### Whether smart indexing is currently enabled for this folder
+  isEnabled: bool
+  ### Timestamp of the last detected file event
+  lastEventAt: DateTime?
+  ### Number of files currently being monitored
+  filesWatched: int?

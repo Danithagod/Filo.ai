@@ -3,10 +3,12 @@ import 'dart:convert';
 import 'dart:async';
 
 import 'package:serverpod/serverpod.dart';
+import '../../server.dart' show getEnv;
 import '../generated/protocol.dart';
 import '../services/openrouter_client.dart';
 import '../services/ai_service.dart';
 import '../services/file_extraction_service.dart';
+import '../services/file_watcher_service.dart';
 import '../config/ai_models.dart';
 
 /// Main endpoint for Semantic Desktop Butler
@@ -19,20 +21,24 @@ class ButlerEndpoint extends Endpoint {
   AIService? _aiService;
   final FileExtractionService _extractionService = FileExtractionService();
 
-  /// Get OpenRouter API key from environment
-  String get _openRouterApiKey =>
-      Platform.environment['OPENROUTER_API_KEY'] ?? '';
+  /// File watcher instances per-session (for smart indexing)
+  static final Map<String, FileWatcherService> _fileWatchers = {};
+
+  /// Get OpenRouter API key from environment (.env file or system env)
+  String get _openRouterApiKey => getEnv('OPENROUTER_API_KEY');
 
   /// Get OpenRouter client (lazily initialized)
   OpenRouterClient get openRouterClient {
     _openRouterClient ??= OpenRouterClient(
       apiKey: _openRouterApiKey,
-      siteUrl:
-          Platform.environment['OPENROUTER_SITE_URL'] ??
-          'https://semantic-butler.app',
-      siteName:
-          Platform.environment['OPENROUTER_SITE_NAME'] ??
-          'Semantic Desktop Butler',
+      siteUrl: getEnv(
+        'OPENROUTER_SITE_URL',
+        defaultValue: 'https://semantic-butler.app',
+      ),
+      siteName: getEnv(
+        'OPENROUTER_SITE_NAME',
+        defaultValue: 'Semantic Desktop Butler',
+      ),
     );
     return _openRouterClient!;
   }
@@ -100,7 +106,8 @@ class ButlerEndpoint extends Endpoint {
       try {
         // Use vector cosine similarity operator (<=>)
         // 1 - (a <=> b) gives cosine similarity
-        final query = '''
+        final query =
+            '''
           SELECT
             "fileIndexId",
             1 - (embedding <=> '$queryEmbeddingJson'::vector) as similarity
@@ -110,7 +117,7 @@ class ButlerEndpoint extends Endpoint {
           LIMIT $limit
         ''';
 
-        final rows = await session.db.query(query);
+        final rows = await session.db.unsafeQuery(query);
 
         // 3. Map results to FileIndex objects
         for (final row in rows) {
@@ -124,7 +131,10 @@ class ButlerEndpoint extends Endpoint {
         }
       } catch (e) {
         // Fallback to Dart-based search if pgvector fails (e.g. extension not installed)
-        session.log('pgvector search failed, falling back to Dart implementation: $e', level: LogLevel.warning);
+        session.log(
+          'pgvector search failed, falling back to Dart implementation: $e',
+          level: LogLevel.warning,
+        );
 
         // Original implementation as fallback
         final allDocs = await FileIndex.db.find(
@@ -217,11 +227,39 @@ class ButlerEndpoint extends Endpoint {
 
     final insertedJob = await IndexingJob.db.insertRow(session, job);
 
-    // Start indexing in background
-    // Note: In production, use Serverpod Future Calls for proper async handling
-    unawaited(_processIndexingJob(session, insertedJob));
+    // Start indexing in background with a new session
+    // The original session will close when the request completes,
+    // so we need to create a child session for the background work
+    unawaited(_processIndexingJobSafe(session.serverpod, insertedJob.id!));
 
     return insertedJob;
+  }
+
+  /// Safe wrapper for background indexing job that creates its own session
+  Future<void> _processIndexingJobSafe(Serverpod serverpod, int jobId) async {
+    // Create a new internal session for background processing
+    // This ensures the session stays open even after the HTTP request completes
+    final session = await serverpod.createSession();
+
+    try {
+      // Fetch the job from database
+      final job = await IndexingJob.db.findById(session, jobId);
+      if (job == null) {
+        session.log('Indexing job $jobId not found', level: LogLevel.error);
+        return;
+      }
+
+      await _processIndexingJob(session, job);
+    } catch (e, stackTrace) {
+      session.log(
+        'Background indexing job $jobId failed unexpectedly: $e',
+        level: LogLevel.error,
+        stackTrace: stackTrace,
+      );
+    } finally {
+      // Always close the session when done
+      await session.close();
+    }
   }
 
   /// Process an indexing job (background task)
@@ -232,38 +270,96 @@ class ButlerEndpoint extends Endpoint {
       job.startedAt = DateTime.now();
       await IndexingJob.db.updateRow(session, job);
 
-      // Scan directory for files
-      final files = await _extractionService.scanDirectory(job.folderPath);
+      // Fetch ignore patterns from database
+      List<String> ignorePatterns;
+      try {
+        ignorePatterns = await getIgnorePatternStrings(session);
+        session.log(
+          'Loaded ${ignorePatterns.length} ignore patterns',
+          level: LogLevel.debug,
+        );
+      } catch (e) {
+        session.log(
+          'Failed to load ignore patterns, continuing without: $e',
+          level: LogLevel.warning,
+        );
+        ignorePatterns = [];
+      }
+
+      // Scan directory for files (applying ignore patterns)
+      List<String> files;
+      try {
+        files = await _extractionService
+            .scanDirectory(job.folderPath, ignorePatterns: ignorePatterns)
+            .timeout(const Duration(minutes: 5));
+      } catch (e) {
+        session.log('Failed to scan directory: $e', level: LogLevel.error);
+        job.status = 'failed';
+        job.errorMessage = 'Failed to scan directory: $e';
+        job.completedAt = DateTime.now();
+        await IndexingJob.db.updateRow(session, job);
+        return;
+      }
+
       job.totalFiles = files.length;
       await IndexingJob.db.updateRow(session, job);
 
-      // Process files in batches
-      const batchSize = 10;
+      // Process files in batches with smaller batch size for stability
+      const batchSize = 5; // Reduced from 10 for more stability
       for (var i = 0; i < files.length; i += batchSize) {
-        final batch = files.sublist(
-          i,
-          i + batchSize > files.length ? files.length : i + batchSize,
-        );
+        try {
+          final batch = files.sublist(
+            i,
+            i + batchSize > files.length ? files.length : i + batchSize,
+          );
 
-        final results = await _processBatch(session, batch);
+          final results = await _processBatch(
+            session,
+            batch,
+          ).timeout(const Duration(minutes: 10));
 
-        job.processedFiles += results.indexedCount;
-        job.failedFiles += results.failedCount;
-        job.skippedFiles += results.skippedCount;
+          job.processedFiles += results.indexedCount;
+          job.failedFiles += results.failedCount;
+          job.skippedFiles += results.skippedCount;
 
-        // Update progress
-        await IndexingJob.db.updateRow(session, job);
+          // Update progress
+          await IndexingJob.db.updateRow(session, job);
+
+          // Small delay between batches to avoid overwhelming the API
+          await Future.delayed(const Duration(milliseconds: 500));
+        } catch (e) {
+          session.log('Batch processing failed: $e', level: LogLevel.warning);
+          job.failedFiles += batchSize;
+          await IndexingJob.db.updateRow(session, job);
+          // Continue with next batch instead of failing entire job
+        }
       }
 
       // Mark job as completed
       job.status = 'completed';
       job.completedAt = DateTime.now();
       await IndexingJob.db.updateRow(session, job);
-    } catch (e) {
-      job.status = 'failed';
-      job.errorMessage = e.toString();
-      job.completedAt = DateTime.now();
-      await IndexingJob.db.updateRow(session, job);
+    } catch (e, stackTrace) {
+      session.log(
+        'Indexing job failed: $e',
+        level: LogLevel.error,
+        stackTrace: stackTrace,
+      );
+
+      // Try to update job status, but don't fail if this also fails
+      try {
+        job.status = 'failed';
+        job.errorMessage = e.toString().length > 500
+            ? '${e.toString().substring(0, 500)}...'
+            : e.toString();
+        job.completedAt = DateTime.now();
+        await IndexingJob.db.updateRow(session, job);
+      } catch (updateError) {
+        session.log(
+          'Failed to update job status: $updateError',
+          level: LogLevel.error,
+        );
+      }
     }
   }
 
@@ -293,12 +389,19 @@ class ButlerEndpoint extends Endpoint {
         );
 
         // Skip if content unchanged
-        if (existing != null && existing.contentHash == extraction.contentHash) {
+        if (existing != null &&
+            existing.contentHash == extraction.contentHash) {
           skipped++;
           continue;
         }
 
-        itemsToProcess.add(_BatchItem(path: path, extraction: extraction, existingIndex: existing));
+        itemsToProcess.add(
+          _BatchItem(
+            path: path,
+            extraction: extraction,
+            existingIndex: existing,
+          ),
+        );
       } catch (e) {
         failed++;
         session.log('Failed to extract $path: $e', level: LogLevel.warning);
@@ -310,24 +413,52 @@ class ButlerEndpoint extends Endpoint {
       return _BatchResult(indexed, failed, skipped);
     }
 
-    // 2. Generate embeddings in batch (optimization)
+    // 2. Generate summaries for large documents in parallel
+    final summaryFutures = itemsToProcess.map((item) async {
+      try {
+        if (item.extraction.wordCount > 500) {
+          return await _retry(
+            () => aiService.summarize(
+              item.extraction.content,
+              maxWords: 250,
+              focusArea: 'key topics and main ideas',
+            ),
+            maxAttempts: 2,
+          );
+        } else {
+          return item.extraction.content;
+        }
+      } catch (e) {
+        session.log(
+          'Summary generation failed for ${item.path}, using preview: $e',
+          level: LogLevel.warning,
+        );
+        return item.extraction.preview;
+      }
+    });
+
+    final summaries = await Future.wait(summaryFutures);
+
+    // 3. Generate embeddings from summaries (not full content)
     List<List<double>> embeddings;
     try {
       embeddings = await _retry(
-        () => aiService.generateEmbeddings(
-          itemsToProcess.map((item) => item.extraction.content).toList(),
-        ),
+        () => aiService.generateEmbeddings(summaries),
         maxAttempts: 3,
       );
     } catch (e) {
-      session.log('Failed to generate embeddings for batch: $e', level: LogLevel.error);
+      session.log(
+        'Failed to generate embeddings for batch: $e',
+        level: LogLevel.error,
+      );
       return _BatchResult(indexed, failed + itemsToProcess.length, skipped);
     }
 
-    // 3. Process each file with its embedding
-    for (var i = 0; i < itemsToProcess.length; i++) {
+    // 4. Process each file with its embedding in parallel (generating tags)
+    final processingFutures = List.generate(itemsToProcess.length, (i) async {
       final item = itemsToProcess[i];
       final embedding = embeddings[i];
+      final summary = summaries[i];
 
       try {
         // Generate tags
@@ -348,10 +479,16 @@ class ButlerEndpoint extends Endpoint {
           fileSizeBytes: item.extraction.fileSizeBytes,
           mimeType: item.extraction.mimeType,
           contentPreview: item.extraction.preview,
+          summary: item.extraction.wordCount > 500 ? summary : null,
           tagsJson: tags.toJson(),
           status: 'indexed',
           embeddingModel: AIModels.embeddingDefault,
           indexedAt: DateTime.now(),
+          isTextContent: true,
+          documentCategory: item.extraction.documentCategory,
+          wordCount: item.extraction.wordCount,
+          fileCreatedAt: item.extraction.fileCreatedAt,
+          fileModifiedAt: item.extraction.fileModifiedAt,
         );
 
         FileIndex savedIndex;
@@ -364,7 +501,27 @@ class ButlerEndpoint extends Endpoint {
             where: (t) => t.fileIndexId.equals(item.existingIndex!.id!),
           );
         } else {
-          savedIndex = await FileIndex.db.insertRow(session, fileIndex);
+          // Try insert, fall back to update if duplicate key
+          try {
+            savedIndex = await FileIndex.db.insertRow(session, fileIndex);
+          } catch (e) {
+            // Likely duplicate key - find existing and update instead
+            final existing = await FileIndex.db.findFirstRow(
+              session,
+              where: (t) => t.path.equals(item.path),
+            );
+            if (existing != null) {
+              fileIndex.id = existing.id;
+              savedIndex = await FileIndex.db.updateRow(session, fileIndex);
+              // Delete old embeddings
+              await DocumentEmbedding.db.deleteWhere(
+                session,
+                where: (t) => t.fileIndexId.equals(existing.id!),
+              );
+            } else {
+              rethrow; // Not a duplicate key issue
+            }
+          }
         }
 
         // Store embedding
@@ -379,20 +536,33 @@ class ButlerEndpoint extends Endpoint {
           ),
         );
 
-        // Update vector column directly
+        // Update vector column directly (optional - Dart fallback works without it)
         try {
-          await session.db.query(
+          await session.db.unsafeQuery(
             'UPDATE document_embedding SET embedding = \'${jsonEncode(embedding)}\'::vector WHERE id = ${embeddingRecord.id}',
           );
         } catch (e) {
-          session.log('Failed to update vector column: $e', level: LogLevel.error);
+          // pgvector extension not installed - this is OK, Dart fallback works
+          // Only log once per session to avoid log spam
         }
 
-        indexed++;
+        return true; // Success
       } catch (e) {
-        failed++;
-        session.log('Failed to index ${item.path}: $e', level: LogLevel.warning);
+        session.log(
+          'Failed to index ${item.path}: $e',
+          level: LogLevel.warning,
+        );
         await _recordIndexingError(session, item.path, 'Indexing failed: $e');
+        return false; // Failure
+      }
+    });
+
+    final results = await Future.wait(processingFutures);
+    for (final success in results) {
+      if (success) {
+        indexed++;
+      } else {
+        failed++;
       }
     }
 
@@ -428,11 +598,15 @@ class ButlerEndpoint extends Endpoint {
             indexedAt: DateTime.now(),
             embeddingModel: AIModels.embeddingDefault,
             tagsJson: null,
+            isTextContent: false,
           ),
         );
       }
     } catch (e) {
-      session.log('Failed to record indexing error for $path: $e', level: LogLevel.error);
+      session.log(
+        'Failed to record indexing error for $path: $e',
+        level: LogLevel.error,
+      );
     }
   }
 
@@ -486,6 +660,14 @@ class ButlerEndpoint extends Endpoint {
       orderDescending: true,
     );
 
+    // Get recent jobs history
+    final recentJobs = await IndexingJob.db.find(
+      session,
+      orderBy: (t) => t.startedAt,
+      orderDescending: true,
+      limit: 10,
+    );
+
     return IndexingStatus(
       totalDocuments: totalDocs,
       indexedDocuments: indexedDocs,
@@ -494,6 +676,7 @@ class ButlerEndpoint extends Endpoint {
       activeJobs: activeJobs,
       databaseSizeMb: await _estimateDatabaseSize(session),
       lastActivity: lastIndexed?.indexedAt,
+      recentJobs: recentJobs,
     );
   }
 
@@ -540,6 +723,174 @@ class ButlerEndpoint extends Endpoint {
     await DocumentEmbedding.db.deleteWhere(session, where: (t) => t.id > 0);
     await FileIndex.db.deleteWhere(session, where: (t) => t.id > 0);
     await IndexingJob.db.deleteWhere(session, where: (t) => t.id > 0);
+  }
+
+  // ==========================================================================
+  // SMART INDEXING (File Watching)
+  // ==========================================================================
+
+  /// Get or create a file watcher service for this session
+  FileWatcherService _getFileWatcher(Session session) {
+    final sessionId = session.sessionId.toString();
+    if (!_fileWatchers.containsKey(sessionId)) {
+      _fileWatchers[sessionId] = FileWatcherService(
+        session,
+        onFilesChanged: (paths) async {
+          // Re-index changed files
+          session.log(
+            'Smart indexing: Re-indexing ${paths.length} changed files',
+            level: LogLevel.info,
+          );
+          await _processBatch(session, paths);
+        },
+      );
+    }
+    return _fileWatchers[sessionId]!;
+  }
+
+  /// Enable smart indexing for a folder (starts file watching)
+  Future<WatchedFolder> enableSmartIndexing(
+    Session session,
+    String folderPath,
+  ) async {
+    final watcher = _getFileWatcher(session);
+    return await watcher.startWatching(folderPath);
+  }
+
+  /// Disable smart indexing for a folder (stops file watching)
+  Future<void> disableSmartIndexing(
+    Session session,
+    String folderPath,
+  ) async {
+    final watcher = _getFileWatcher(session);
+    await watcher.stopWatching(folderPath);
+  }
+
+  /// Get all watched folders
+  Future<List<WatchedFolder>> getWatchedFolders(Session session) async {
+    return await WatchedFolder.db.find(session);
+  }
+
+  /// Toggle smart indexing for a folder
+  Future<WatchedFolder?> toggleSmartIndexing(
+    Session session,
+    String folderPath,
+  ) async {
+    final existing = await WatchedFolder.db.findFirstRow(
+      session,
+      where: (t) => t.path.equals(folderPath),
+    );
+
+    if (existing != null && existing.isEnabled) {
+      await disableSmartIndexing(session, folderPath);
+      existing.isEnabled = false;
+      await WatchedFolder.db.updateRow(session, existing);
+      return existing;
+    } else {
+      return await enableSmartIndexing(session, folderPath);
+    }
+  }
+
+  // ==========================================================================
+  // IGNORE PATTERNS
+  // ==========================================================================
+
+  /// Add an ignore pattern
+  /// [pattern] - Glob pattern like "*.log", "node_modules/**"
+  /// [patternType] - Type: "file", "directory", or "both"
+  Future<IgnorePattern> addIgnorePattern(
+    Session session,
+    String pattern, {
+    String patternType = 'both',
+    String? description,
+  }) async {
+    final ignorePattern = IgnorePattern(
+      pattern: pattern,
+      patternType: patternType,
+      description: description,
+      createdAt: DateTime.now(),
+    );
+    return await IgnorePattern.db.insertRow(session, ignorePattern);
+  }
+
+  /// Remove an ignore pattern by ID
+  Future<int> removeIgnorePattern(Session session, int patternId) async {
+    final deleted = await IgnorePattern.db.deleteWhere(
+      session,
+      where: (t) => t.id.equals(patternId),
+    );
+    return deleted.length;
+  }
+
+  /// List all ignore patterns
+  Future<List<IgnorePattern>> listIgnorePatterns(Session session) async {
+    return await IgnorePattern.db.find(
+      session,
+      orderBy: (t) => t.createdAt,
+      orderDescending: true,
+    );
+  }
+
+  /// Get ignore patterns as list of strings for filtering
+  /// Used by the indexing process to filter out ignored files
+  Future<List<String>> getIgnorePatternStrings(Session session) async {
+    final patterns = await IgnorePattern.db.find(session);
+    return patterns.map((p) => p.pattern).toList();
+  }
+
+  // ==========================================================================
+  // FILE REMOVAL
+  // ==========================================================================
+
+  /// Remove a file from the index by path or ID
+  /// Returns true if the file was removed, false if not found
+  Future<bool> removeFromIndex(
+    Session session, {
+    String? path,
+    int? id,
+  }) async {
+    if (path == null && id == null) {
+      throw ArgumentError('Either path or id must be provided');
+    }
+
+    FileIndex? fileIndex;
+    if (id != null) {
+      fileIndex = await FileIndex.db.findById(session, id);
+    } else if (path != null) {
+      fileIndex = await FileIndex.db.findFirstRow(
+        session,
+        where: (t) => t.path.equals(path),
+      );
+    }
+
+    if (fileIndex == null) {
+      return false;
+    }
+
+    // Delete associated embeddings first
+    await DocumentEmbedding.db.deleteWhere(
+      session,
+      where: (t) => t.fileIndexId.equals(fileIndex!.id!),
+    );
+
+    // Delete the file index
+    await FileIndex.db.deleteRow(session, fileIndex);
+
+    return true;
+  }
+
+  /// Remove multiple files from the index by paths
+  Future<int> removeMultipleFromIndex(
+    Session session,
+    List<String> paths,
+  ) async {
+    int removed = 0;
+    for (final path in paths) {
+      if (await removeFromIndex(session, path: path)) {
+        removed++;
+      }
+    }
+    return removed;
   }
 
   // ==========================================================================

@@ -31,13 +31,15 @@ class AppTheme {
         ),
       ),
 
-      // Cards - Material 3 style
+      // Cards - Material 3 outlined style
       cardTheme: CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: colorScheme.outlineVariant),
         ),
-        color: colorScheme.surfaceContainerHighest,
+        color: colorScheme.surface,
+        margin: EdgeInsets.zero,
       ),
 
       // Navigation Rail
@@ -177,12 +179,15 @@ class AppTheme {
         centerTitle: false,
       ),
 
+      // Cards - Material 3 outlined style
       cardTheme: CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: colorScheme.outlineVariant),
         ),
-        color: colorScheme.surfaceContainerHighest,
+        color: colorScheme.surface,
+        margin: EdgeInsets.zero,
       ),
 
       navigationRailTheme: NavigationRailThemeData(
