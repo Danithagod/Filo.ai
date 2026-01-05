@@ -855,6 +855,12 @@ When responding:
     // Get source document info
     final sourceDoc = await FileIndex.db.findById(session, documentId);
 
+    // Parse embedding from JSON
+    final vectorQuery =
+        (jsonDecode(embedding.embeddingJson) as List<dynamic>)
+            .map((e) => (e as num).toDouble())
+            .toList();
+
     // Search using the document's embedding as query
     // This finds semantically similar documents
     final butlerEndpoint = ButlerEndpoint();
@@ -862,6 +868,7 @@ When responding:
       session,
       sourceDoc?.contentPreview ?? '',
       limit: limit + 1, // +1 because it might include itself
+      vectorQuery: vectorQuery,
     );
 
     // Filter out the source document

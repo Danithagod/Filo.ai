@@ -63,12 +63,13 @@ class ButlerEndpoint extends Endpoint {
     String query, {
     int limit = 10,
     double threshold = 0.3,
+    List<double>? vectorQuery,
   }) async {
     final stopwatch = Stopwatch()..start();
 
     try {
       // 0. Handle empty query: Return recently indexed documents
-      if (query.trim().isEmpty) {
+      if (vectorQuery == null && query.trim().isEmpty) {
         final recentDocs = await FileIndex.db.find(
           session,
           where: (t) => t.status.equals('indexed'),
@@ -97,7 +98,8 @@ class ButlerEndpoint extends Endpoint {
       }
 
       // 1. Generate embedding for the query using OpenRouter
-      final queryEmbedding = await aiService.generateEmbedding(query);
+      final queryEmbedding =
+          vectorQuery ?? await aiService.generateEmbedding(query);
 
       // 2. Perform vector search using pgvector
       final queryEmbeddingJson = jsonEncode(queryEmbedding);
