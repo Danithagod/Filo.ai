@@ -23,18 +23,20 @@ import 'package:semantic_butler_client/src/protocol/indexing_status.dart'
 import 'package:semantic_butler_client/src/protocol/database_stats.dart' as _i9;
 import 'package:semantic_butler_client/src/protocol/search_history.dart'
     as _i10;
-import 'package:semantic_butler_client/src/protocol/watched_folder.dart'
+import 'package:semantic_butler_client/src/protocol/indexing_progress.dart'
     as _i11;
-import 'package:semantic_butler_client/src/protocol/ignore_pattern.dart'
+import 'package:semantic_butler_client/src/protocol/watched_folder.dart'
     as _i12;
-import 'package:semantic_butler_client/src/protocol/file_system_entry.dart'
+import 'package:semantic_butler_client/src/protocol/ignore_pattern.dart'
     as _i13;
-import 'package:semantic_butler_client/src/protocol/drive_info.dart' as _i14;
+import 'package:semantic_butler_client/src/protocol/file_system_entry.dart'
+    as _i14;
+import 'package:semantic_butler_client/src/protocol/drive_info.dart' as _i15;
 import 'package:semantic_butler_client/src/protocol/file_operation_result.dart'
-    as _i15;
-import 'package:semantic_butler_client/src/protocol/greetings/greeting.dart'
     as _i16;
-import 'protocol.dart' as _i17;
+import 'package:semantic_butler_client/src/protocol/greetings/greeting.dart'
+    as _i17;
+import 'protocol.dart' as _i18;
 
 /// Agent endpoint for natural language interactions
 ///
@@ -172,9 +174,24 @@ class EndpointButler extends _i1.EndpointRef {
     {},
   );
 
+  /// Stream real-time indexing progress for a specific job
+  ///
+  /// Yields [IndexingProgress] updates every 500ms while the job is running.
+  /// Automatically completes when the job finishes or fails.
+  _i2.Stream<_i11.IndexingProgress> streamIndexingProgress(int jobId) =>
+      caller.callStreamingServerEndpoint<
+        _i2.Stream<_i11.IndexingProgress>,
+        _i11.IndexingProgress
+      >(
+        'butler',
+        'streamIndexingProgress',
+        {'jobId': jobId},
+        {},
+      );
+
   /// Enable smart indexing for a folder (starts file watching)
-  _i2.Future<_i11.WatchedFolder> enableSmartIndexing(String folderPath) =>
-      caller.callServerEndpoint<_i11.WatchedFolder>(
+  _i2.Future<_i12.WatchedFolder> enableSmartIndexing(String folderPath) =>
+      caller.callServerEndpoint<_i12.WatchedFolder>(
         'butler',
         'enableSmartIndexing',
         {'folderPath': folderPath},
@@ -189,16 +206,16 @@ class EndpointButler extends _i1.EndpointRef {
       );
 
   /// Get all watched folders
-  _i2.Future<List<_i11.WatchedFolder>> getWatchedFolders() =>
-      caller.callServerEndpoint<List<_i11.WatchedFolder>>(
+  _i2.Future<List<_i12.WatchedFolder>> getWatchedFolders() =>
+      caller.callServerEndpoint<List<_i12.WatchedFolder>>(
         'butler',
         'getWatchedFolders',
         {},
       );
 
   /// Toggle smart indexing for a folder
-  _i2.Future<_i11.WatchedFolder?> toggleSmartIndexing(String folderPath) =>
-      caller.callServerEndpoint<_i11.WatchedFolder?>(
+  _i2.Future<_i12.WatchedFolder?> toggleSmartIndexing(String folderPath) =>
+      caller.callServerEndpoint<_i12.WatchedFolder?>(
         'butler',
         'toggleSmartIndexing',
         {'folderPath': folderPath},
@@ -207,11 +224,11 @@ class EndpointButler extends _i1.EndpointRef {
   /// Add an ignore pattern
   /// [pattern] - Glob pattern like "*.log", "node_modules/**"
   /// [patternType] - Type: "file", "directory", or "both"
-  _i2.Future<_i12.IgnorePattern> addIgnorePattern(
+  _i2.Future<_i13.IgnorePattern> addIgnorePattern(
     String pattern, {
     required String patternType,
     String? description,
-  }) => caller.callServerEndpoint<_i12.IgnorePattern>(
+  }) => caller.callServerEndpoint<_i13.IgnorePattern>(
     'butler',
     'addIgnorePattern',
     {
@@ -230,8 +247,8 @@ class EndpointButler extends _i1.EndpointRef {
       );
 
   /// List all ignore patterns
-  _i2.Future<List<_i12.IgnorePattern>> listIgnorePatterns() =>
-      caller.callServerEndpoint<List<_i12.IgnorePattern>>(
+  _i2.Future<List<_i13.IgnorePattern>> listIgnorePatterns() =>
+      caller.callServerEndpoint<List<_i13.IgnorePattern>>(
         'butler',
         'listIgnorePatterns',
         {},
@@ -278,27 +295,27 @@ class EndpointFileSystem extends _i1.EndpointRef {
   String get name => 'fileSystem';
 
   /// List contents of a directory
-  _i2.Future<List<_i13.FileSystemEntry>> listDirectory(String path) =>
-      caller.callServerEndpoint<List<_i13.FileSystemEntry>>(
+  _i2.Future<List<_i14.FileSystemEntry>> listDirectory(String path) =>
+      caller.callServerEndpoint<List<_i14.FileSystemEntry>>(
         'fileSystem',
         'listDirectory',
         {'path': path},
       );
 
   /// Get available drives on the system
-  _i2.Future<List<_i14.DriveInfo>> getDrives() =>
-      caller.callServerEndpoint<List<_i14.DriveInfo>>(
+  _i2.Future<List<_i15.DriveInfo>> getDrives() =>
+      caller.callServerEndpoint<List<_i15.DriveInfo>>(
         'fileSystem',
         'getDrives',
         {},
       );
 
   /// Rename a file or folder
-  _i2.Future<_i15.FileOperationResult> rename(
+  _i2.Future<_i16.FileOperationResult> rename(
     String path,
     String newName,
     bool isDirectory,
-  ) => caller.callServerEndpoint<_i15.FileOperationResult>(
+  ) => caller.callServerEndpoint<_i16.FileOperationResult>(
     'fileSystem',
     'rename',
     {
@@ -309,10 +326,10 @@ class EndpointFileSystem extends _i1.EndpointRef {
   );
 
   /// Move a file or folder
-  _i2.Future<_i15.FileOperationResult> move(
+  _i2.Future<_i16.FileOperationResult> move(
     String sourcePath,
     String destFolder,
-  ) => caller.callServerEndpoint<_i15.FileOperationResult>(
+  ) => caller.callServerEndpoint<_i16.FileOperationResult>(
     'fileSystem',
     'move',
     {
@@ -322,16 +339,16 @@ class EndpointFileSystem extends _i1.EndpointRef {
   );
 
   /// Delete a file or folder
-  _i2.Future<_i15.FileOperationResult> delete(String path) =>
-      caller.callServerEndpoint<_i15.FileOperationResult>(
+  _i2.Future<_i16.FileOperationResult> delete(String path) =>
+      caller.callServerEndpoint<_i16.FileOperationResult>(
         'fileSystem',
         'delete',
         {'path': path},
       );
 
   /// Create a new folder
-  _i2.Future<_i15.FileOperationResult> createFolder(String path) =>
-      caller.callServerEndpoint<_i15.FileOperationResult>(
+  _i2.Future<_i16.FileOperationResult> createFolder(String path) =>
+      caller.callServerEndpoint<_i16.FileOperationResult>(
         'fileSystem',
         'createFolder',
         {'path': path},
@@ -348,8 +365,8 @@ class EndpointGreeting extends _i1.EndpointRef {
   String get name => 'greeting';
 
   /// Returns a personalized greeting message: "Hello {name}".
-  _i2.Future<_i16.Greeting> hello(String name) =>
-      caller.callServerEndpoint<_i16.Greeting>(
+  _i2.Future<_i17.Greeting> hello(String name) =>
+      caller.callServerEndpoint<_i17.Greeting>(
         'greeting',
         'hello',
         {'name': name},
@@ -376,7 +393,7 @@ class Client extends _i1.ServerpodClientShared {
     bool? disconnectStreamsOnLostInternetConnection,
   }) : super(
          host,
-         _i17.Protocol(),
+         _i18.Protocol(),
          securityContext: securityContext,
          streamingConnectionTimeout: streamingConnectionTimeout,
          connectionTimeout: connectionTimeout,

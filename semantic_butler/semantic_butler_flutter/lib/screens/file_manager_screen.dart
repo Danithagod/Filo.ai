@@ -278,6 +278,11 @@ class _FileManagerScreenState extends ConsumerState<FileManagerScreen> {
                   border: InputBorder.none,
                   hintStyle: TextStyle(color: colorScheme.onSurfaceVariant),
                 ),
+                keyboardType: TextInputType.text,
+                enableInteractiveSelection: true,
+                autocorrect: false,
+                enableSuggestions: true,
+                textInputAction: TextInputAction.search,
               ),
             ),
           ] else ...[
@@ -714,6 +719,11 @@ class _FileManagerScreenState extends ConsumerState<FileManagerScreen> {
             labelText: 'New name',
             border: OutlineInputBorder(),
           ),
+          keyboardType: TextInputType.text,
+          enableInteractiveSelection: true,
+          autocorrect: false,
+          enableSuggestions: false,
+          textInputAction: TextInputAction.done,
         ),
         actions: [
           TextButton(

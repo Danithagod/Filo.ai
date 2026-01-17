@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math' as math;
 
 import 'package:serverpod/serverpod.dart';
 import '../generated/protocol.dart';
@@ -7,7 +6,10 @@ import '../services/openrouter_client.dart';
 import '../services/ai_service.dart';
 import '../services/file_operations_service.dart';
 import '../services/terminal_service.dart';
+import '../services/auth_service.dart';
+import '../services/rate_limit_service.dart';
 import '../config/ai_models.dart';
+import '../utils/error_sanitizer.dart';
 import 'butler_endpoint.dart';
 import '../../server.dart' show getEnv;
 
@@ -25,12 +27,50 @@ class AgentEndpoint extends Endpoint {
   AIService? _aiService;
   final FileOperationsService _fileOps = FileOperationsService();
   final TerminalService _terminal = TerminalService();
+  final RateLimitService _rateLimiter = RateLimitService.instance;
+
+  /// Maximum message length (prevent abuse)
+  static const int maxMessageLength = 10000;
+
+  /// Maximum streaming buffer size (prevent memory exhaustion)
+  static const int maxBufferSize = 100 * 1024; // 100KB
+
+  /// Maximum time for a single streaming iteration (5 minutes)
+  static const Duration maxIterationTimeout = Duration(minutes: 5);
+
+  /// Maximum time for tool execution (2 minutes)
+  static const Duration maxToolTimeout = Duration(minutes: 2);
+
+  /// Maximum total stream duration (15 minutes for complex multi-tool tasks)
+  static const Duration maxTotalStreamTimeout = Duration(minutes: 15);
+
+  /// Track all client instances for cleanup
+  static final List<OpenRouterClient> _allClients = [];
 
   OpenRouterClient get client {
-    _client ??= OpenRouterClient(
-      apiKey: getEnv('OPENROUTER_API_KEY'),
-    );
+    if (_client == null) {
+      _client = OpenRouterClient(
+        apiKey: getEnv('OPENROUTER_API_KEY'),
+      );
+      // Track for cleanup
+      _allClients.add(_client!);
+    }
     return _client!;
+  }
+
+  /// Dispose the HTTP client when this endpoint is no longer needed
+  void disposeClient() {
+    _client?.dispose();
+    _client = null;
+    _aiService = null;
+  }
+
+  /// Dispose all resources (call on server shutdown)
+  static void disposeAll() {
+    for (final client in _allClients) {
+      client.dispose();
+    }
+    _allClients.clear();
   }
 
   AIService get aiService {
@@ -97,9 +137,17 @@ You have access to the following tools:
 16. **run_command** - Execute a shell command (read-only commands only)
     Parameters: command (string), working_directory (string, optional)
 
+**Safe Operations:**
+17. **batch_operations** - Execute multiple file operations (rename, move, copy, delete, create) in one go.
+    Parameters: operations (list of objects with type, source_path, and optional new_name/destination_path)
+
 When responding:
 - Be helpful and conversational
-- Use terminal commands to explore the file system when needed
+- USE MEMORY: If you renamed or moved a file, remember its NEW path for future tools in the same conversation.
+- RETRY STRATEGY: If an operation fails because a path is not found, do NOT just ask the user. Try to:
+  1. Use `list_directory` on the parent folder to see if you have the right name.
+  2. Use `find_files` or `grep_search` to locate the missing item.
+  3. Suggest the most likely correct path to the user.
 - Explain what you're doing when using tools
 - For file operations, ALWAYS confirm before destructive operations
 - If an operation fails, explain why and suggest alternatives
@@ -411,6 +459,57 @@ When responding:
         },
       ),
     ),
+    Tool(
+      function: ToolFunction(
+        name: 'batch_operations',
+        description: 'Perform multiple file operations in a single batch',
+        parameters: {
+          'type': 'object',
+          'properties': {
+            'operations': {
+              'type': 'array',
+              'items': {
+                'type': 'object',
+                'properties': {
+                  'type': {
+                    'type': 'string',
+                    'enum': [
+                      'rename',
+                      'move',
+                      'copy',
+                      'delete',
+                      'create',
+                      'trash',
+                    ],
+                    'description': 'Type of operation',
+                  },
+                  'source_path': {
+                    'type': 'string',
+                    'description': 'Current path of the file/folder',
+                  },
+                  'new_name': {
+                    'type': 'string',
+                    'description': 'New name (for rename only)',
+                  },
+                  'destination_path': {
+                    'type': 'string',
+                    'description':
+                        'Destination folder path (for move/copy only)',
+                  },
+                },
+                'required': ['type', 'source_path'],
+              },
+            },
+            'rollback_on_error': {
+              'type': 'boolean',
+              'description':
+                  'Whether to undo successful steps if one fails (default: true)',
+            },
+          },
+          'required': ['operations'],
+        },
+      ),
+    ),
   ];
 
   /// Streaming chat with real-time updates
@@ -427,6 +526,22 @@ When responding:
     String message, {
     List<AgentMessage>? conversationHistory,
   }) async* {
+    // Security: Validate authentication
+    AuthService.requireAuth(session);
+
+    // Security: Rate limiting
+    final clientId = session.sessionId.toString();
+    _rateLimiter.requireRateLimit(clientId, 'agentChat');
+
+    // Security: Input validation
+    if (message.length > maxMessageLength) {
+      yield AgentStreamMessage(
+        type: 'error',
+        content: 'Message too long (max $maxMessageLength characters)',
+      );
+      return;
+    }
+
     // Emit thinking status
     yield AgentStreamMessage(
       type: 'thinking',
@@ -449,112 +564,209 @@ When responding:
 
     int totalTokens = 0;
     int iteration = 0;
-    const maxIterations = 10;
+    const maxIterations = 15;
 
-    while (iteration < maxIterations) {
-      iteration++;
+    // Track total stream time for timeout protection
+    final streamStartTime = DateTime.now();
 
-      // Stream the response
-      final contentBuffer = StringBuffer();
-      List<ToolCall>? pendingToolCalls;
-      String? finishReason;
+    try {
+      while (iteration < maxIterations) {
+        iteration++;
 
-      try {
-        await for (final chunk in client.streamChatCompletion(
-          model: AIModels.agentDefault,
-          messages: messages,
-          tools: tools,
-          temperature: 0.7,
-          maxTokens: 4096,
-        )) {
-          if (chunk.isDone) {
-            finishReason = 'stop';
-            break;
-          }
-
-          // Emit text tokens
-          if (chunk.deltaContent != null && chunk.deltaContent!.isNotEmpty) {
-            contentBuffer.write(chunk.deltaContent);
-            totalTokens++;
-            yield AgentStreamMessage(
-              type: 'text',
-              content: chunk.deltaContent,
-              tokenCount: totalTokens,
-            );
-          }
-
-          // Check for tool calls
-          if (chunk.hasToolCalls) {
-            pendingToolCalls = chunk.toolCalls;
-          }
-
-          // Check finish reason
-          if (chunk.finishReason != null) {
-            finishReason = chunk.finishReason;
-          }
+        // Check total stream timeout
+        if (DateTime.now().difference(streamStartTime) >
+            maxTotalStreamTimeout) {
+          yield AgentStreamMessage(
+            type: 'error',
+            content:
+                'Stream timed out after ${maxTotalStreamTimeout.inMinutes} minutes',
+          );
+          return;
         }
-      } catch (e) {
-        yield AgentStreamMessage(
-          type: 'error',
-          content: 'Streaming failed: $e',
-        );
-        return;
-      }
 
-      final content = contentBuffer.toString();
+        // Stream the response
+        final contentBuffer = StringBuffer();
+        final Map<int, String> toolCallIds = {};
+        final Map<int, String> toolNames = {};
+        final Map<int, StringBuffer> toolArguments = {};
+        String? finishReason;
 
-      // If we have tool calls, execute them
-      if (finishReason == 'tool_calls' &&
-          pendingToolCalls != null &&
-          pendingToolCalls.isNotEmpty) {
-        // Add assistant message with tool calls
-        messages.add(
-          ChatMessage.assistant(content, toolCalls: pendingToolCalls),
-        );
+        try {
+          await for (final chunk
+              in client
+                  .streamChatCompletion(
+                    model: AIModels.agentDefault,
+                    messages: messages,
+                    tools: tools,
+                    temperature: 0.7,
+                    maxTokens: 4096,
+                  )
+                  .timeout(
+                    maxIterationTimeout,
+                    onTimeout: (sink) {
+                      // Timeout handler: close the stream
+                      sink.close();
+                    },
+                  )) {
+            if (chunk.isDone) {
+              finishReason = 'stop';
+              break;
+            }
 
-        // Execute each tool
-        for (final toolCall in pendingToolCalls) {
-          // Emit tool start
+            // Emit text tokens
+            if (chunk.deltaContent != null && chunk.deltaContent!.isNotEmpty) {
+              final delta = chunk.deltaContent!;
+
+              // Memory safety: Check buffer size to prevent unbounded growth
+              if (contentBuffer.length + delta.length > maxBufferSize) {
+                yield AgentStreamMessage(
+                  type: 'error',
+                  content:
+                      'Response too large, streaming terminated for safety.',
+                );
+                return;
+              }
+
+              contentBuffer.write(delta);
+              totalTokens++;
+              yield AgentStreamMessage(
+                type: 'text',
+                content: delta,
+                tokenCount: totalTokens,
+              );
+            }
+
+            // Accumulate tool calls
+            if (chunk.hasToolCalls) {
+              for (final tc in chunk.toolCalls!) {
+                final index = tc.index ?? 0;
+                if (tc.id != null) {
+                  toolCallIds[index] = tc.id!;
+                }
+                if (tc.function?.name != null) {
+                  toolNames[index] = tc.function!.name!;
+                }
+                if (tc.function?.arguments != null) {
+                  toolArguments
+                      .putIfAbsent(index, () => StringBuffer())
+                      .write(tc.function!.arguments);
+                }
+              }
+            }
+
+            // Check finish reason
+            if (chunk.finishReason != null) {
+              finishReason = chunk.finishReason;
+            }
+          }
+        } catch (e) {
           yield AgentStreamMessage(
-            type: 'tool_start',
-            tool: toolCall.function.name,
-            content: 'Executing ${toolCall.function.name}...',
+            type: 'error',
+            content: 'Streaming failed: ${ErrorSanitizer.sanitizeException(e)}',
           );
+          return;
+        }
 
-          // Execute the tool
-          final result = await _executeTool(session, toolCall);
+        final content = contentBuffer.toString();
 
-          // Emit tool result
-          yield AgentStreamMessage(
-            type: 'tool_result',
-            tool: toolCall.function.name,
-            result: jsonEncode(result),
-          );
-
-          // Add tool result message
-          messages.add(
-            ChatMessage.tool(
-              jsonEncode(result),
-              toolCall.id,
+        // Reconstruct ToolCalls from accumulated deltas
+        final List<ToolCall> pendingToolCalls = [];
+        for (final index in toolNames.keys) {
+          pendingToolCalls.add(
+            ToolCall(
+              id: toolCallIds[index] ?? 'call_$index',
+              index: index,
+              function: ToolCallFunction(
+                name: toolNames[index],
+                arguments: toolArguments[index]?.toString() ?? '{}',
+              ),
             ),
           );
         }
 
-        // Continue the loop to get the next response
-        yield AgentStreamMessage(
-          type: 'thinking',
-          content: 'Processing tool results...',
-        );
-        continue;
-      }
+        // If we have tool calls, execute them
+        if ((finishReason == 'tool_calls' || pendingToolCalls.isNotEmpty) &&
+            pendingToolCalls.isNotEmpty) {
+          // Add assistant message with tool calls to history
+          messages.add(
+            ChatMessage.assistant(content, toolCalls: pendingToolCalls),
+          );
 
-      // No more tool calls, we're done
-      yield AgentStreamMessage(
-        type: 'complete',
-        content: content,
-        tokenCount: totalTokens,
+          // Execute each tool with timeout protection
+          for (final toolCall in pendingToolCalls) {
+            final toolName = toolCall.function?.name ?? 'unknown';
+
+            // Emit tool start
+            yield AgentStreamMessage(
+              type: 'tool_start',
+              tool: toolName,
+              content: 'Executing $toolName...',
+            );
+
+            // Execute the tool with timeout
+            Map<String, dynamic> result;
+            try {
+              result = await _executeTool(session, toolCall).timeout(
+                maxToolTimeout,
+                onTimeout: () {
+                  return {
+                    'error':
+                        'Tool execution timed out after ${maxToolTimeout.inSeconds} seconds',
+                    'tool': toolName,
+                    'timedOut': true,
+                  };
+                },
+              );
+            } catch (e) {
+              result = {
+                'error': ErrorSanitizer.sanitizeException(e),
+                'tool': toolName,
+              };
+            }
+
+            // Emit tool result
+            yield AgentStreamMessage(
+              type: 'tool_result',
+              tool: toolName,
+              result: jsonEncode(result),
+            );
+
+            // Add tool result message to history
+            messages.add(
+              ChatMessage.tool(
+                jsonEncode(result),
+                toolCall.id ?? 'unknown',
+              ),
+            );
+          }
+
+          // Continue the loop to get the next response
+          yield AgentStreamMessage(
+            type: 'thinking',
+            content: 'Processing tool results...',
+          );
+          continue;
+        }
+
+        // No more tool calls, we're done
+        yield AgentStreamMessage(
+          type: 'complete',
+          content: content,
+          tokenCount: totalTokens,
+        );
+        return;
+      }
+    } catch (e, stack) {
+      session.log(
+        'Agent stream error: $e',
+        level: LogLevel.error,
+        stackTrace: stack,
       );
-      return;
+      yield AgentStreamMessage(
+        type: 'error',
+        content:
+            'I encountered an internal error: ${ErrorSanitizer.sanitizeException(e)}',
+      );
     }
 
     // Max iterations reached
@@ -573,13 +785,30 @@ When responding:
     String message, {
     List<AgentMessage>? conversationHistory,
   }) async {
+    // Security: Validate authentication
+    AuthService.requireAuth(session);
+
+    // Security: Rate limiting
+    final clientId = session.sessionId.toString();
+    _rateLimiter.requireRateLimit(clientId, 'agentChat');
+
+    // Security: Input validation
+    if (message.length > maxMessageLength) {
+      throw ArgumentError(
+        'Message too long (max $maxMessageLength characters)',
+      );
+    }
+
     final messages = <ChatMessage>[
       ChatMessage.system(systemPrompt),
     ];
 
-    // Add conversation history if provided
+    // Add conversation history if provided (limit to 20 messages)
     if (conversationHistory != null) {
-      for (final msg in conversationHistory) {
+      final history = conversationHistory.length > 20
+          ? conversationHistory.sublist(conversationHistory.length - 20)
+          : conversationHistory;
+      for (final msg in history) {
         messages.add(
           ChatMessage(
             role: msg.role,
@@ -600,7 +829,7 @@ When responding:
     );
 
     // Handle tool calls in a loop (agent may need multiple steps)
-    int maxIterations = 10;
+    int maxIterations = 15;
     int iteration = 0;
 
     while (response.hasToolCalls && iteration < maxIterations) {
@@ -617,7 +846,7 @@ When responding:
         messages.add(
           ChatMessage.tool(
             jsonEncode(result),
-            toolCall.id,
+            toolCall.id ?? 'unknown',
           ),
         );
       }
@@ -645,9 +874,22 @@ When responding:
     Session session,
     ToolCall toolCall,
   ) async {
-    final args = toolCall.function.parsedArguments;
+    final function = toolCall.function;
+    if (function == null) {
+      return {'error': 'Missing function definition in tool call'};
+    }
+    Map<String, dynamic> args;
+    try {
+      args = function.parsedArguments;
+    } catch (e) {
+      // Sanitize error message - don't expose raw_arguments or internal details
+      return {
+        'error': 'Failed to parse tool arguments',
+        'hint': 'Please ensure arguments are valid JSON',
+      };
+    }
 
-    switch (toolCall.function.name) {
+    switch (function.name) {
       case 'search_files':
         return await _toolSearchFiles(
           session,
@@ -745,11 +987,18 @@ When responding:
           args['path'] as String,
         );
 
+      case 'batch_operations':
+        return await _toolBatchOperations(
+          session,
+          args['operations'] as List,
+          rollbackOnError: args['rollback_on_error'] as bool? ?? true,
+        );
+
       case 'get_drives':
         return await _toolGetDrives();
 
       default:
-        return {'error': 'Unknown tool: ${toolCall.function.name}'};
+        return {'error': 'Unknown tool: ${function.name}'};
     }
   }
 
@@ -880,7 +1129,9 @@ When responding:
               'relevanceScore': r.relevanceScore,
               'preview': r.contentPreview?.substring(
                 0,
-                math.min(100, r.contentPreview?.length ?? 0),
+                (r.contentPreview?.length ?? 0) > 100
+                    ? 100
+                    : (r.contentPreview?.length ?? 0),
               ),
             },
           )
@@ -1270,6 +1521,94 @@ When responding:
       return {
         'success': false,
         'error': 'Failed to list drives: $e',
+      };
+    }
+  }
+
+  /// Tool: Execute multiple operations in a batch
+  Future<Map<String, dynamic>> _toolBatchOperations(
+    Session session,
+    List operations, {
+    bool rollbackOnError = true,
+  }) async {
+    try {
+      final requests = <FileOperationRequest>[];
+      for (final op in operations) {
+        if (op is! Map) continue;
+
+        FileOperationType type;
+        switch (op['type']) {
+          case 'rename':
+            type = FileOperationType.rename;
+            break;
+          case 'move':
+            type = FileOperationType.move;
+            break;
+          case 'copy':
+            type = FileOperationType.copy;
+            break;
+          case 'delete':
+            type = FileOperationType.delete;
+            break;
+          case 'create':
+            type = FileOperationType.create;
+            break;
+          case 'trash':
+            type = FileOperationType.trash;
+            break;
+          default:
+            continue;
+        }
+
+        if (type == FileOperationType.rename && op['new_name'] == null) {
+          continue;
+        }
+        if ((type == FileOperationType.move ||
+                type == FileOperationType.copy) &&
+            op['destination_path'] == null) {
+          continue;
+        }
+
+        requests.add(
+          FileOperationRequest(
+            type: type,
+            sourcePath: op['source_path'] as String? ?? '',
+            newName: op['new_name'] as String?,
+            destinationPath: op['destination_path'] as String?,
+          ),
+        );
+      }
+
+      if (requests.isEmpty) {
+        return {
+          'success': false,
+          'error': 'No valid operations provided',
+        };
+      }
+
+      final result = await _fileOps.batchOperations(
+        requests,
+        rollbackOnError: rollbackOnError,
+      );
+
+      return {
+        'success': result.success,
+        'error': result.error,
+        'results': result.results
+            .map(
+              (r) => {
+                'success': r.success,
+                'command': r.command,
+                'error': r.error,
+                'newPath': r.newPath,
+              },
+            )
+            .toList(),
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'error': 'Batch execution failed: $e',
       };
     }
   }

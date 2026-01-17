@@ -9,6 +9,7 @@ butler:
   - getSearchHistory:
   - getAIUsageStats:
   - clearIndex:
+  - streamIndexingProgress:
   - enableSmartIndexing:
   - disableSmartIndexing:
   - getWatchedFolders:

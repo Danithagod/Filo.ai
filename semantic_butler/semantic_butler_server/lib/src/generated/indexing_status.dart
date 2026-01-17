@@ -26,6 +26,8 @@ abstract class IndexingStatus
     required this.databaseSizeMb,
     this.lastActivity,
     this.recentJobs,
+    this.estimatedTimeRemainingSeconds,
+    this.cacheHitRate,
   });
 
   factory IndexingStatus({
@@ -37,6 +39,8 @@ abstract class IndexingStatus
     required double databaseSizeMb,
     DateTime? lastActivity,
     List<_i2.IndexingJob>? recentJobs,
+    int? estimatedTimeRemainingSeconds,
+    double? cacheHitRate,
   }) = _IndexingStatusImpl;
 
   factory IndexingStatus.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -57,6 +61,9 @@ abstract class IndexingStatus
           : _i3.Protocol().deserialize<List<_i2.IndexingJob>>(
               jsonSerialization['recentJobs'],
             ),
+      estimatedTimeRemainingSeconds:
+          jsonSerialization['estimatedTimeRemainingSeconds'] as int?,
+      cacheHitRate: (jsonSerialization['cacheHitRate'] as num?)?.toDouble(),
     );
   }
 
@@ -83,6 +90,12 @@ abstract class IndexingStatus
 
   List<_i2.IndexingJob>? recentJobs;
 
+  /// Estimated time remaining for current indexing in seconds
+  int? estimatedTimeRemainingSeconds;
+
+  /// Cache hit rate (0.0 to 1.0)
+  double? cacheHitRate;
+
   /// Returns a shallow copy of this [IndexingStatus]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
@@ -95,6 +108,8 @@ abstract class IndexingStatus
     double? databaseSizeMb,
     DateTime? lastActivity,
     List<_i2.IndexingJob>? recentJobs,
+    int? estimatedTimeRemainingSeconds,
+    double? cacheHitRate,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -109,6 +124,9 @@ abstract class IndexingStatus
       if (lastActivity != null) 'lastActivity': lastActivity?.toJson(),
       if (recentJobs != null)
         'recentJobs': recentJobs?.toJson(valueToJson: (v) => v.toJson()),
+      if (estimatedTimeRemainingSeconds != null)
+        'estimatedTimeRemainingSeconds': estimatedTimeRemainingSeconds,
+      if (cacheHitRate != null) 'cacheHitRate': cacheHitRate,
     };
   }
 
@@ -127,6 +145,9 @@ abstract class IndexingStatus
         'recentJobs': recentJobs?.toJson(
           valueToJson: (v) => v.toJsonForProtocol(),
         ),
+      if (estimatedTimeRemainingSeconds != null)
+        'estimatedTimeRemainingSeconds': estimatedTimeRemainingSeconds,
+      if (cacheHitRate != null) 'cacheHitRate': cacheHitRate,
     };
   }
 
@@ -148,6 +169,8 @@ class _IndexingStatusImpl extends IndexingStatus {
     required double databaseSizeMb,
     DateTime? lastActivity,
     List<_i2.IndexingJob>? recentJobs,
+    int? estimatedTimeRemainingSeconds,
+    double? cacheHitRate,
   }) : super._(
          totalDocuments: totalDocuments,
          indexedDocuments: indexedDocuments,
@@ -157,6 +180,8 @@ class _IndexingStatusImpl extends IndexingStatus {
          databaseSizeMb: databaseSizeMb,
          lastActivity: lastActivity,
          recentJobs: recentJobs,
+         estimatedTimeRemainingSeconds: estimatedTimeRemainingSeconds,
+         cacheHitRate: cacheHitRate,
        );
 
   /// Returns a shallow copy of this [IndexingStatus]
@@ -172,6 +197,8 @@ class _IndexingStatusImpl extends IndexingStatus {
     double? databaseSizeMb,
     Object? lastActivity = _Undefined,
     Object? recentJobs = _Undefined,
+    Object? estimatedTimeRemainingSeconds = _Undefined,
+    Object? cacheHitRate = _Undefined,
   }) {
     return IndexingStatus(
       totalDocuments: totalDocuments ?? this.totalDocuments,
@@ -186,6 +213,10 @@ class _IndexingStatusImpl extends IndexingStatus {
       recentJobs: recentJobs is List<_i2.IndexingJob>?
           ? recentJobs
           : this.recentJobs?.map((e0) => e0.copyWith()).toList(),
+      estimatedTimeRemainingSeconds: estimatedTimeRemainingSeconds is int?
+          ? estimatedTimeRemainingSeconds
+          : this.estimatedTimeRemainingSeconds,
+      cacheHitRate: cacheHitRate is double? ? cacheHitRate : this.cacheHitRate,
     );
   }
 }

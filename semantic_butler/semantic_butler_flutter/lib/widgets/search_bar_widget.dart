@@ -42,6 +42,9 @@ class SearchBarWidget extends StatelessWidget {
         const SizedBox(width: 8),
       ],
       onSubmitted: onSearch,
+      keyboardType: TextInputType.text,
+      textInputAction: TextInputAction.search,
+      autoFocus: false,
     );
   }
 }

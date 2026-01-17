@@ -343,55 +343,61 @@ class ToolFunction {
 
 /// Tool call made by the model
 class ToolCall {
-  final String id;
-  final String type;
-  final ToolCallFunction function;
+  final String? id;
+  final int? index;
+  final String? type;
+  final ToolCallFunction? function;
 
   ToolCall({
-    required this.id,
+    this.id,
+    this.index,
     this.type = 'function',
-    required this.function,
+    this.function,
   });
 
   Map<String, dynamic> toJson() => {
-    'id': id,
+    if (id != null) 'id': id,
+    if (index != null) 'index': index,
     'type': type,
-    'function': function.toJson(),
+    if (function != null) 'function': function!.toJson(),
   };
 
   factory ToolCall.fromJson(Map<String, dynamic> json) {
     return ToolCall(
-      id: json['id'] as String,
+      id: json['id'] as String?,
+      index: json['index'] as int?,
       type: json['type'] as String? ?? 'function',
-      function: ToolCallFunction.fromJson(json['function']),
+      function: json['function'] != null
+          ? ToolCallFunction.fromJson(json['function'])
+          : null,
     );
   }
 }
 
 /// Function call details
 class ToolCallFunction {
-  final String name;
-  final String arguments;
+  final String? name;
+  final String? arguments;
 
   ToolCallFunction({
-    required this.name,
-    required this.arguments,
+    this.name,
+    this.arguments,
   });
 
   Map<String, dynamic> toJson() => {
-    'name': name,
-    'arguments': arguments,
+    if (name != null) 'name': name,
+    if (arguments != null) 'arguments': arguments,
   };
 
   factory ToolCallFunction.fromJson(Map<String, dynamic> json) {
     return ToolCallFunction(
-      name: json['name'] as String,
-      arguments: json['arguments'] as String,
+      name: json['name'] as String?,
+      arguments: json['arguments'] as String?,
     );
   }
 
   /// Parse arguments as JSON
-  Map<String, dynamic> get parsedArguments => jsonDecode(arguments);
+  Map<String, dynamic> get parsedArguments => jsonDecode(arguments ?? '{}');
 }
 
 /// Chat completion response

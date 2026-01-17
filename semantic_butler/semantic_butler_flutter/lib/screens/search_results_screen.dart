@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../main.dart';
 import '../widgets/search_result_card.dart';
+import '../widgets/loading_skeletons.dart';
 import '../widgets/app_background.dart';
 
 /// Search results screen
@@ -71,15 +72,23 @@ class _SearchResultsScreenState extends ConsumerState<SearchResultsScreen> {
 
   Widget _buildContent() {
     if (_isLoading) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Searching...'),
-          ],
-        ),
+      // Show skeleton loading for better UX
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Searching...',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Expanded(
+            child: SingleChildScrollView(
+              child: SearchResultsSkeletonList(itemCount: 5),
+            ),
+          ),
+        ],
       );
     }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
 import '../utils/app_logger.dart';
+import 'loading_skeletons.dart';
 
 /// Recent searches list widget with Material 3 styling
 class RecentSearches extends StatefulWidget {
@@ -83,7 +84,8 @@ class _RecentSearchesState extends State<RecentSearches> {
     final textTheme = Theme.of(context).textTheme;
 
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      // Show skeleton loading instead of spinner
+      return const RecentSearchesSkeleton(itemCount: 3);
     }
 
     if (_searches.isEmpty) {

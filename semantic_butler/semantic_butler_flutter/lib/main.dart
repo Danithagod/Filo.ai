@@ -33,9 +33,10 @@ void main() async {
 
       // Load configuration
       const serverUrlFromEnv = String.fromEnvironment('SERVER_URL');
+      AppLogger.info('Loading configuration...', tag: 'Init');
       final config = await AppConfig.loadConfig();
       final serverUrl = serverUrlFromEnv.isEmpty
-          ? config.apiUrl ?? 'http://$localhost:8080/'
+          ? config.apiUrl ?? 'http://localhost:8080/'
           : serverUrlFromEnv;
 
       AppLogger.info('Connecting to server: $serverUrl', tag: 'Init');
@@ -62,7 +63,7 @@ void main() async {
         },
       )..connectivityMonitor = FlutterConnectivityMonitor();
 
-      AppLogger.lifecycle('Client initialized');
+      AppLogger.lifecycle('Client initialized. Starting UI...');
 
       runApp(
         const ProviderScope(
@@ -70,13 +71,17 @@ void main() async {
         ),
       );
 
+      AppLogger.lifecycle('runApp called, waiting for window ready...');
+
       doWhenWindowReady(() {
+        AppLogger.lifecycle('Window ready, configuring appearance...');
         final win = appWindow;
         const initialSize = Size(1280, 720);
         win.minSize = const Size(800, 600);
         win.size = initialSize;
         win.alignment = Alignment.center;
         win.title = "Semantic Butler";
+        AppLogger.lifecycle('Showing window...');
         win.show();
       });
     },
@@ -106,16 +111,13 @@ class SemanticButlerApp extends StatelessWidget {
       home: const HomeScreen(),
       navigatorObservers: [_LoggingNavigatorObserver()],
       builder: (context, child) {
-        return Scaffold(
-          body: WindowBorder(
-            color: Colors.transparent,
-            width: 0,
-            child: Column(
-              children: [
-                const WindowTitleBar(),
-                Expanded(child: child ?? const SizedBox()),
-              ],
-            ),
+        return Material(
+          color: Theme.of(context).colorScheme.surface,
+          child: Column(
+            children: [
+              const WindowTitleBar(),
+              Expanded(child: child ?? const SizedBox()),
+            ],
           ),
         );
       },

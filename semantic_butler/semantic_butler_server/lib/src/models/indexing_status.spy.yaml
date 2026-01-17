@@ -16,3 +16,7 @@ fields:
   ### Last indexing activity timestamp
   lastActivity: DateTime?
   recentJobs: List<IndexingJob>?
+  ### Estimated time remaining for current indexing in seconds
+  estimatedTimeRemainingSeconds: int?
+  ### Cache hit rate (0.0 to 1.0)
+  cacheHitRate: double?

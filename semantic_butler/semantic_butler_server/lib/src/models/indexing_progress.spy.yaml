@@ -1,0 +1,33 @@
+### IndexingProgress model for real-time streaming updates
+
+class: IndexingProgress
+fields:
+  ### Job ID being tracked
+  jobId: int
+  
+  ### Current status (running, completed, failed)
+  status: String
+  
+  ### Total files to process
+  totalFiles: int
+  
+  ### Files processed successfully
+  processedFiles: int
+  
+  ### Files that failed processing
+  failedFiles: int
+  
+  ### Files skipped (unchanged/cached)
+  skippedFiles: int
+  
+  ### Progress percentage (0-100)
+  progressPercent: double
+  
+  ### Estimated seconds remaining
+  estimatedSecondsRemaining: int?
+  
+  ### Current file being processed (if any)
+  currentFile: String?
+  
+  ### Timestamp of this update
+  timestamp: DateTime

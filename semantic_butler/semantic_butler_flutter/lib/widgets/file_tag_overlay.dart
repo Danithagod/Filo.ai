@@ -31,10 +31,18 @@ class _FileTagOverlayState extends State<FileTagOverlay> {
   int _selectedIndex = 0;
   final ScrollController _scrollController = ScrollController();
 
+  /// FocusNode for keyboard handling - stored as instance variable for proper disposal
+  late final FocusNode _keyboardFocusNode;
+
   @override
   void initState() {
     super.initState();
+    _keyboardFocusNode = FocusNode();
     _loadDrives();
+    // Request focus after the frame is built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _keyboardFocusNode.requestFocus();
+    });
   }
 
   @override
@@ -47,6 +55,7 @@ class _FileTagOverlayState extends State<FileTagOverlay> {
 
   @override
   void dispose() {
+    _keyboardFocusNode.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -216,7 +225,7 @@ class _FileTagOverlayState extends State<FileTagOverlay> {
       left: widget.position.dx,
       bottom: widget.position.dy,
       child: KeyboardListener(
-        focusNode: FocusNode()..requestFocus(),
+        focusNode: _keyboardFocusNode,
         onKeyEvent: _handleKeyEvent,
         child: Material(
           elevation: 12,

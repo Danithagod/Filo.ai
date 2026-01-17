@@ -1,0 +1,28 @@
+### TagTaxonomy model for normalized tag storage with categories
+
+class: TagTaxonomy
+table: tag_taxonomy
+fields:
+  ### Tag category: 'topic', 'entity', 'keyword', 'technology', etc.
+  category: String
+  
+  ### The actual tag value
+  tagValue: String
+  
+  ### How many times this tag appears across documents
+  frequency: int
+  
+  ### First document that used this tag
+  firstSeenAt: DateTime
+  
+  ### Last document that used this tag
+  lastSeenAt: DateTime
+
+indexes:
+  tag_taxonomy_category_idx:
+    fields: category
+  tag_taxonomy_value_idx:
+    fields: tagValue
+  tag_taxonomy_frequency_idx:
+    fields: frequency
+    type: btree

@@ -1,7 +1,28 @@
 class: FileOperationResult
 fields:
+  ### Whether the operation succeeded
   success: bool
+  
+  ### New path after the operation (for rename/move/copy)
   newPath: String?
+  
+  ### Error message if failed
   error: String?
+  
+  ### Error type classification for better handling
+  errorType: String?
+  
+  ### What operation was attempted
   command: String
+  
+  ### Additional output (for list operations)
   output: String?
+  
+  ### Whether this was a dry-run preview
+  isDryRun: bool?
+  
+  ### For undo: the reversible operation type
+  undoOperation: String?
+  
+  ### For undo: the original path to restore to
+  undoPath: String?

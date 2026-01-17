@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
@@ -12,6 +13,7 @@ import 'search_results_screen.dart';
 import 'settings_screen.dart';
 import 'chat_screen.dart';
 import 'file_manager_screen.dart';
+import '../providers/watched_folders_provider.dart';
 
 /// Home screen with Material 3 navigation rail
 class HomeScreen extends ConsumerStatefulWidget {
@@ -474,10 +476,25 @@ class _IndexingScreenState extends State<IndexingScreen> {
   int _failedDocuments = 0;
   List<IndexingJob> _recentJobs = [];
 
+  /// Timer for polling indexing status - cancellable to prevent memory leaks
+  Timer? _pollingTimer;
+
   @override
   void initState() {
     super.initState();
     _loadIndexingStatus();
+  }
+
+  @override
+  void dispose() {
+    _stopPolling();
+    super.dispose();
+  }
+
+  /// Stop the polling timer
+  void _stopPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
   }
 
   Future<void> _loadIndexingStatus() async {
@@ -498,9 +515,9 @@ class _IndexingScreenState extends State<IndexingScreen> {
           _isIndexing = status.activeJobs > 0;
         });
 
-        // If indexing is active, poll for updates
+        // If indexing is active, start polling for updates
         if (_isIndexing) {
-          _pollIndexingStatus();
+          _startPolling();
         }
       }
     } catch (e, stackTrace) {
@@ -513,9 +530,19 @@ class _IndexingScreenState extends State<IndexingScreen> {
     }
   }
 
-  Future<void> _pollIndexingStatus() async {
-    while (_isIndexing && mounted) {
-      await Future.delayed(const Duration(seconds: 2));
+  /// Start polling for indexing status updates using a cancellable Timer
+  void _startPolling() {
+    // Cancel any existing timer first
+    _stopPolling();
+
+    // Use Timer.periodic for cancellable polling
+    _pollingTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
+      // Safety check: stop polling if widget is disposed
+      if (!mounted) {
+        _stopPolling();
+        return;
+      }
+
       try {
         final status = await client.butler.getIndexingStatus();
         if (mounted) {
@@ -527,11 +554,17 @@ class _IndexingScreenState extends State<IndexingScreen> {
             _recentJobs = status.recentJobs ?? [];
             _isIndexing = status.activeJobs > 0;
           });
+
+          // Stop polling if indexing completed
+          if (!_isIndexing) {
+            _stopPolling();
+          }
         }
       } catch (e) {
-        // Continue polling even on error
+        // Continue polling even on error, but log it
+        AppLogger.warning('Polling error: $e', tag: 'Indexing');
       }
-    }
+    });
   }
 
   Future<void> _pickFolder() async {
@@ -558,7 +591,7 @@ class _IndexingScreenState extends State<IndexingScreen> {
         AppLogger.info('startIndexing API call completed', tag: 'Indexing');
 
         // Start polling for status
-        _pollIndexingStatus();
+        _startPolling();
       } else {
         AppLogger.debug('Folder picker cancelled', tag: 'Indexing');
       }
@@ -858,44 +891,28 @@ class _SemanticSearchDelegate extends SearchDelegate<String> {
   }
 }
 
-class _IndexingJobCard extends StatefulWidget {
+class _IndexingJobCard extends ConsumerStatefulWidget {
   final IndexingJob job;
 
   const _IndexingJobCard({required this.job});
 
   @override
-  State<_IndexingJobCard> createState() => _IndexingJobCardState();
+  ConsumerState<_IndexingJobCard> createState() => _IndexingJobCardState();
 }
 
-class _IndexingJobCardState extends State<_IndexingJobCard> {
-  bool _isSmartIndexing = false;
+class _IndexingJobCardState extends ConsumerState<_IndexingJobCard> {
   bool _isToggling = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadWatchedStatus();
-  }
-
-  Future<void> _loadWatchedStatus() async {
-    try {
-      final watchedFolders = await client.butler.getWatchedFolders();
-      final isWatched = watchedFolders.any(
-        (f) => f.path == widget.job.folderPath && f.isEnabled,
-      );
-      if (mounted && isWatched != _isSmartIndexing) {
-        setState(() => _isSmartIndexing = isWatched);
-      }
-    } catch (e) {
-      // Ignore - just use default false state
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final job = widget.job;
+
+    final watchedFolders = ref.watch(watchedFoldersProvider);
+    final isSmartIndexing = watchedFolders.any(
+      (f) => f.path == job.folderPath && f.isEnabled,
+    );
 
     final isRunning = job.status == 'running';
     final isFailed = job.status == 'failed';
@@ -1032,23 +1049,23 @@ class _IndexingJobCardState extends State<_IndexingJobCard> {
             Row(
               children: [
                 Icon(
-                  _isSmartIndexing
+                  isSmartIndexing
                       ? Icons.visibility_rounded
                       : Icons.visibility_outlined,
                   size: 18,
-                  color: _isSmartIndexing
+                  color: isSmartIndexing
                       ? colorScheme.primary
                       : colorScheme.onSurfaceVariant,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    _isSmartIndexing ? 'Smart Indexing On' : 'Smart Indexing',
+                    isSmartIndexing ? 'Smart Indexing On' : 'Smart Indexing',
                     style: textTheme.bodyMedium?.copyWith(
-                      color: _isSmartIndexing
+                      color: isSmartIndexing
                           ? colorScheme.primary
                           : colorScheme.onSurfaceVariant,
-                      fontWeight: _isSmartIndexing ? FontWeight.w600 : null,
+                      fontWeight: isSmartIndexing ? FontWeight.w600 : null,
                     ),
                   ),
                 ),
@@ -1059,7 +1076,7 @@ class _IndexingJobCardState extends State<_IndexingJobCard> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : Switch.adaptive(
-                        value: _isSmartIndexing,
+                        value: isSmartIndexing,
                         onChanged: (value) =>
                             _toggleSmartIndexing(job.folderPath),
                       ),
@@ -1074,8 +1091,7 @@ class _IndexingJobCardState extends State<_IndexingJobCard> {
   Future<void> _toggleSmartIndexing(String folderPath) async {
     setState(() => _isToggling = true);
     try {
-      await client.butler.toggleSmartIndexing(folderPath);
-      setState(() => _isSmartIndexing = !_isSmartIndexing);
+      await ref.read(watchedFoldersProvider.notifier).toggle(folderPath);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

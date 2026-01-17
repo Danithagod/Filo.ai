@@ -58,7 +58,15 @@ class TerminalService {
     'curl',
     'wget',
     'powershell',
+    'pwsh',      // PowerShell Core
     'cmd /c',
+    'cmd.exe',   // Direct cmd.exe invocation
+    'cmd /k',    // cmd with keep-open flag
+    'wscript',   // Windows Script Host
+    'cscript',   // Console-based script host
+    'mshta',     // HTML Application Host (can run scripts)
+    'rundll32',  // Can execute arbitrary code
+    'regsvr32',  // Can download and execute scripts
   ];
 
   /// Check if the platform is Windows
@@ -174,6 +182,24 @@ class TerminalService {
 
   /// Validate that the command uses only allowed commands
   void _validateCommand(String command) {
+    // Check for encoded characters that could bypass validation
+    // Hex encoding (0x41), URL encoding (%41), Unicode encoding (%u0041)
+    if (RegExp(r'0x[0-9a-fA-F]{2}').hasMatch(command) ||
+        RegExp(r'%[0-9a-fA-F]{2}').hasMatch(command) ||
+        RegExp(r'%u[0-9a-fA-F]{4}').hasMatch(command)) {
+      throw TerminalSecurityException(
+        'Encoded characters not allowed in commands',
+      );
+    }
+
+    // Check for Unicode homoglyph bypasses (characters that look like ASCII but aren't)
+    // Only allow basic ASCII printable characters and common whitespace
+    if (!RegExp(r'^[\x20-\x7E\t\n\r]*$').hasMatch(command)) {
+      throw TerminalSecurityException(
+        'Command contains non-ASCII characters that may be used for bypasses',
+      );
+    }
+
     // Check for blocked patterns
     final lowerCommand = command.toLowerCase();
     for (final pattern in blockedPatterns) {
@@ -194,8 +220,12 @@ class TerminalService {
     // Remove path prefix if present (e.g., /usr/bin/ls -> ls)
     final commandName = baseCommand.split(RegExp(r'[/\\]')).last;
 
+    // Also check for extension bypass (e.g., powershell.exe, cmd.com)
+    final commandWithoutExt = commandName.replaceAll(RegExp(r'\.(exe|com|bat|cmd|ps1|vbs|js)$'), '');
+
     // Check if command is in whitelist
-    if (!allowedCommands.contains(commandName)) {
+    if (!allowedCommands.contains(commandName) &&
+        !allowedCommands.contains(commandWithoutExt)) {
       throw TerminalSecurityException(
         'Command not allowed: $commandName. '
         'Allowed commands: ${allowedCommands.join(", ")}',
@@ -271,46 +301,63 @@ class TerminalService {
   }
 
   /// Find files matching a pattern
+  ///
+  /// SECURITY: Pattern and directory are sanitized to prevent command injection.
   Future<CommandResult> findFiles(
     String pattern, {
     String? directory,
     bool recursive = true,
   }) async {
-    final searchDir = directory ?? (isWindows ? 'C:\\' : '/');
+    // Sanitize inputs to prevent command injection
+    final sanitizedPattern = _sanitizeArgument(pattern);
+    final searchDir = directory != null
+        ? _sanitizeArgument(directory)
+        : (isWindows ? 'C:\\' : '/');
 
     if (isWindows) {
       final recurseFlag = recursive ? '/S' : '';
-      return execute('where $recurseFlag /R "$searchDir" "$pattern"');
+      return execute('where $recurseFlag /R "$searchDir" "$sanitizedPattern"');
     } else {
       final depthFlag = recursive ? '' : '-maxdepth 1';
-      return execute('find "$searchDir" $depthFlag -name "$pattern"');
+      return execute('find "$searchDir" $depthFlag -name "$sanitizedPattern"');
     }
   }
 
   /// Search file contents for a pattern (grep-like)
+  ///
+  /// SECURITY: Pattern and path are sanitized to prevent command injection.
   Future<CommandResult> grepSearch(
     String pattern,
     String path, {
     bool recursive = true,
     bool ignoreCase = true,
   }) async {
+    // Sanitize inputs to prevent command injection
+    final sanitizedPattern = _sanitizeArgument(pattern);
+    final sanitizedPath = _sanitizeArgument(path);
+
     if (isWindows) {
       final recurseFlag = recursive ? '/S' : '';
       final caseFlag = ignoreCase ? '/I' : '';
-      return execute('findstr $recurseFlag $caseFlag "$pattern" "$path"');
+      return execute(
+        'findstr $recurseFlag $caseFlag "$sanitizedPattern" "$sanitizedPath"',
+      );
     } else {
       final recurseFlag = recursive ? '-r' : '';
       final caseFlag = ignoreCase ? '-i' : '';
-      return execute('grep $recurseFlag $caseFlag "$pattern" "$path"');
+      return execute(
+        'grep $recurseFlag $caseFlag "$sanitizedPattern" "$sanitizedPath"',
+      );
     }
   }
 
   /// Read file contents
   Future<CommandResult> readFile(String path) async {
+    final sanitizedPath = _sanitizeArgument(path);
     if (isWindows) {
-      return execute('type "$path"');
+      return execute('type "$sanitizedPath"');
     } else {
-      return execute('cat "$path"');
+      return execute('cat "$sanitizedPath"');
     }
   }
 
@@ -319,11 +366,60 @@ class TerminalService {
     String path, {
     bool detailed = true,
   }) async {
+    final sanitizedPath = _sanitizeArgument(path);
     if (isWindows) {
-      return execute('dir ${detailed ? '' : '/B'} "$path"');
+      return execute('dir ${detailed ? '' : '/B'} "$sanitizedPath"');
     } else {
-      return execute('ls ${detailed ? '-la' : ''} "$path"');
+      return execute('ls ${detailed ? '-la' : ''} "$sanitizedPath"');
     }
+  }
+
+  /// Sanitize a command argument to prevent injection attacks
+  ///
+  /// Removes or escapes special shell characters that could be used for injection:
+  /// - Semicolons, pipes, backticks, $(), etc.
+  /// - Null bytes
+  /// - Control characters
+  static String _sanitizeArgument(String arg) {
+    // Remove null bytes
+    var sanitized = arg.replaceAll('\x00', '');
+
+    // Remove control characters except newline and tab
+    sanitized = sanitized.replaceAll(
+      RegExp(r'[\x00-\x08\x0B\x0C\x0E-\x1F]'),
+      '',
+    );
+
+    // Remove or escape dangerous shell characters
+    // These could be used for command chaining/injection
+    const dangerousChars = [
+      ';', // Command separator
+      '|', // Pipe
+      '&', // Background/AND
+      '`', // Command substitution
+      '\$', // Variable expansion
+      '(', // Subshell
+      ')', // Subshell
+      '<', // Redirect
+      '>', // Redirect
+      '\n', // Newline (command separator)
+      '\r', // Carriage return
+    ];
+
+    for (final char in dangerousChars) {
+      sanitized = sanitized.replaceAll(char, '');
+    }
+
+    // Remove command substitution patterns
+    sanitized = sanitized.replaceAll(RegExp(r'\$\([^)]*\)'), '');
+    sanitized = sanitized.replaceAll(RegExp(r'\$\{[^}]*\}'), '');
+
+    // Limit length to prevent buffer issues
+    if (sanitized.length > 4096) {
+      sanitized = sanitized.substring(0, 4096);
+    }
+
+    return sanitized;
   }
 }
 

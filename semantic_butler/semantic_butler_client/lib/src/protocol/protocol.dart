@@ -25,21 +25,23 @@ import 'greetings/greeting.dart' as _i12;
 import 'ignore_pattern.dart' as _i13;
 import 'indexing_job.dart' as _i14;
 import 'indexing_job_detail.dart' as _i15;
-import 'indexing_status.dart' as _i16;
-import 'search_history.dart' as _i17;
-import 'search_result.dart' as _i18;
-import 'watched_folder.dart' as _i19;
-import 'package:semantic_butler_client/src/protocol/agent_message.dart' as _i20;
-import 'package:semantic_butler_client/src/protocol/search_result.dart' as _i21;
+import 'indexing_progress.dart' as _i16;
+import 'indexing_status.dart' as _i17;
+import 'search_history.dart' as _i18;
+import 'search_result.dart' as _i19;
+import 'tag_taxonomy.dart' as _i20;
+import 'watched_folder.dart' as _i21;
+import 'package:semantic_butler_client/src/protocol/agent_message.dart' as _i22;
+import 'package:semantic_butler_client/src/protocol/search_result.dart' as _i23;
 import 'package:semantic_butler_client/src/protocol/search_history.dart'
-    as _i22;
-import 'package:semantic_butler_client/src/protocol/watched_folder.dart'
-    as _i23;
-import 'package:semantic_butler_client/src/protocol/ignore_pattern.dart'
     as _i24;
-import 'package:semantic_butler_client/src/protocol/file_system_entry.dart'
+import 'package:semantic_butler_client/src/protocol/watched_folder.dart'
     as _i25;
-import 'package:semantic_butler_client/src/protocol/drive_info.dart' as _i26;
+import 'package:semantic_butler_client/src/protocol/ignore_pattern.dart'
+    as _i26;
+import 'package:semantic_butler_client/src/protocol/file_system_entry.dart'
+    as _i27;
+import 'package:semantic_butler_client/src/protocol/drive_info.dart' as _i28;
 export 'agent_file_command.dart';
 export 'agent_message.dart';
 export 'agent_response.dart';
@@ -54,9 +56,11 @@ export 'greetings/greeting.dart';
 export 'ignore_pattern.dart';
 export 'indexing_job.dart';
 export 'indexing_job_detail.dart';
+export 'indexing_progress.dart';
 export 'indexing_status.dart';
 export 'search_history.dart';
 export 'search_result.dart';
+export 'tag_taxonomy.dart';
 export 'watched_folder.dart';
 export 'client.dart';
 
@@ -136,17 +140,23 @@ class Protocol extends _i1.SerializationManager {
     if (t == _i15.IndexingJobDetail) {
       return _i15.IndexingJobDetail.fromJson(data) as T;
     }
-    if (t == _i16.IndexingStatus) {
-      return _i16.IndexingStatus.fromJson(data) as T;
+    if (t == _i16.IndexingProgress) {
+      return _i16.IndexingProgress.fromJson(data) as T;
     }
-    if (t == _i17.SearchHistory) {
-      return _i17.SearchHistory.fromJson(data) as T;
+    if (t == _i17.IndexingStatus) {
+      return _i17.IndexingStatus.fromJson(data) as T;
     }
-    if (t == _i18.SearchResult) {
-      return _i18.SearchResult.fromJson(data) as T;
+    if (t == _i18.SearchHistory) {
+      return _i18.SearchHistory.fromJson(data) as T;
     }
-    if (t == _i19.WatchedFolder) {
-      return _i19.WatchedFolder.fromJson(data) as T;
+    if (t == _i19.SearchResult) {
+      return _i19.SearchResult.fromJson(data) as T;
+    }
+    if (t == _i20.TagTaxonomy) {
+      return _i20.TagTaxonomy.fromJson(data) as T;
+    }
+    if (t == _i21.WatchedFolder) {
+      return _i21.WatchedFolder.fromJson(data) as T;
     }
     if (t == _i1.getType<_i2.AgentFileCommand?>()) {
       return (data != null ? _i2.AgentFileCommand.fromJson(data) : null) as T;
@@ -191,17 +201,23 @@ class Protocol extends _i1.SerializationManager {
     if (t == _i1.getType<_i15.IndexingJobDetail?>()) {
       return (data != null ? _i15.IndexingJobDetail.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i16.IndexingStatus?>()) {
-      return (data != null ? _i16.IndexingStatus.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i16.IndexingProgress?>()) {
+      return (data != null ? _i16.IndexingProgress.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i17.SearchHistory?>()) {
-      return (data != null ? _i17.SearchHistory.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i17.IndexingStatus?>()) {
+      return (data != null ? _i17.IndexingStatus.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i18.SearchResult?>()) {
-      return (data != null ? _i18.SearchResult.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i18.SearchHistory?>()) {
+      return (data != null ? _i18.SearchHistory.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i19.WatchedFolder?>()) {
-      return (data != null ? _i19.WatchedFolder.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i19.SearchResult?>()) {
+      return (data != null ? _i19.SearchResult.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i20.TagTaxonomy?>()) {
+      return (data != null ? _i20.TagTaxonomy.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i21.WatchedFolder?>()) {
+      return (data != null ? _i21.WatchedFolder.fromJson(data) : null) as T;
     }
     if (t == List<_i14.IndexingJob>) {
       return (data as List)
@@ -220,29 +236,29 @@ class Protocol extends _i1.SerializationManager {
     if (t == List<String>) {
       return (data as List).map((e) => deserialize<String>(e)).toList() as T;
     }
-    if (t == List<_i20.AgentMessage>) {
+    if (t == List<_i22.AgentMessage>) {
       return (data as List)
-              .map((e) => deserialize<_i20.AgentMessage>(e))
+              .map((e) => deserialize<_i22.AgentMessage>(e))
               .toList()
           as T;
     }
-    if (t == _i1.getType<List<_i20.AgentMessage>?>()) {
+    if (t == _i1.getType<List<_i22.AgentMessage>?>()) {
       return (data != null
               ? (data as List)
-                    .map((e) => deserialize<_i20.AgentMessage>(e))
+                    .map((e) => deserialize<_i22.AgentMessage>(e))
                     .toList()
               : null)
           as T;
     }
-    if (t == List<_i21.SearchResult>) {
+    if (t == List<_i23.SearchResult>) {
       return (data as List)
-              .map((e) => deserialize<_i21.SearchResult>(e))
+              .map((e) => deserialize<_i23.SearchResult>(e))
               .toList()
           as T;
     }
-    if (t == List<_i22.SearchHistory>) {
+    if (t == List<_i24.SearchHistory>) {
       return (data as List)
-              .map((e) => deserialize<_i22.SearchHistory>(e))
+              .map((e) => deserialize<_i24.SearchHistory>(e))
               .toList()
           as T;
     }
@@ -252,29 +268,29 @@ class Protocol extends _i1.SerializationManager {
           )
           as T;
     }
-    if (t == List<_i23.WatchedFolder>) {
+    if (t == List<_i25.WatchedFolder>) {
       return (data as List)
-              .map((e) => deserialize<_i23.WatchedFolder>(e))
+              .map((e) => deserialize<_i25.WatchedFolder>(e))
               .toList()
           as T;
     }
-    if (t == List<_i24.IgnorePattern>) {
+    if (t == List<_i26.IgnorePattern>) {
       return (data as List)
-              .map((e) => deserialize<_i24.IgnorePattern>(e))
+              .map((e) => deserialize<_i26.IgnorePattern>(e))
               .toList()
           as T;
     }
     if (t == List<String>) {
       return (data as List).map((e) => deserialize<String>(e)).toList() as T;
     }
-    if (t == List<_i25.FileSystemEntry>) {
+    if (t == List<_i27.FileSystemEntry>) {
       return (data as List)
-              .map((e) => deserialize<_i25.FileSystemEntry>(e))
+              .map((e) => deserialize<_i27.FileSystemEntry>(e))
               .toList()
           as T;
     }
-    if (t == List<_i26.DriveInfo>) {
-      return (data as List).map((e) => deserialize<_i26.DriveInfo>(e)).toList()
+    if (t == List<_i28.DriveInfo>) {
+      return (data as List).map((e) => deserialize<_i28.DriveInfo>(e)).toList()
           as T;
     }
     return super.deserialize<T>(data, t);
@@ -296,10 +312,12 @@ class Protocol extends _i1.SerializationManager {
       _i13.IgnorePattern => 'IgnorePattern',
       _i14.IndexingJob => 'IndexingJob',
       _i15.IndexingJobDetail => 'IndexingJobDetail',
-      _i16.IndexingStatus => 'IndexingStatus',
-      _i17.SearchHistory => 'SearchHistory',
-      _i18.SearchResult => 'SearchResult',
-      _i19.WatchedFolder => 'WatchedFolder',
+      _i16.IndexingProgress => 'IndexingProgress',
+      _i17.IndexingStatus => 'IndexingStatus',
+      _i18.SearchHistory => 'SearchHistory',
+      _i19.SearchResult => 'SearchResult',
+      _i20.TagTaxonomy => 'TagTaxonomy',
+      _i21.WatchedFolder => 'WatchedFolder',
       _ => null,
     };
   }
@@ -345,13 +363,17 @@ class Protocol extends _i1.SerializationManager {
         return 'IndexingJob';
       case _i15.IndexingJobDetail():
         return 'IndexingJobDetail';
-      case _i16.IndexingStatus():
+      case _i16.IndexingProgress():
+        return 'IndexingProgress';
+      case _i17.IndexingStatus():
         return 'IndexingStatus';
-      case _i17.SearchHistory():
+      case _i18.SearchHistory():
         return 'SearchHistory';
-      case _i18.SearchResult():
+      case _i19.SearchResult():
         return 'SearchResult';
-      case _i19.WatchedFolder():
+      case _i20.TagTaxonomy():
+        return 'TagTaxonomy';
+      case _i21.WatchedFolder():
         return 'WatchedFolder';
     }
     return null;
@@ -405,17 +427,23 @@ class Protocol extends _i1.SerializationManager {
     if (dataClassName == 'IndexingJobDetail') {
       return deserialize<_i15.IndexingJobDetail>(data['data']);
     }
+    if (dataClassName == 'IndexingProgress') {
+      return deserialize<_i16.IndexingProgress>(data['data']);
+    }
     if (dataClassName == 'IndexingStatus') {
-      return deserialize<_i16.IndexingStatus>(data['data']);
+      return deserialize<_i17.IndexingStatus>(data['data']);
     }
     if (dataClassName == 'SearchHistory') {
-      return deserialize<_i17.SearchHistory>(data['data']);
+      return deserialize<_i18.SearchHistory>(data['data']);
     }
     if (dataClassName == 'SearchResult') {
-      return deserialize<_i18.SearchResult>(data['data']);
+      return deserialize<_i19.SearchResult>(data['data']);
+    }
+    if (dataClassName == 'TagTaxonomy') {
+      return deserialize<_i20.TagTaxonomy>(data['data']);
     }
     if (dataClassName == 'WatchedFolder') {
-      return deserialize<_i19.WatchedFolder>(data['data']);
+      return deserialize<_i21.WatchedFolder>(data['data']);
     }
     return super.deserializeByClassName(data);
   }
