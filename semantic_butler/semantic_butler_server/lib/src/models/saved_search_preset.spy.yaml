@@ -1,0 +1,14 @@
+class: SavedSearchPreset
+table: saved_search_preset
+fields:
+  name: String
+  query: String
+  category: String?
+  tags: List<String>?
+  fileTypes: List<String>?
+  dateFrom: DateTime?
+  dateTo: DateTime?
+  minSize: int?
+  maxSize: int?
+  createdAt: DateTime
+  usageCount: int

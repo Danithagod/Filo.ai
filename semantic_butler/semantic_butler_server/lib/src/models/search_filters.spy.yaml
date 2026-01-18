@@ -1,0 +1,8 @@
+class: SearchFilters
+fields:
+  dateFrom: DateTime?
+  dateTo: DateTime?
+  fileTypes: List<String>?
+  tags: List<String>?
+  minSize: int?
+  maxSize: int?

@@ -1,0 +1,30 @@
+.nav-loader {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: var(--surface);
+  z-index: 9999;
+}
+
+.nav-loader-spinner {
+  height: 100%;
+  width: 50%;
+  background: var(--primary-light);
+  animation: nav-load 1.5s ease-in-out infinite;
+}
+
+@keyframes nav-load {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  50% {
+    transform: translateX(0%);
+  }
+
+  100% {
+    transform: translateX(200%);
+  }
+}

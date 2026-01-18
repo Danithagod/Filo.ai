@@ -12,13 +12,17 @@ dependencies:
   http: ^1.6.0
   path: ^1.9.1
   pdf: ^3.11.3
+  postgres: ^3.5.9
   serverpod: 3.1.0
   watcher: ^1.1.0
 
 dev_dependencies:
   lints: '>=3.0.0 <7.0.0'
+  serverpod_cli: 3.1.0
   serverpod_test: 3.1.0
   test: ^1.25.5
+  mockito: ^5.4.4
+  build_runner: ^2.4.11
 
 
 serverpod:

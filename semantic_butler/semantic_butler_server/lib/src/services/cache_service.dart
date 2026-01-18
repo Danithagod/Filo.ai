@@ -1,4 +1,7 @@
 import 'dart:collection';
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 
 /// In-memory cache service with TTL support
 ///
@@ -97,9 +100,10 @@ class CacheService {
     hitRate: _hits + _misses > 0 ? _hits / (_hits + _misses) : 0.0,
   );
 
-  /// Generate a cache key for embeddings
+  /// Generate a cache key for embeddings (Issue #10: Using SHA-256 for collision resistance)
   static String embeddingKey(String text) {
-    return 'embed:${text.hashCode}';
+    final hash = sha256.convert(utf8.encode(text)).toString();
+    return 'embed:$hash';
   }
 
   /// Generate a cache key for summaries
@@ -111,6 +115,43 @@ class CacheService {
   static String tagsKey(String contentHash) {
     return 'tags:$contentHash';
   }
+
+  /// Generate a cache key for hybrid search results
+  static String hybridSearchKey(
+    String query,
+    double threshold,
+    int limit,
+    int offset,
+    double semanticWeight,
+    double keywordWeight,
+  ) {
+    final params = '$query:$threshold:$limit:$offset:$semanticWeight:$keywordWeight';
+    final hash = sha256.convert(utf8.encode(params)).toString().substring(0, 16);
+    return 'hybrid:$hash';
+  }
+
+  /// Generate a cache key for semantic search results
+  static String semanticSearchKey(
+    String query,
+    double threshold,
+    int limit,
+    int offset,
+  ) {
+    final params = '$query:$threshold:$limit:$offset';
+    final hash = sha256.convert(utf8.encode(params)).toString().substring(0, 16);
+    return 'semantic:$hash';
+  }
+
+  /// Generate a cache key for recent documents (empty query)
+  static String recentDocsKey(int limit, int offset) {
+    return 'recent:$limit:$offset';
+  }
+
+  /// Short TTL for search results (5 minutes)
+  static const Duration searchResultTtl = Duration(minutes: 5);
+
+  /// Very short TTL for recent documents (1 minute - changes frequently)
+  static const Duration recentDocsTtl = Duration(minutes: 1);
 
   /// Cleanup expired entries (call periodically)
   int cleanupExpired() {

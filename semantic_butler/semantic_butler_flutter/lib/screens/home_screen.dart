@@ -1,113 +1,191 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:semantic_butler_client/semantic_butler_client.dart';
 import '../main.dart';
 import '../utils/app_logger.dart';
-import '../widgets/search_bar_widget.dart';
+import '../widgets/search/advanced_search_bar.dart';
+import '../widgets/search/advanced_filters.dart';
+
 import '../widgets/recent_searches.dart';
 import '../widgets/app_background.dart';
 import 'search_results_screen.dart';
 import 'settings_screen.dart';
 import 'chat_screen.dart';
 import 'file_manager_screen.dart';
-import '../providers/watched_folders_provider.dart';
+import 'organization_screen.dart';
+import '../widgets/home/stats_card.dart';
+import '../widgets/home/fade_in_animation.dart';
+import '../widgets/home/compact_index_card.dart';
+import '../widgets/home/tag_manager_dialog.dart';
+import '../widgets/home/ai_cost_dashboard.dart';
+import '../widgets/home/index_health_dashboard.dart';
+import '../providers/indexing_status_provider.dart';
+import '../providers/navigation_provider.dart';
+import '../services/shortcut_manager.dart' as sm;
+import '../services/shortcut_manager.dart'
+    show FocusSearchIntent, NavigateTabIntent;
 
 /// Home screen with Material 3 navigation rail
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
-  int _selectedIndex = 0;
-
+class HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final navState = ref.watch(navigationProvider);
 
-    return Scaffold(
-      body: SafeArea(
-        child: Row(
-          children: [
-            // Material 3 Navigation Rail
-            NavigationRail(
-              selectedIndex: _selectedIndex,
-              onDestinationSelected: (index) {
-                setState(() => _selectedIndex = index);
-              },
-              leading: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                child: FloatingActionButton(
-                  elevation: 0,
-                  onPressed: () => _showQuickSearch(context),
-                  child: const Icon(Icons.search),
-                ),
+    return Shortcuts(
+      shortcuts: sm.ShortcutManager.shortcuts,
+      child: Actions(
+        actions: <Type, Action<Intent>>{
+          FocusSearchIntent: CallbackAction<FocusSearchIntent>(
+            onInvoke: (_) => _showQuickSearch(context),
+          ),
+          NavigateTabIntent: CallbackAction<NavigateTabIntent>(
+            onInvoke: (intent) {
+              // Clear focus before navigating to prevent focus being stuck in hidden input fields
+              FocusManager.instance.primaryFocus?.unfocus();
+              ref.read(navigationProvider.notifier).navigateTo(intent.index);
+              return null;
+            },
+          ),
+        },
+        child: Focus(
+          autofocus: true,
+          child: Scaffold(
+            body: SafeArea(
+              child: Row(
+                children: [
+                  // Material 3 Navigation Rail
+                  NavigationRail(
+                    selectedIndex: navState.selectedIndex,
+                    onDestinationSelected: (index) {
+                      ref.read(navigationProvider.notifier).navigateTo(index);
+                    },
+                    leading: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: FloatingActionButton(
+                        elevation: 0,
+                        onPressed: () => _showQuickSearch(context),
+                        child: const Icon(Icons.search),
+                      ),
+                    ),
+                    destinations: const [
+                      NavigationRailDestination(
+                        icon: Tooltip(
+                          message: 'Home (Ctrl+1 / Cmd+1)',
+                          child: Icon(Icons.home_outlined),
+                        ),
+                        selectedIcon: Icon(Icons.home),
+                        label: Text('Home'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Tooltip(
+                          message: 'Index (Ctrl+2 / Cmd+2)',
+                          child: Icon(Icons.folder_outlined),
+                        ),
+                        selectedIcon: Icon(Icons.folder),
+                        label: Text('Index'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Tooltip(
+                          message: 'Chat (Ctrl+3 / Cmd+3)',
+                          child: Icon(Icons.chat_bubble_outline),
+                        ),
+                        selectedIcon: Icon(Icons.chat_bubble),
+                        label: Text('Chat'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Tooltip(
+                          message: 'Files (Ctrl+4 / Cmd+4)',
+                          child: Icon(Icons.folder_shared_outlined),
+                        ),
+                        selectedIcon: Icon(Icons.folder_shared),
+                        label: Text('Files'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Tooltip(
+                          message: 'Organization (Ctrl+5 / Cmd+5)',
+                          child: Icon(Icons.auto_fix_high_outlined),
+                        ),
+                        selectedIcon: Icon(Icons.auto_fix_high),
+                        label: Text('Organization'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Tooltip(
+                          message: 'Settings (Ctrl+6 / Cmd+6)',
+                          child: Icon(Icons.settings_outlined),
+                        ),
+                        selectedIcon: Icon(Icons.settings),
+                        label: Text('Settings'),
+                      ),
+                    ],
+                  ),
+
+                  // Divider
+                  VerticalDivider(
+                    thickness: 1,
+                    width: 1,
+                    color: colorScheme.outlineVariant,
+                  ),
+
+                  // Content area
+                  Expanded(
+                    child: AppBackground(
+                      child: _buildContent(),
+                    ),
+                  ),
+                ],
               ),
-              destinations: const [
-                NavigationRailDestination(
-                  icon: Icon(Icons.home_outlined),
-                  selectedIcon: Icon(Icons.home),
-                  label: Text('Home'),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.folder_outlined),
-                  selectedIcon: Icon(Icons.folder),
-                  label: Text('Index'),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.chat_bubble_outline),
-                  selectedIcon: Icon(Icons.chat_bubble),
-                  label: Text('Chat'),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.folder_shared_outlined),
-                  selectedIcon: Icon(Icons.folder_shared),
-                  label: Text('Files'),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.settings_outlined),
-                  selectedIcon: Icon(Icons.settings),
-                  label: Text('Settings'),
-                ),
-              ],
             ),
-
-            // Divider
-            VerticalDivider(
-              thickness: 1,
-              width: 1,
-              color: colorScheme.outlineVariant,
-            ),
-
-            // Content area
-            Expanded(
-              child: AppBackground(
-                child: _buildContent(),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
+  // PageStorage bucket for preserving scroll positions across tab switches
+  final PageStorageBucket _bucket = PageStorageBucket();
+
   Widget _buildContent() {
-    // Using IndexedStack to preserve state when switching tabs
-    return IndexedStack(
-      index: _selectedIndex,
-      children: [
-        SearchDashboard(),
-        IndexingScreen(),
-        ChatScreen(),
-        FileManagerScreen(),
-        SettingsScreen(),
-      ],
+    final navState = ref.watch(navigationProvider);
+
+    // Using PageStorage + conditional building for better memory usage
+    // Only the visible screen is built, with selective state preservation
+    return PageStorage(
+      bucket: _bucket,
+      child: _buildScreen(navState.selectedIndex),
     );
+  }
+
+  Widget _buildScreen(int index) {
+    // Build only the visible screen
+    // Screens not in _keepAliveScreens will be rebuilt when navigated to
+    switch (index) {
+      case 0:
+        return const SearchDashboard(key: PageStorageKey('search_dashboard'));
+      case 1:
+        return const IndexingScreen(key: PageStorageKey('indexing_screen'));
+      case 2:
+        return const ChatScreen(key: PageStorageKey('chat_screen'));
+      case 3:
+        return const FileManagerScreen(key: PageStorageKey('file_manager'));
+      case 4:
+        return const OrganizationScreen(
+          key: PageStorageKey('organization_screen'),
+        );
+      case 5:
+        return const SettingsScreen(key: PageStorageKey('settings_screen'));
+      default:
+        return const SearchDashboard(key: PageStorageKey('search_dashboard'));
+    }
   }
 
   void _showQuickSearch(BuildContext context) {
@@ -119,20 +197,67 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 }
 
 /// Search dashboard - main view with Material 3 styling
-class SearchDashboard extends StatefulWidget {
+class SearchDashboard extends ConsumerStatefulWidget {
   const SearchDashboard({super.key});
 
   @override
-  State<SearchDashboard> createState() => _SearchDashboardState();
+  ConsumerState<SearchDashboard> createState() => _SearchDashboardState();
 }
 
-class _SearchDashboardState extends State<SearchDashboard> {
+class _SearchDashboardState extends ConsumerState<SearchDashboard>
+    with WidgetsBindingObserver {
   final TextEditingController _searchController = TextEditingController();
+  SearchFilters _searchFilters = SearchFilters();
+  DateTime? _lastRefreshTime;
+  static const _refreshCooldown = Duration(minutes: 2);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Refresh data when app comes back to foreground
+    if (state == AppLifecycleState.resumed) {
+      _scheduleRefreshIfNeeded();
+    }
+  }
+
+  /// Check if current navigation state shows this dashboard
+  bool get _isVisible {
+    final navState = ref.read(navigationProvider);
+    return navState.selectedIndex == 0;
+  }
+
+  /// Refresh dashboard data if enough time has passed
+  void _scheduleRefreshIfNeeded() {
+    if (!_isVisible) return;
+
+    final now = DateTime.now();
+    if (_lastRefreshTime == null ||
+        now.difference(_lastRefreshTime!) > _refreshCooldown) {
+      _refreshDashboard();
+    }
+  }
+
+  /// Refresh all dashboard data
+  Future<void> _refreshDashboard() async {
+    _lastRefreshTime = DateTime.now();
+
+    // Refresh indexing status
+    ref.read(indexingStatusProvider.notifier).refresh();
+
+    // Note: RecentSearches widget handles its own refresh internally
+    // The key forces a rebuild which triggers a fresh load
   }
 
   void _performSearch(String query) {
@@ -140,13 +265,53 @@ class _SearchDashboardState extends State<SearchDashboard> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => SearchResultsScreen(query: query),
+        builder: (context) => SearchResultsScreen(
+          query: query,
+          initialMode: SearchMode.hybrid,
+          initialFilters: _searchFilters,
+        ),
       ),
+    );
+  }
+
+  void _performAISearch(String query) {
+    if (query.trim().isEmpty) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SearchResultsScreen(
+          query: query,
+          initialMode: SearchMode.ai,
+          // AI Search doesn't support filters yet in this implementation
+        ),
+      ),
+    );
+  }
+
+  void _showTagManager(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => const TagManagerDialog(),
+    );
+  }
+
+  void _showCostDashboard(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => const AICostDashboard(),
+    );
+  }
+
+  void _showIndexHealth(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => const IndexHealthDashboard(),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final status = ref.watch(indexingStatusProvider);
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -159,7 +324,7 @@ class _SearchDashboardState extends State<SearchDashboard> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Welcome header with modern look
-              const _FadeInUp(
+              const FadeInAnimation(
                 delay: Duration(milliseconds: 100),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -185,7 +350,7 @@ class _SearchDashboardState extends State<SearchDashboard> {
                 ),
               ),
               const SizedBox(height: 12),
-              _FadeInUp(
+              FadeInAnimation(
                 delay: const Duration(milliseconds: 200),
                 child: Text(
                   'Search your files using natural language',
@@ -199,7 +364,7 @@ class _SearchDashboardState extends State<SearchDashboard> {
               const SizedBox(height: 48),
 
               // Enhanced Search bar
-              _FadeInUp(
+              FadeInAnimation(
                 delay: const Duration(milliseconds: 300),
                 child: Container(
                   decoration: BoxDecoration(
@@ -211,10 +376,25 @@ class _SearchDashboardState extends State<SearchDashboard> {
                       ),
                     ],
                   ),
-                  child: SearchBarWidget(
-                    controller: _searchController,
-                    onSearch: _performSearch,
-                    hintText: 'Ask anything about your files...',
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    children: [
+                      AdvancedSearchBar(
+                        controller: _searchController,
+                        onSearch: _performSearch,
+                        onAISearch: _performAISearch,
+                        hintText: 'Search files, content, or ask questions...',
+                      ),
+                      const SizedBox(height: 8),
+                      AdvancedFilters(
+                        initialFilters: _searchFilters,
+                        onFiltersChanged: (filters) {
+                          setState(() {
+                            _searchFilters = filters;
+                          });
+                        },
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -222,7 +402,7 @@ class _SearchDashboardState extends State<SearchDashboard> {
               const SizedBox(height: 60),
 
               // Stats section
-              _FadeInUp(
+              FadeInAnimation(
                 delay: const Duration(milliseconds: 400),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -250,27 +430,43 @@ class _SearchDashboardState extends State<SearchDashboard> {
                     Row(
                       children: [
                         Expanded(
-                          child: _ModernStatsCard(
+                          child: StatsCard(
                             title: 'Documents',
-                            value: '1,248',
+                            numericValue: (status?.totalDocuments ?? 0)
+                                .toDouble(),
                             icon: Icons.description_rounded,
                             color: colorScheme.primary,
                           ),
                         ),
                         const SizedBox(width: 20),
                         Expanded(
-                          child: _ModernStatsCard(
+                          child: StatsCard(
                             title: 'Indexed',
-                            value: '85%',
+                            numericValue:
+                                status != null && status.totalDocuments > 0
+                                ? (status.indexedDocuments /
+                                      status.totalDocuments *
+                                      100)
+                                : 0,
+                            suffix: '%',
+                            progress:
+                                status != null && status.totalDocuments > 0
+                                ? (status.indexedDocuments /
+                                      status.totalDocuments)
+                                : 0,
                             icon: Icons.offline_bolt_rounded,
                             color: colorScheme.tertiary,
                           ),
                         ),
                         const SizedBox(width: 20),
                         Expanded(
-                          child: _ModernStatsCard(
+                          child: StatsCard(
                             title: 'Activity',
-                            value: 'High',
+                            numericValue: (status?.activeJobs ?? 0).toDouble(),
+                            suffix: status != null && status.activeJobs > 0
+                                ? ' Active'
+                                : ' Jobs',
+                            isPulse: status != null && status.activeJobs > 0,
                             icon: Icons.trending_up_rounded,
                             color: colorScheme.secondary,
                           ),
@@ -281,10 +477,81 @@ class _SearchDashboardState extends State<SearchDashboard> {
                 ),
               ),
 
-              const SizedBox(height: 60),
+              const SizedBox(height: 40),
+
+              // Quick actions section
+              FadeInAnimation(
+                delay: const Duration(milliseconds: 450),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Quick actions',
+                          style: textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Divider(
+                            color: colorScheme.outlineVariant.withValues(
+                              alpha: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () => _showTagManager(context),
+                          icon: const Icon(Icons.label_outline, size: 20),
+                          label: const Text('Manage Tags'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 16,
+                            ),
+                          ),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () => _showCostDashboard(context),
+                          icon: const Icon(Icons.analytics_outlined, size: 20),
+                          label: const Text('Cost Dashboard'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 16,
+                            ),
+                          ),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () => _showIndexHealth(context),
+                          icon: const Icon(Icons.health_and_safety, size: 20),
+                          label: const Text('Index Health'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 16,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 40),
 
               // Recent searches section
-              _FadeInUp(
+              FadeInAnimation(
                 delay: const Duration(milliseconds: 500),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -324,247 +591,29 @@ class _SearchDashboardState extends State<SearchDashboard> {
   }
 }
 
-class _ModernStatsCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color color;
-
-  const _ModernStatsCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.3),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            value,
-            style: textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: textTheme.labelLarge?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              letterSpacing: 0.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FadeInUp extends StatefulWidget {
-  final Widget child;
-  final Duration delay;
-
-  const _FadeInUp({required this.child, this.delay = Duration.zero});
-
-  @override
-  State<_FadeInUp> createState() => _FadeInUpState();
-}
-
-class _FadeInUpState extends State<_FadeInUp>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<Offset> _offsetAnimation;
-  late Animation<double> _opacityAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-
-    _offsetAnimation =
-        Tween<Offset>(
-          begin: const Offset(0, 0.1),
-          end: Offset.zero,
-        ).animate(
-          CurvedAnimation(
-            parent: _controller,
-            curve: Curves.easeOutCirc,
-          ),
-        );
-
-    _opacityAnimation =
-        Tween<double>(
-          begin: 0.0,
-          end: 1.0,
-        ).animate(
-          CurvedAnimation(
-            parent: _controller,
-            curve: Curves.easeOut,
-          ),
-        );
-
-    Future.delayed(widget.delay, () {
-      if (mounted) _controller.forward();
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _opacityAnimation,
-      child: SlideTransition(
-        position: _offsetAnimation,
-        child: widget.child,
-      ),
-    );
-  }
-}
-
 /// Indexing screen with Material 3 styling and real-time progress
-class IndexingScreen extends StatefulWidget {
+class IndexingScreen extends ConsumerStatefulWidget {
   const IndexingScreen({super.key});
 
   @override
-  State<IndexingScreen> createState() => _IndexingScreenState();
+  ConsumerState<IndexingScreen> createState() => _IndexingScreenState();
 }
 
-class _IndexingScreenState extends State<IndexingScreen> {
-  bool _isIndexing = false;
-  int _totalDocuments = 0;
-  int _indexedDocuments = 0;
-  int _pendingDocuments = 0;
-  int _failedDocuments = 0;
-  List<IndexingJob> _recentJobs = [];
-
-  /// Timer for polling indexing status - cancellable to prevent memory leaks
-  Timer? _pollingTimer;
+class _IndexingScreenState extends ConsumerState<IndexingScreen> {
+  bool _isStatusLoading = false;
+  bool _isGridView = true;
 
   @override
   void initState() {
     super.initState();
-    _loadIndexingStatus();
-  }
-
-  @override
-  void dispose() {
-    _stopPolling();
-    super.dispose();
-  }
-
-  /// Stop the polling timer
-  void _stopPolling() {
-    _pollingTimer?.cancel();
-    _pollingTimer = null;
+    // Use provider for initial load
+    Future.microtask(() => ref.read(indexingStatusProvider.notifier).refresh());
   }
 
   Future<void> _loadIndexingStatus() async {
-    AppLogger.debug('Loading indexing status...', tag: 'Indexing');
-    try {
-      final status = await client.butler.getIndexingStatus();
-      AppLogger.info(
-        'Status: ${status.indexedDocuments}/${status.totalDocuments} indexed, ${status.activeJobs} active jobs',
-        tag: 'Indexing',
-      );
-      if (mounted) {
-        setState(() {
-          _totalDocuments = status.totalDocuments;
-          _indexedDocuments = status.indexedDocuments;
-          _pendingDocuments = status.pendingDocuments;
-          _failedDocuments = status.failedDocuments;
-          _recentJobs = status.recentJobs ?? [];
-          _isIndexing = status.activeJobs > 0;
-        });
-
-        // If indexing is active, start polling for updates
-        if (_isIndexing) {
-          _startPolling();
-        }
-      }
-    } catch (e, stackTrace) {
-      AppLogger.error(
-        'Failed to load indexing status',
-        tag: 'Indexing',
-        error: e,
-        stackTrace: stackTrace,
-      );
-    }
-  }
-
-  /// Start polling for indexing status updates using a cancellable Timer
-  void _startPolling() {
-    // Cancel any existing timer first
-    _stopPolling();
-
-    // Use Timer.periodic for cancellable polling
-    _pollingTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
-      // Safety check: stop polling if widget is disposed
-      if (!mounted) {
-        _stopPolling();
-        return;
-      }
-
-      try {
-        final status = await client.butler.getIndexingStatus();
-        if (mounted) {
-          setState(() {
-            _totalDocuments = status.totalDocuments;
-            _indexedDocuments = status.indexedDocuments;
-            _pendingDocuments = status.pendingDocuments;
-            _failedDocuments = status.failedDocuments;
-            _recentJobs = status.recentJobs ?? [];
-            _isIndexing = status.activeJobs > 0;
-          });
-
-          // Stop polling if indexing completed
-          if (!_isIndexing) {
-            _stopPolling();
-          }
-        }
-      } catch (e) {
-        // Continue polling even on error, but log it
-        AppLogger.warning('Polling error: $e', tag: 'Indexing');
-      }
-    });
+    setState(() => _isStatusLoading = true);
+    await ref.read(indexingStatusProvider.notifier).refresh();
+    if (mounted) setState(() => _isStatusLoading = false);
   }
 
   Future<void> _pickFolder() async {
@@ -574,9 +623,6 @@ class _IndexingScreenState extends State<IndexingScreen> {
 
       if (selectedDirectory != null && mounted) {
         AppLogger.info('Selected folder: $selectedDirectory', tag: 'Indexing');
-        setState(() {
-          _isIndexing = true;
-        });
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -590,8 +636,8 @@ class _IndexingScreenState extends State<IndexingScreen> {
         await client.butler.startIndexing(selectedDirectory);
         AppLogger.info('startIndexing API call completed', tag: 'Indexing');
 
-        // Start polling for status
-        _startPolling();
+        // Refresh global provider immediately
+        ref.read(indexingStatusProvider.notifier).refresh();
       } else {
         AppLogger.debug('Folder picker cancelled', tag: 'Indexing');
       }
@@ -603,7 +649,6 @@ class _IndexingScreenState extends State<IndexingScreen> {
         stackTrace: stackTrace,
       );
       if (mounted) {
-        setState(() => _isIndexing = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e')),
         );
@@ -613,8 +658,11 @@ class _IndexingScreenState extends State<IndexingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final status = ref.watch(indexingStatusProvider);
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final recentJobs = status?.recentJobs ?? [];
+    final isIndexing = (status?.activeJobs ?? 0) > 0;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -642,30 +690,30 @@ class _IndexingScreenState extends State<IndexingScreen> {
             child: Row(
               children: [
                 _StatCard(
-                  label: 'TOTAL',
-                  value: _totalDocuments.toString(),
+                  label: 'TOTAL DOCUMENTS',
+                  numericValue: (status?.totalDocuments ?? 0).toDouble(),
                   icon: Icons.description_outlined,
                   color: colorScheme.primary,
                 ),
                 const SizedBox(width: 12),
                 _StatCard(
                   label: 'INDEXED',
-                  value: _indexedDocuments.toString(),
+                  numericValue: (status?.indexedDocuments ?? 0).toDouble(),
                   icon: Icons.check_circle_outline,
                   color: colorScheme.tertiary,
                 ),
                 const SizedBox(width: 12),
                 _StatCard(
                   label: 'PENDING',
-                  value: _pendingDocuments.toString(),
+                  numericValue: (status?.pendingDocuments ?? 0).toDouble(),
                   icon: Icons.pending_outlined,
                   color: colorScheme.secondary,
                 ),
-                if (_failedDocuments > 0) ...[
+                if ((status?.failedDocuments ?? 0) > 0) ...[
                   const SizedBox(width: 12),
                   _StatCard(
                     label: 'FAILED',
-                    value: _failedDocuments.toString(),
+                    numericValue: (status?.failedDocuments ?? 0).toDouble(),
                     icon: Icons.error_outline,
                     color: colorScheme.error,
                   ),
@@ -680,11 +728,11 @@ class _IndexingScreenState extends State<IndexingScreen> {
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: _isIndexing ? null : _pickFolder,
+              onPressed: isIndexing ? null : _pickFolder,
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
-              icon: _isIndexing
+              icon: (status?.activeJobs ?? 0) > 0
                   ? const SizedBox(
                       width: 18,
                       height: 18,
@@ -692,34 +740,197 @@ class _IndexingScreenState extends State<IndexingScreen> {
                     )
                   : const Icon(Icons.create_new_folder_outlined),
               label: Text(
-                _isIndexing ? 'Indexing in Progress...' : 'Index New Folder',
+                (status?.activeJobs ?? 0) > 0
+                    ? 'Indexing in Progress...'
+                    : 'Index New Folder',
               ),
             ),
           ),
 
           const SizedBox(height: 32),
 
-          // Recent Jobs Section
-          Text(
-            'Indexed Folders',
-            style: textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+          // Recent Jobs Section Header
+          Row(
+            children: [
+              Text(
+                'Indexed Folders',
+                style: textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer.withAlpha(100),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${recentJobs.length}',
+                  style: textTheme.labelSmall?.copyWith(
+                    color: colorScheme.onPrimaryContainer,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              // View Toggle
+              Container(
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest.withAlpha(50),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.grid_view_rounded, size: 18),
+                      onPressed: () => setState(() => _isGridView = true),
+                      color: _isGridView
+                          ? colorScheme.primary
+                          : colorScheme.onSurfaceVariant,
+                      style: IconButton.styleFrom(
+                        backgroundColor: _isGridView
+                            ? colorScheme.primaryContainer.withAlpha(150)
+                            : null,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.view_list_rounded, size: 18),
+                      onPressed: () => setState(() => _isGridView = false),
+                      color: !_isGridView
+                          ? colorScheme.primary
+                          : colorScheme.onSurfaceVariant,
+                      style: IconButton.styleFrom(
+                        backgroundColor: !_isGridView
+                            ? colorScheme.primaryContainer.withAlpha(150)
+                            : null,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (recentJobs.isNotEmpty)
+                TextButton.icon(
+                  onPressed: ((status?.activeJobs ?? 0) > 0 || _isStatusLoading)
+                      ? null
+                      : _loadIndexingStatus,
+                  icon: _isStatusLoading
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            strokeCap: StrokeCap.round,
+                          ),
+                        )
+                      : const Icon(Icons.refresh_rounded, size: 18),
+                  label: Text(_isStatusLoading ? '' : 'Refresh'),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 16),
 
-          if (_recentJobs.isEmpty)
+          if (_isStatusLoading && recentJobs.isEmpty)
+            if (_isGridView)
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 180,
+                  childAspectRatio: 0.85,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                ),
+                itemCount: 8,
+                itemBuilder: (context, index) => CompactIndexCard.skeleton(
+                  isListView: false,
+                ),
+              )
+            else
+              ListView.separated(
+                physics: const NeverScrollableScrollPhysics(),
+                shrinkWrap: true,
+                padding: const EdgeInsets.all(16),
+                itemCount: 8,
+                separatorBuilder: (context, index) => const SizedBox(height: 8),
+                itemBuilder: (context, index) => CompactIndexCard.skeleton(
+                  isListView: true,
+                ),
+              )
+          else if (recentJobs.isEmpty)
             _buildEmptyState(colorScheme, textTheme)
+          else if (_isGridView)
+            Stack(
+              children: [
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(16),
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 180,
+                    childAspectRatio: 0.85,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                  ),
+                  itemCount: recentJobs.length,
+                  itemBuilder: (context, index) {
+                    final job = recentJobs[index];
+                    return CompactIndexCard(
+                      job: job,
+                      onRefresh: _loadIndexingStatus,
+                      isListView: false,
+                    );
+                  },
+                ),
+                if (_isStatusLoading)
+                  Positioned.fill(
+                    child: Container(
+                      color: colorScheme.surface.withValues(alpha: 0.3),
+                    ),
+                  ),
+              ],
+            )
           else
-            ListView.separated(
-              physics: const NeverScrollableScrollPhysics(),
-              shrinkWrap: true,
-              itemCount: _recentJobs.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final job = _recentJobs[index];
-                return _IndexingJobCard(job: job);
-              },
+            Stack(
+              children: [
+                ListView.separated(
+                  physics: const NeverScrollableScrollPhysics(),
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.all(16),
+                  itemCount: recentJobs.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final job = recentJobs[index];
+                    return CompactIndexCard(
+                      job: job,
+                      onRefresh: _loadIndexingStatus,
+                      isListView: true,
+                    );
+                  },
+                ),
+                if (_isStatusLoading)
+                  Positioned.fill(
+                    child: Container(
+                      color: colorScheme.surface.withValues(alpha: 0.3),
+                    ),
+                  ),
+              ],
             ),
 
           // Bottom spacer
@@ -770,16 +981,16 @@ class _IndexingScreenState extends State<IndexingScreen> {
   }
 }
 
-/// Styled stat card for indexing progress
+/// Styled stat card for indexing progress with counter animation
 class _StatCard extends StatelessWidget {
   final String label;
-  final String value;
+  final double numericValue;
   final IconData icon;
   final Color color;
 
   const _StatCard({
     required this.label,
-    required this.value,
+    required this.numericValue,
     required this.icon,
     required this.color,
   });
@@ -800,12 +1011,19 @@ class _StatCard extends StatelessWidget {
         children: [
           Icon(icon, color: color, size: 24),
           const SizedBox(height: 8),
-          Text(
-            value,
-            style: textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: colorScheme.onSurface,
-            ),
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: numericValue),
+            duration: const Duration(seconds: 1),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, child) {
+              return Text(
+                value.toInt().toString(),
+                style: textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
+              );
+            },
           ),
           Text(
             label,
@@ -820,8 +1038,12 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-/// Custom search delegate for Material 3 search
+/// Custom search delegate for Material 3 search with dynamic suggestions
 class _SemanticSearchDelegate extends SearchDelegate<String> {
+  // Cache for search history
+  List<SearchHistory>? _searchHistoryCache;
+  bool _isLoadingHistory = false;
+
   @override
   ThemeData appBarTheme(BuildContext context) {
     return Theme.of(context);
@@ -854,6 +1076,7 @@ class _SemanticSearchDelegate extends SearchDelegate<String> {
 
     // Navigate to search results
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.mounted) return;
       close(context, query);
       Navigator.push(
         context,
@@ -868,238 +1091,143 @@ class _SemanticSearchDelegate extends SearchDelegate<String> {
 
   @override
   Widget buildSuggestions(BuildContext context) {
-    final suggestions = [
-      'Find all Flutter documentation',
-      'What are my recent notes about?',
-      'Search for API implementations',
-      'Find project configuration files',
-    ];
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
-    return ListView.builder(
-      itemCount: suggestions.length,
-      itemBuilder: (context, index) {
-        return ListTile(
-          leading: const Icon(Icons.search),
-          title: Text(suggestions[index]),
-          onTap: () {
-            query = suggestions[index];
-            showResults(context);
-          },
+    return FutureBuilder<List<SearchHistory>>(
+      future: _loadSearchHistory(),
+      builder: (context, snapshot) {
+        // Default suggestions for when we're loading or have no history
+        final defaultSuggestions = [
+          'Find all documentation',
+          'Search for API implementations',
+          'Find configuration files',
+          'Recent notes and files',
+        ];
+
+        // Filter suggestions based on current query
+        final historyItems = snapshot.data ?? [];
+        final historySuggestions = historyItems
+            .where(
+              (h) =>
+                  h.query.isNotEmpty &&
+                  (query.isEmpty ||
+                      h.query.toLowerCase().contains(query.toLowerCase())),
+            )
+            .take(5)
+            .toList();
+
+        final filteredDefaults = defaultSuggestions
+            .where(
+              (s) =>
+                  query.isEmpty ||
+                  s.toLowerCase().contains(query.toLowerCase()),
+            )
+            .toList();
+
+        return ListView(
+          children: [
+            // Recent searches section
+            if (historySuggestions.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  'Recent Searches',
+                  style: textTheme.labelLarge?.copyWith(
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              ...historySuggestions.map(
+                (history) => ListTile(
+                  leading: Icon(Icons.history, color: colorScheme.primary),
+                  title: Text(history.query),
+                  subtitle: Text(
+                    '${history.resultCount} results',
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  trailing: Icon(
+                    Icons.north_west,
+                    size: 16,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  onTap: () {
+                    query = history.query;
+                    showResults(context);
+                  },
+                ),
+              ),
+              const Divider(),
+            ],
+
+            // Suggested searches section
+            if (filteredDefaults.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  'Suggested Searches',
+                  style: textTheme.labelLarge?.copyWith(
+                    color: colorScheme.secondary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              ...filteredDefaults.map(
+                (suggestion) => ListTile(
+                  leading: Icon(
+                    Icons.search,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  title: Text(suggestion),
+                  onTap: () {
+                    query = suggestion;
+                    showResults(context);
+                  },
+                ),
+              ),
+            ],
+
+            // Show loading indicator if still loading
+            if (snapshot.connectionState == ConnectionState.waiting &&
+                historySuggestions.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+          ],
         );
       },
     );
   }
-}
 
-class _IndexingJobCard extends ConsumerStatefulWidget {
-  final IndexingJob job;
-
-  const _IndexingJobCard({required this.job});
-
-  @override
-  ConsumerState<_IndexingJobCard> createState() => _IndexingJobCardState();
-}
-
-class _IndexingJobCardState extends ConsumerState<_IndexingJobCard> {
-  bool _isToggling = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final job = widget.job;
-
-    final watchedFolders = ref.watch(watchedFoldersProvider);
-    final isSmartIndexing = watchedFolders.any(
-      (f) => f.path == job.folderPath && f.isEnabled,
-    );
-
-    final isRunning = job.status == 'running';
-    final isFailed = job.status == 'failed';
-
-    // Calculate progress
-    double progress = 0.0;
-    if (job.totalFiles > 0) {
-      progress =
-          (job.processedFiles + job.failedFiles + job.skippedFiles) /
-          job.totalFiles;
-      if (progress > 1.0) progress = 1.0;
+  /// Load search history from server with caching
+  Future<List<SearchHistory>> _loadSearchHistory() async {
+    // Return cached results if available
+    if (_searchHistoryCache != null) {
+      return _searchHistoryCache!;
     }
 
-    return Card(
-      elevation: 0,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: colorScheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: isRunning
-                        ? colorScheme.primaryContainer
-                        : isFailed
-                        ? colorScheme.errorContainer
-                        : colorScheme.tertiaryContainer,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    isRunning
-                        ? Icons.sync
-                        : isFailed
-                        ? Icons.error_outline
-                        : Icons.check,
-                    size: 20,
-                    color: isRunning
-                        ? colorScheme.onPrimaryContainer
-                        : isFailed
-                        ? colorScheme.onErrorContainer
-                        : colorScheme.onTertiaryContainer,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        job.folderPath.split(Platform.pathSeparator).last,
-                        style: textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        job.folderPath,
-                        style: textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                // Status Chip
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    job.status.toUpperCase(),
-                    style: textTheme.labelSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+    // Prevent duplicate loading
+    if (_isLoadingHistory) {
+      return [];
+    }
 
-            if (isRunning || progress > 0) ...[
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '${(progress * 100).toInt()}%',
-                    style: textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    '${job.processedFiles}/${job.totalFiles} files',
-                    style: textTheme.bodySmall,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              LinearProgressIndicator(
-                value: progress,
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ],
-
-            if (isFailed && job.errorMessage != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                job.errorMessage!,
-                style: textTheme.bodySmall?.copyWith(
-                  color: colorScheme.error,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-
-            // Smart Indexing Toggle
-            const SizedBox(height: 12),
-            const Divider(height: 1),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(
-                  isSmartIndexing
-                      ? Icons.visibility_rounded
-                      : Icons.visibility_outlined,
-                  size: 18,
-                  color: isSmartIndexing
-                      ? colorScheme.primary
-                      : colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    isSmartIndexing ? 'Smart Indexing On' : 'Smart Indexing',
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: isSmartIndexing
-                          ? colorScheme.primary
-                          : colorScheme.onSurfaceVariant,
-                      fontWeight: isSmartIndexing ? FontWeight.w600 : null,
-                    ),
-                  ),
-                ),
-                _isToggling
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Switch.adaptive(
-                        value: isSmartIndexing,
-                        onChanged: (value) =>
-                            _toggleSmartIndexing(job.folderPath),
-                      ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _toggleSmartIndexing(String folderPath) async {
-    setState(() => _isToggling = true);
+    _isLoadingHistory = true;
     try {
-      await ref.read(watchedFoldersProvider.notifier).toggle(folderPath);
+      final history = await client.butler.getSearchHistory(
+        limit: 10,
+        offset: 0,
+      );
+      _searchHistoryCache = history;
+      return history;
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to toggle smart indexing: $e')),
-        );
-      }
+      AppLogger.warning('Failed to load search history: $e');
+      return [];
     } finally {
-      if (mounted) setState(() => _isToggling = false);
+      _isLoadingHistory = false;
     }
   }
 }

@@ -16,53 +16,86 @@ import 'agent_file_command.dart' as _i3;
 import 'agent_message.dart' as _i4;
 import 'agent_response.dart' as _i5;
 import 'agent_stream_message.dart' as _i6;
-import 'database_stats.dart' as _i7;
-import 'document_embedding.dart' as _i8;
-import 'drive_info.dart' as _i9;
-import 'file_index.dart' as _i10;
-import 'file_operation_result.dart' as _i11;
-import 'file_system_entry.dart' as _i12;
-import 'greetings/greeting.dart' as _i13;
-import 'ignore_pattern.dart' as _i14;
-import 'indexing_job.dart' as _i15;
-import 'indexing_job_detail.dart' as _i16;
-import 'indexing_progress.dart' as _i17;
-import 'indexing_status.dart' as _i18;
-import 'search_history.dart' as _i19;
-import 'search_result.dart' as _i20;
-import 'tag_taxonomy.dart' as _i21;
-import 'watched_folder.dart' as _i22;
+import 'ai_search_progress.dart' as _i7;
+import 'ai_search_result.dart' as _i8;
+import 'database_stats.dart' as _i9;
+import 'document_embedding.dart' as _i10;
+import 'drive_info.dart' as _i11;
+import 'duplicate_file.dart' as _i12;
+import 'duplicate_group.dart' as _i13;
+import 'error_category_count.dart' as _i14;
+import 'error_stats.dart' as _i15;
+import 'file_index.dart' as _i16;
+import 'file_operation_result.dart' as _i17;
+import 'file_system_entry.dart' as _i18;
+import 'greetings/greeting.dart' as _i19;
+import 'health_check.dart' as _i20;
+import 'ignore_pattern.dart' as _i21;
+import 'indexing_job.dart' as _i22;
+import 'indexing_job_detail.dart' as _i23;
+import 'indexing_progress.dart' as _i24;
+import 'indexing_status.dart' as _i25;
+import 'naming_issue.dart' as _i26;
+import 'organization_suggestions.dart' as _i27;
+import 'saved_search_preset.dart' as _i28;
+import 'search_filters.dart' as _i29;
+import 'search_history.dart' as _i30;
+import 'search_result.dart' as _i31;
+import 'search_suggestion.dart' as _i32;
+import 'similar_content_group.dart' as _i33;
+import 'similar_file.dart' as _i34;
+import 'tag_taxonomy.dart' as _i35;
+import 'watched_folder.dart' as _i36;
 import 'package:semantic_butler_server/src/generated/agent_message.dart'
-    as _i23;
+    as _i37;
 import 'package:semantic_butler_server/src/generated/search_result.dart'
-    as _i24;
+    as _i38;
+import 'package:semantic_butler_server/src/generated/search_suggestion.dart'
+    as _i39;
+import 'package:semantic_butler_server/src/generated/saved_search_preset.dart'
+    as _i40;
 import 'package:semantic_butler_server/src/generated/search_history.dart'
-    as _i25;
+    as _i41;
 import 'package:semantic_butler_server/src/generated/watched_folder.dart'
-    as _i26;
+    as _i42;
 import 'package:semantic_butler_server/src/generated/ignore_pattern.dart'
-    as _i27;
+    as _i43;
+import 'package:semantic_butler_server/src/generated/tag_taxonomy.dart' as _i44;
 import 'package:semantic_butler_server/src/generated/file_system_entry.dart'
-    as _i28;
-import 'package:semantic_butler_server/src/generated/drive_info.dart' as _i29;
+    as _i45;
+import 'package:semantic_butler_server/src/generated/drive_info.dart' as _i46;
 export 'agent_file_command.dart';
 export 'agent_message.dart';
 export 'agent_response.dart';
 export 'agent_stream_message.dart';
+export 'ai_search_progress.dart';
+export 'ai_search_result.dart';
 export 'database_stats.dart';
 export 'document_embedding.dart';
 export 'drive_info.dart';
+export 'duplicate_file.dart';
+export 'duplicate_group.dart';
+export 'error_category_count.dart';
+export 'error_stats.dart';
 export 'file_index.dart';
 export 'file_operation_result.dart';
 export 'file_system_entry.dart';
 export 'greetings/greeting.dart';
+export 'health_check.dart';
 export 'ignore_pattern.dart';
 export 'indexing_job.dart';
 export 'indexing_job_detail.dart';
 export 'indexing_progress.dart';
 export 'indexing_status.dart';
+export 'naming_issue.dart';
+export 'organization_suggestions.dart';
+export 'saved_search_preset.dart';
+export 'search_filters.dart';
 export 'search_history.dart';
 export 'search_result.dart';
+export 'search_suggestion.dart';
+export 'similar_content_group.dart';
+export 'similar_file.dart';
 export 'tag_taxonomy.dart';
 export 'watched_folder.dart';
 
@@ -600,6 +633,12 @@ class Protocol extends _i1.SerializationManagerServer {
           isNullable: true,
           dartType: 'String?',
         ),
+        _i2.ColumnDefinition(
+          name: 'errorCategory',
+          columnType: _i2.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
       ],
       foreignKeys: [],
       indexes: [
@@ -694,6 +733,12 @@ class Protocol extends _i1.SerializationManagerServer {
           isNullable: true,
           dartType: 'String?',
         ),
+        _i2.ColumnDefinition(
+          name: 'errorCategory',
+          columnType: _i2.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
       ],
       foreignKeys: [],
       indexes: [
@@ -749,6 +794,117 @@ class Protocol extends _i1.SerializationManagerServer {
           isUnique: false,
           isPrimary: false,
         ),
+        _i2.IndexDefinition(
+          indexName: 'idx_job_detail_error_category',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'errorCategory',
+            ),
+          ],
+          type: 'btree',
+          isUnique: false,
+          isPrimary: false,
+        ),
+      ],
+      managed: true,
+    ),
+    _i2.TableDefinition(
+      name: 'saved_search_preset',
+      dartName: 'SavedSearchPreset',
+      schema: 'public',
+      module: 'semantic_butler',
+      columns: [
+        _i2.ColumnDefinition(
+          name: 'id',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int?',
+          columnDefault: 'nextval(\'saved_search_preset_id_seq\'::regclass)',
+        ),
+        _i2.ColumnDefinition(
+          name: 'name',
+          columnType: _i2.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _i2.ColumnDefinition(
+          name: 'query',
+          columnType: _i2.ColumnType.text,
+          isNullable: false,
+          dartType: 'String',
+        ),
+        _i2.ColumnDefinition(
+          name: 'category',
+          columnType: _i2.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
+        _i2.ColumnDefinition(
+          name: 'tags',
+          columnType: _i2.ColumnType.json,
+          isNullable: true,
+          dartType: 'List<String>?',
+        ),
+        _i2.ColumnDefinition(
+          name: 'fileTypes',
+          columnType: _i2.ColumnType.json,
+          isNullable: true,
+          dartType: 'List<String>?',
+        ),
+        _i2.ColumnDefinition(
+          name: 'dateFrom',
+          columnType: _i2.ColumnType.timestampWithoutTimeZone,
+          isNullable: true,
+          dartType: 'DateTime?',
+        ),
+        _i2.ColumnDefinition(
+          name: 'dateTo',
+          columnType: _i2.ColumnType.timestampWithoutTimeZone,
+          isNullable: true,
+          dartType: 'DateTime?',
+        ),
+        _i2.ColumnDefinition(
+          name: 'minSize',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: true,
+          dartType: 'int?',
+        ),
+        _i2.ColumnDefinition(
+          name: 'maxSize',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: true,
+          dartType: 'int?',
+        ),
+        _i2.ColumnDefinition(
+          name: 'createdAt',
+          columnType: _i2.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+        ),
+        _i2.ColumnDefinition(
+          name: 'usageCount',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+      ],
+      foreignKeys: [],
+      indexes: [
+        _i2.IndexDefinition(
+          indexName: 'saved_search_preset_pkey',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'id',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: true,
+        ),
       ],
       managed: true,
     ),
@@ -795,6 +951,18 @@ class Protocol extends _i1.SerializationManagerServer {
           isNullable: false,
           dartType: 'DateTime',
         ),
+        _i2.ColumnDefinition(
+          name: 'searchType',
+          columnType: _i2.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
+        _i2.ColumnDefinition(
+          name: 'directoryContext',
+          columnType: _i2.ColumnType.text,
+          isNullable: true,
+          dartType: 'String?',
+        ),
       ],
       foreignKeys: [],
       indexes: [
@@ -818,6 +986,19 @@ class Protocol extends _i1.SerializationManagerServer {
             _i2.IndexElementDefinition(
               type: _i2.IndexElementDefinitionType.column,
               definition: 'searchedAt',
+            ),
+          ],
+          type: 'btree',
+          isUnique: false,
+          isPrimary: false,
+        ),
+        _i2.IndexDefinition(
+          indexName: 'search_history_type',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'searchType',
             ),
           ],
           type: 'btree',
@@ -1026,53 +1207,95 @@ class Protocol extends _i1.SerializationManagerServer {
     if (t == _i6.AgentStreamMessage) {
       return _i6.AgentStreamMessage.fromJson(data) as T;
     }
-    if (t == _i7.DatabaseStats) {
-      return _i7.DatabaseStats.fromJson(data) as T;
+    if (t == _i7.AISearchProgress) {
+      return _i7.AISearchProgress.fromJson(data) as T;
     }
-    if (t == _i8.DocumentEmbedding) {
-      return _i8.DocumentEmbedding.fromJson(data) as T;
+    if (t == _i8.AISearchResult) {
+      return _i8.AISearchResult.fromJson(data) as T;
     }
-    if (t == _i9.DriveInfo) {
-      return _i9.DriveInfo.fromJson(data) as T;
+    if (t == _i9.DatabaseStats) {
+      return _i9.DatabaseStats.fromJson(data) as T;
     }
-    if (t == _i10.FileIndex) {
-      return _i10.FileIndex.fromJson(data) as T;
+    if (t == _i10.DocumentEmbedding) {
+      return _i10.DocumentEmbedding.fromJson(data) as T;
     }
-    if (t == _i11.FileOperationResult) {
-      return _i11.FileOperationResult.fromJson(data) as T;
+    if (t == _i11.DriveInfo) {
+      return _i11.DriveInfo.fromJson(data) as T;
     }
-    if (t == _i12.FileSystemEntry) {
-      return _i12.FileSystemEntry.fromJson(data) as T;
+    if (t == _i12.DuplicateFile) {
+      return _i12.DuplicateFile.fromJson(data) as T;
     }
-    if (t == _i13.Greeting) {
-      return _i13.Greeting.fromJson(data) as T;
+    if (t == _i13.DuplicateGroup) {
+      return _i13.DuplicateGroup.fromJson(data) as T;
     }
-    if (t == _i14.IgnorePattern) {
-      return _i14.IgnorePattern.fromJson(data) as T;
+    if (t == _i14.ErrorCategoryCount) {
+      return _i14.ErrorCategoryCount.fromJson(data) as T;
     }
-    if (t == _i15.IndexingJob) {
-      return _i15.IndexingJob.fromJson(data) as T;
+    if (t == _i15.ErrorStats) {
+      return _i15.ErrorStats.fromJson(data) as T;
     }
-    if (t == _i16.IndexingJobDetail) {
-      return _i16.IndexingJobDetail.fromJson(data) as T;
+    if (t == _i16.FileIndex) {
+      return _i16.FileIndex.fromJson(data) as T;
     }
-    if (t == _i17.IndexingProgress) {
-      return _i17.IndexingProgress.fromJson(data) as T;
+    if (t == _i17.FileOperationResult) {
+      return _i17.FileOperationResult.fromJson(data) as T;
     }
-    if (t == _i18.IndexingStatus) {
-      return _i18.IndexingStatus.fromJson(data) as T;
+    if (t == _i18.FileSystemEntry) {
+      return _i18.FileSystemEntry.fromJson(data) as T;
     }
-    if (t == _i19.SearchHistory) {
-      return _i19.SearchHistory.fromJson(data) as T;
+    if (t == _i19.Greeting) {
+      return _i19.Greeting.fromJson(data) as T;
     }
-    if (t == _i20.SearchResult) {
-      return _i20.SearchResult.fromJson(data) as T;
+    if (t == _i20.HealthCheck) {
+      return _i20.HealthCheck.fromJson(data) as T;
     }
-    if (t == _i21.TagTaxonomy) {
-      return _i21.TagTaxonomy.fromJson(data) as T;
+    if (t == _i21.IgnorePattern) {
+      return _i21.IgnorePattern.fromJson(data) as T;
     }
-    if (t == _i22.WatchedFolder) {
-      return _i22.WatchedFolder.fromJson(data) as T;
+    if (t == _i22.IndexingJob) {
+      return _i22.IndexingJob.fromJson(data) as T;
+    }
+    if (t == _i23.IndexingJobDetail) {
+      return _i23.IndexingJobDetail.fromJson(data) as T;
+    }
+    if (t == _i24.IndexingProgress) {
+      return _i24.IndexingProgress.fromJson(data) as T;
+    }
+    if (t == _i25.IndexingStatus) {
+      return _i25.IndexingStatus.fromJson(data) as T;
+    }
+    if (t == _i26.NamingIssue) {
+      return _i26.NamingIssue.fromJson(data) as T;
+    }
+    if (t == _i27.OrganizationSuggestions) {
+      return _i27.OrganizationSuggestions.fromJson(data) as T;
+    }
+    if (t == _i28.SavedSearchPreset) {
+      return _i28.SavedSearchPreset.fromJson(data) as T;
+    }
+    if (t == _i29.SearchFilters) {
+      return _i29.SearchFilters.fromJson(data) as T;
+    }
+    if (t == _i30.SearchHistory) {
+      return _i30.SearchHistory.fromJson(data) as T;
+    }
+    if (t == _i31.SearchResult) {
+      return _i31.SearchResult.fromJson(data) as T;
+    }
+    if (t == _i32.SearchSuggestion) {
+      return _i32.SearchSuggestion.fromJson(data) as T;
+    }
+    if (t == _i33.SimilarContentGroup) {
+      return _i33.SimilarContentGroup.fromJson(data) as T;
+    }
+    if (t == _i34.SimilarFile) {
+      return _i34.SimilarFile.fromJson(data) as T;
+    }
+    if (t == _i35.TagTaxonomy) {
+      return _i35.TagTaxonomy.fromJson(data) as T;
+    }
+    if (t == _i36.WatchedFolder) {
+      return _i36.WatchedFolder.fromJson(data) as T;
     }
     if (t == _i1.getType<_i3.AgentFileCommand?>()) {
       return (data != null ? _i3.AgentFileCommand.fromJson(data) : null) as T;
@@ -1086,65 +1309,110 @@ class Protocol extends _i1.SerializationManagerServer {
     if (t == _i1.getType<_i6.AgentStreamMessage?>()) {
       return (data != null ? _i6.AgentStreamMessage.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i7.DatabaseStats?>()) {
-      return (data != null ? _i7.DatabaseStats.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i7.AISearchProgress?>()) {
+      return (data != null ? _i7.AISearchProgress.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i8.DocumentEmbedding?>()) {
-      return (data != null ? _i8.DocumentEmbedding.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i8.AISearchResult?>()) {
+      return (data != null ? _i8.AISearchResult.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i9.DriveInfo?>()) {
-      return (data != null ? _i9.DriveInfo.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i9.DatabaseStats?>()) {
+      return (data != null ? _i9.DatabaseStats.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i10.FileIndex?>()) {
-      return (data != null ? _i10.FileIndex.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i10.DocumentEmbedding?>()) {
+      return (data != null ? _i10.DocumentEmbedding.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i11.FileOperationResult?>()) {
-      return (data != null ? _i11.FileOperationResult.fromJson(data) : null)
+    if (t == _i1.getType<_i11.DriveInfo?>()) {
+      return (data != null ? _i11.DriveInfo.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i12.DuplicateFile?>()) {
+      return (data != null ? _i12.DuplicateFile.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i13.DuplicateGroup?>()) {
+      return (data != null ? _i13.DuplicateGroup.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i14.ErrorCategoryCount?>()) {
+      return (data != null ? _i14.ErrorCategoryCount.fromJson(data) : null)
           as T;
     }
-    if (t == _i1.getType<_i12.FileSystemEntry?>()) {
-      return (data != null ? _i12.FileSystemEntry.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i15.ErrorStats?>()) {
+      return (data != null ? _i15.ErrorStats.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i13.Greeting?>()) {
-      return (data != null ? _i13.Greeting.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i16.FileIndex?>()) {
+      return (data != null ? _i16.FileIndex.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i14.IgnorePattern?>()) {
-      return (data != null ? _i14.IgnorePattern.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i17.FileOperationResult?>()) {
+      return (data != null ? _i17.FileOperationResult.fromJson(data) : null)
+          as T;
     }
-    if (t == _i1.getType<_i15.IndexingJob?>()) {
-      return (data != null ? _i15.IndexingJob.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i18.FileSystemEntry?>()) {
+      return (data != null ? _i18.FileSystemEntry.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i16.IndexingJobDetail?>()) {
-      return (data != null ? _i16.IndexingJobDetail.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i19.Greeting?>()) {
+      return (data != null ? _i19.Greeting.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i17.IndexingProgress?>()) {
-      return (data != null ? _i17.IndexingProgress.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i20.HealthCheck?>()) {
+      return (data != null ? _i20.HealthCheck.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i18.IndexingStatus?>()) {
-      return (data != null ? _i18.IndexingStatus.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i21.IgnorePattern?>()) {
+      return (data != null ? _i21.IgnorePattern.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i19.SearchHistory?>()) {
-      return (data != null ? _i19.SearchHistory.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i22.IndexingJob?>()) {
+      return (data != null ? _i22.IndexingJob.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i20.SearchResult?>()) {
-      return (data != null ? _i20.SearchResult.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i23.IndexingJobDetail?>()) {
+      return (data != null ? _i23.IndexingJobDetail.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i21.TagTaxonomy?>()) {
-      return (data != null ? _i21.TagTaxonomy.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i24.IndexingProgress?>()) {
+      return (data != null ? _i24.IndexingProgress.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i22.WatchedFolder?>()) {
-      return (data != null ? _i22.WatchedFolder.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i25.IndexingStatus?>()) {
+      return (data != null ? _i25.IndexingStatus.fromJson(data) : null) as T;
     }
-    if (t == List<_i15.IndexingJob>) {
+    if (t == _i1.getType<_i26.NamingIssue?>()) {
+      return (data != null ? _i26.NamingIssue.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i27.OrganizationSuggestions?>()) {
+      return (data != null ? _i27.OrganizationSuggestions.fromJson(data) : null)
+          as T;
+    }
+    if (t == _i1.getType<_i28.SavedSearchPreset?>()) {
+      return (data != null ? _i28.SavedSearchPreset.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i29.SearchFilters?>()) {
+      return (data != null ? _i29.SearchFilters.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i30.SearchHistory?>()) {
+      return (data != null ? _i30.SearchHistory.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i31.SearchResult?>()) {
+      return (data != null ? _i31.SearchResult.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i32.SearchSuggestion?>()) {
+      return (data != null ? _i32.SearchSuggestion.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i33.SimilarContentGroup?>()) {
+      return (data != null ? _i33.SimilarContentGroup.fromJson(data) : null)
+          as T;
+    }
+    if (t == _i1.getType<_i34.SimilarFile?>()) {
+      return (data != null ? _i34.SimilarFile.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i35.TagTaxonomy?>()) {
+      return (data != null ? _i35.TagTaxonomy.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i36.WatchedFolder?>()) {
+      return (data != null ? _i36.WatchedFolder.fromJson(data) : null) as T;
+    }
+    if (t == List<_i8.AISearchResult>) {
       return (data as List)
-              .map((e) => deserialize<_i15.IndexingJob>(e))
+              .map((e) => deserialize<_i8.AISearchResult>(e))
               .toList()
           as T;
     }
-    if (t == _i1.getType<List<_i15.IndexingJob>?>()) {
+    if (t == _i1.getType<List<_i8.AISearchResult>?>()) {
       return (data != null
               ? (data as List)
-                    .map((e) => deserialize<_i15.IndexingJob>(e))
+                    .map((e) => deserialize<_i8.AISearchResult>(e))
                     .toList()
               : null)
           as T;
@@ -1152,29 +1420,97 @@ class Protocol extends _i1.SerializationManagerServer {
     if (t == List<String>) {
       return (data as List).map((e) => deserialize<String>(e)).toList() as T;
     }
-    if (t == List<_i23.AgentMessage>) {
+    if (t == _i1.getType<List<String>?>()) {
+      return (data != null
+              ? (data as List).map((e) => deserialize<String>(e)).toList()
+              : null)
+          as T;
+    }
+    if (t == List<_i12.DuplicateFile>) {
       return (data as List)
-              .map((e) => deserialize<_i23.AgentMessage>(e))
+              .map((e) => deserialize<_i12.DuplicateFile>(e))
               .toList()
           as T;
     }
-    if (t == _i1.getType<List<_i23.AgentMessage>?>()) {
+    if (t == List<_i14.ErrorCategoryCount>) {
+      return (data as List)
+              .map((e) => deserialize<_i14.ErrorCategoryCount>(e))
+              .toList()
+          as T;
+    }
+    if (t == List<_i22.IndexingJob>) {
+      return (data as List)
+              .map((e) => deserialize<_i22.IndexingJob>(e))
+              .toList()
+          as T;
+    }
+    if (t == _i1.getType<List<_i22.IndexingJob>?>()) {
       return (data != null
               ? (data as List)
-                    .map((e) => deserialize<_i23.AgentMessage>(e))
+                    .map((e) => deserialize<_i22.IndexingJob>(e))
                     .toList()
               : null)
           as T;
     }
-    if (t == List<_i24.SearchResult>) {
+    if (t == List<_i13.DuplicateGroup>) {
       return (data as List)
-              .map((e) => deserialize<_i24.SearchResult>(e))
+              .map((e) => deserialize<_i13.DuplicateGroup>(e))
               .toList()
           as T;
     }
-    if (t == List<_i25.SearchHistory>) {
+    if (t == List<_i26.NamingIssue>) {
       return (data as List)
-              .map((e) => deserialize<_i25.SearchHistory>(e))
+              .map((e) => deserialize<_i26.NamingIssue>(e))
+              .toList()
+          as T;
+    }
+    if (t == List<_i33.SimilarContentGroup>) {
+      return (data as List)
+              .map((e) => deserialize<_i33.SimilarContentGroup>(e))
+              .toList()
+          as T;
+    }
+    if (t == List<_i34.SimilarFile>) {
+      return (data as List)
+              .map((e) => deserialize<_i34.SimilarFile>(e))
+              .toList()
+          as T;
+    }
+    if (t == List<_i37.AgentMessage>) {
+      return (data as List)
+              .map((e) => deserialize<_i37.AgentMessage>(e))
+              .toList()
+          as T;
+    }
+    if (t == _i1.getType<List<_i37.AgentMessage>?>()) {
+      return (data != null
+              ? (data as List)
+                    .map((e) => deserialize<_i37.AgentMessage>(e))
+                    .toList()
+              : null)
+          as T;
+    }
+    if (t == List<_i38.SearchResult>) {
+      return (data as List)
+              .map((e) => deserialize<_i38.SearchResult>(e))
+              .toList()
+          as T;
+    }
+    if (t == List<_i39.SearchSuggestion>) {
+      return (data as List)
+              .map((e) => deserialize<_i39.SearchSuggestion>(e))
+              .toList()
+          as T;
+    }
+    if (t == List<_i40.SavedSearchPreset>) {
+      return (data as List)
+              .map((e) => deserialize<_i40.SavedSearchPreset>(e))
+              .toList()
+          as T;
+    }
+    if (t == List<_i41.SearchHistory>) {
+      return (data as List)
+              .map((e) => deserialize<_i41.SearchHistory>(e))
               .toList()
           as T;
     }
@@ -1184,29 +1520,56 @@ class Protocol extends _i1.SerializationManagerServer {
           )
           as T;
     }
-    if (t == List<_i26.WatchedFolder>) {
+    if (t == List<_i42.WatchedFolder>) {
       return (data as List)
-              .map((e) => deserialize<_i26.WatchedFolder>(e))
+              .map((e) => deserialize<_i42.WatchedFolder>(e))
               .toList()
           as T;
     }
-    if (t == List<_i27.IgnorePattern>) {
+    if (t == List<_i43.IgnorePattern>) {
       return (data as List)
-              .map((e) => deserialize<_i27.IgnorePattern>(e))
+              .map((e) => deserialize<_i43.IgnorePattern>(e))
               .toList()
           as T;
     }
     if (t == List<String>) {
       return (data as List).map((e) => deserialize<String>(e)).toList() as T;
     }
-    if (t == List<_i28.FileSystemEntry>) {
+    if (t == List<_i44.TagTaxonomy>) {
       return (data as List)
-              .map((e) => deserialize<_i28.FileSystemEntry>(e))
+              .map((e) => deserialize<_i44.TagTaxonomy>(e))
               .toList()
           as T;
     }
-    if (t == List<_i29.DriveInfo>) {
-      return (data as List).map((e) => deserialize<_i29.DriveInfo>(e)).toList()
+    if (t == List<Map<String, dynamic>>) {
+      return (data as List)
+              .map((e) => deserialize<Map<String, dynamic>>(e))
+              .toList()
+          as T;
+    }
+    if (t == Map<String, double>) {
+      return (data as Map).map(
+            (k, v) => MapEntry(deserialize<String>(k), deserialize<double>(v)),
+          )
+          as T;
+    }
+    if (t == _i1.getType<Map<String, dynamic>?>()) {
+      return (data != null
+              ? (data as Map).map(
+                  (k, v) =>
+                      MapEntry(deserialize<String>(k), deserialize<dynamic>(v)),
+                )
+              : null)
+          as T;
+    }
+    if (t == List<_i45.FileSystemEntry>) {
+      return (data as List)
+              .map((e) => deserialize<_i45.FileSystemEntry>(e))
+              .toList()
+          as T;
+    }
+    if (t == List<_i46.DriveInfo>) {
+      return (data as List).map((e) => deserialize<_i46.DriveInfo>(e)).toList()
           as T;
     }
     try {
@@ -1221,22 +1584,36 @@ class Protocol extends _i1.SerializationManagerServer {
       _i4.AgentMessage => 'AgentMessage',
       _i5.AgentResponse => 'AgentResponse',
       _i6.AgentStreamMessage => 'AgentStreamMessage',
-      _i7.DatabaseStats => 'DatabaseStats',
-      _i8.DocumentEmbedding => 'DocumentEmbedding',
-      _i9.DriveInfo => 'DriveInfo',
-      _i10.FileIndex => 'FileIndex',
-      _i11.FileOperationResult => 'FileOperationResult',
-      _i12.FileSystemEntry => 'FileSystemEntry',
-      _i13.Greeting => 'Greeting',
-      _i14.IgnorePattern => 'IgnorePattern',
-      _i15.IndexingJob => 'IndexingJob',
-      _i16.IndexingJobDetail => 'IndexingJobDetail',
-      _i17.IndexingProgress => 'IndexingProgress',
-      _i18.IndexingStatus => 'IndexingStatus',
-      _i19.SearchHistory => 'SearchHistory',
-      _i20.SearchResult => 'SearchResult',
-      _i21.TagTaxonomy => 'TagTaxonomy',
-      _i22.WatchedFolder => 'WatchedFolder',
+      _i7.AISearchProgress => 'AISearchProgress',
+      _i8.AISearchResult => 'AISearchResult',
+      _i9.DatabaseStats => 'DatabaseStats',
+      _i10.DocumentEmbedding => 'DocumentEmbedding',
+      _i11.DriveInfo => 'DriveInfo',
+      _i12.DuplicateFile => 'DuplicateFile',
+      _i13.DuplicateGroup => 'DuplicateGroup',
+      _i14.ErrorCategoryCount => 'ErrorCategoryCount',
+      _i15.ErrorStats => 'ErrorStats',
+      _i16.FileIndex => 'FileIndex',
+      _i17.FileOperationResult => 'FileOperationResult',
+      _i18.FileSystemEntry => 'FileSystemEntry',
+      _i19.Greeting => 'Greeting',
+      _i20.HealthCheck => 'HealthCheck',
+      _i21.IgnorePattern => 'IgnorePattern',
+      _i22.IndexingJob => 'IndexingJob',
+      _i23.IndexingJobDetail => 'IndexingJobDetail',
+      _i24.IndexingProgress => 'IndexingProgress',
+      _i25.IndexingStatus => 'IndexingStatus',
+      _i26.NamingIssue => 'NamingIssue',
+      _i27.OrganizationSuggestions => 'OrganizationSuggestions',
+      _i28.SavedSearchPreset => 'SavedSearchPreset',
+      _i29.SearchFilters => 'SearchFilters',
+      _i30.SearchHistory => 'SearchHistory',
+      _i31.SearchResult => 'SearchResult',
+      _i32.SearchSuggestion => 'SearchSuggestion',
+      _i33.SimilarContentGroup => 'SimilarContentGroup',
+      _i34.SimilarFile => 'SimilarFile',
+      _i35.TagTaxonomy => 'TagTaxonomy',
+      _i36.WatchedFolder => 'WatchedFolder',
       _ => null,
     };
   }
@@ -1262,37 +1639,65 @@ class Protocol extends _i1.SerializationManagerServer {
         return 'AgentResponse';
       case _i6.AgentStreamMessage():
         return 'AgentStreamMessage';
-      case _i7.DatabaseStats():
+      case _i7.AISearchProgress():
+        return 'AISearchProgress';
+      case _i8.AISearchResult():
+        return 'AISearchResult';
+      case _i9.DatabaseStats():
         return 'DatabaseStats';
-      case _i8.DocumentEmbedding():
+      case _i10.DocumentEmbedding():
         return 'DocumentEmbedding';
-      case _i9.DriveInfo():
+      case _i11.DriveInfo():
         return 'DriveInfo';
-      case _i10.FileIndex():
+      case _i12.DuplicateFile():
+        return 'DuplicateFile';
+      case _i13.DuplicateGroup():
+        return 'DuplicateGroup';
+      case _i14.ErrorCategoryCount():
+        return 'ErrorCategoryCount';
+      case _i15.ErrorStats():
+        return 'ErrorStats';
+      case _i16.FileIndex():
         return 'FileIndex';
-      case _i11.FileOperationResult():
+      case _i17.FileOperationResult():
         return 'FileOperationResult';
-      case _i12.FileSystemEntry():
+      case _i18.FileSystemEntry():
         return 'FileSystemEntry';
-      case _i13.Greeting():
+      case _i19.Greeting():
         return 'Greeting';
-      case _i14.IgnorePattern():
+      case _i20.HealthCheck():
+        return 'HealthCheck';
+      case _i21.IgnorePattern():
         return 'IgnorePattern';
-      case _i15.IndexingJob():
+      case _i22.IndexingJob():
         return 'IndexingJob';
-      case _i16.IndexingJobDetail():
+      case _i23.IndexingJobDetail():
         return 'IndexingJobDetail';
-      case _i17.IndexingProgress():
+      case _i24.IndexingProgress():
         return 'IndexingProgress';
-      case _i18.IndexingStatus():
+      case _i25.IndexingStatus():
         return 'IndexingStatus';
-      case _i19.SearchHistory():
+      case _i26.NamingIssue():
+        return 'NamingIssue';
+      case _i27.OrganizationSuggestions():
+        return 'OrganizationSuggestions';
+      case _i28.SavedSearchPreset():
+        return 'SavedSearchPreset';
+      case _i29.SearchFilters():
+        return 'SearchFilters';
+      case _i30.SearchHistory():
         return 'SearchHistory';
-      case _i20.SearchResult():
+      case _i31.SearchResult():
         return 'SearchResult';
-      case _i21.TagTaxonomy():
+      case _i32.SearchSuggestion():
+        return 'SearchSuggestion';
+      case _i33.SimilarContentGroup():
+        return 'SimilarContentGroup';
+      case _i34.SimilarFile():
+        return 'SimilarFile';
+      case _i35.TagTaxonomy():
         return 'TagTaxonomy';
-      case _i22.WatchedFolder():
+      case _i36.WatchedFolder():
         return 'WatchedFolder';
     }
     className = _i2.Protocol().getClassNameForObject(data);
@@ -1320,53 +1725,95 @@ class Protocol extends _i1.SerializationManagerServer {
     if (dataClassName == 'AgentStreamMessage') {
       return deserialize<_i6.AgentStreamMessage>(data['data']);
     }
+    if (dataClassName == 'AISearchProgress') {
+      return deserialize<_i7.AISearchProgress>(data['data']);
+    }
+    if (dataClassName == 'AISearchResult') {
+      return deserialize<_i8.AISearchResult>(data['data']);
+    }
     if (dataClassName == 'DatabaseStats') {
-      return deserialize<_i7.DatabaseStats>(data['data']);
+      return deserialize<_i9.DatabaseStats>(data['data']);
     }
     if (dataClassName == 'DocumentEmbedding') {
-      return deserialize<_i8.DocumentEmbedding>(data['data']);
+      return deserialize<_i10.DocumentEmbedding>(data['data']);
     }
     if (dataClassName == 'DriveInfo') {
-      return deserialize<_i9.DriveInfo>(data['data']);
+      return deserialize<_i11.DriveInfo>(data['data']);
+    }
+    if (dataClassName == 'DuplicateFile') {
+      return deserialize<_i12.DuplicateFile>(data['data']);
+    }
+    if (dataClassName == 'DuplicateGroup') {
+      return deserialize<_i13.DuplicateGroup>(data['data']);
+    }
+    if (dataClassName == 'ErrorCategoryCount') {
+      return deserialize<_i14.ErrorCategoryCount>(data['data']);
+    }
+    if (dataClassName == 'ErrorStats') {
+      return deserialize<_i15.ErrorStats>(data['data']);
     }
     if (dataClassName == 'FileIndex') {
-      return deserialize<_i10.FileIndex>(data['data']);
+      return deserialize<_i16.FileIndex>(data['data']);
     }
     if (dataClassName == 'FileOperationResult') {
-      return deserialize<_i11.FileOperationResult>(data['data']);
+      return deserialize<_i17.FileOperationResult>(data['data']);
     }
     if (dataClassName == 'FileSystemEntry') {
-      return deserialize<_i12.FileSystemEntry>(data['data']);
+      return deserialize<_i18.FileSystemEntry>(data['data']);
     }
     if (dataClassName == 'Greeting') {
-      return deserialize<_i13.Greeting>(data['data']);
+      return deserialize<_i19.Greeting>(data['data']);
+    }
+    if (dataClassName == 'HealthCheck') {
+      return deserialize<_i20.HealthCheck>(data['data']);
     }
     if (dataClassName == 'IgnorePattern') {
-      return deserialize<_i14.IgnorePattern>(data['data']);
+      return deserialize<_i21.IgnorePattern>(data['data']);
     }
     if (dataClassName == 'IndexingJob') {
-      return deserialize<_i15.IndexingJob>(data['data']);
+      return deserialize<_i22.IndexingJob>(data['data']);
     }
     if (dataClassName == 'IndexingJobDetail') {
-      return deserialize<_i16.IndexingJobDetail>(data['data']);
+      return deserialize<_i23.IndexingJobDetail>(data['data']);
     }
     if (dataClassName == 'IndexingProgress') {
-      return deserialize<_i17.IndexingProgress>(data['data']);
+      return deserialize<_i24.IndexingProgress>(data['data']);
     }
     if (dataClassName == 'IndexingStatus') {
-      return deserialize<_i18.IndexingStatus>(data['data']);
+      return deserialize<_i25.IndexingStatus>(data['data']);
+    }
+    if (dataClassName == 'NamingIssue') {
+      return deserialize<_i26.NamingIssue>(data['data']);
+    }
+    if (dataClassName == 'OrganizationSuggestions') {
+      return deserialize<_i27.OrganizationSuggestions>(data['data']);
+    }
+    if (dataClassName == 'SavedSearchPreset') {
+      return deserialize<_i28.SavedSearchPreset>(data['data']);
+    }
+    if (dataClassName == 'SearchFilters') {
+      return deserialize<_i29.SearchFilters>(data['data']);
     }
     if (dataClassName == 'SearchHistory') {
-      return deserialize<_i19.SearchHistory>(data['data']);
+      return deserialize<_i30.SearchHistory>(data['data']);
     }
     if (dataClassName == 'SearchResult') {
-      return deserialize<_i20.SearchResult>(data['data']);
+      return deserialize<_i31.SearchResult>(data['data']);
+    }
+    if (dataClassName == 'SearchSuggestion') {
+      return deserialize<_i32.SearchSuggestion>(data['data']);
+    }
+    if (dataClassName == 'SimilarContentGroup') {
+      return deserialize<_i33.SimilarContentGroup>(data['data']);
+    }
+    if (dataClassName == 'SimilarFile') {
+      return deserialize<_i34.SimilarFile>(data['data']);
     }
     if (dataClassName == 'TagTaxonomy') {
-      return deserialize<_i21.TagTaxonomy>(data['data']);
+      return deserialize<_i35.TagTaxonomy>(data['data']);
     }
     if (dataClassName == 'WatchedFolder') {
-      return deserialize<_i22.WatchedFolder>(data['data']);
+      return deserialize<_i36.WatchedFolder>(data['data']);
     }
     if (dataClassName.startsWith('serverpod.')) {
       data['className'] = dataClassName.substring(10);
@@ -1386,22 +1833,24 @@ class Protocol extends _i1.SerializationManagerServer {
     switch (t) {
       case _i3.AgentFileCommand:
         return _i3.AgentFileCommand.t;
-      case _i8.DocumentEmbedding:
-        return _i8.DocumentEmbedding.t;
-      case _i10.FileIndex:
-        return _i10.FileIndex.t;
-      case _i14.IgnorePattern:
-        return _i14.IgnorePattern.t;
-      case _i15.IndexingJob:
-        return _i15.IndexingJob.t;
-      case _i16.IndexingJobDetail:
-        return _i16.IndexingJobDetail.t;
-      case _i19.SearchHistory:
-        return _i19.SearchHistory.t;
-      case _i21.TagTaxonomy:
-        return _i21.TagTaxonomy.t;
-      case _i22.WatchedFolder:
-        return _i22.WatchedFolder.t;
+      case _i10.DocumentEmbedding:
+        return _i10.DocumentEmbedding.t;
+      case _i16.FileIndex:
+        return _i16.FileIndex.t;
+      case _i21.IgnorePattern:
+        return _i21.IgnorePattern.t;
+      case _i22.IndexingJob:
+        return _i22.IndexingJob.t;
+      case _i23.IndexingJobDetail:
+        return _i23.IndexingJobDetail.t;
+      case _i28.SavedSearchPreset:
+        return _i28.SavedSearchPreset.t;
+      case _i30.SearchHistory:
+        return _i30.SearchHistory.t;
+      case _i35.TagTaxonomy:
+        return _i35.TagTaxonomy.t;
+      case _i36.WatchedFolder:
+        return _i36.WatchedFolder.t;
     }
     return null;
   }

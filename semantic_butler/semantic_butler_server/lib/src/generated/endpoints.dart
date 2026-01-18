@@ -14,8 +14,13 @@ import 'package:serverpod/serverpod.dart' as _i1;
 import '../endpoints/agent_endpoint.dart' as _i2;
 import '../endpoints/butler_endpoint.dart' as _i3;
 import '../endpoints/file_system_endpoint.dart' as _i4;
-import '../greetings/greeting_endpoint.dart' as _i5;
-import 'package:semantic_butler_server/src/generated/agent_message.dart' as _i6;
+import '../endpoints/health_endpoint.dart' as _i5;
+import '../greetings/greeting_endpoint.dart' as _i6;
+import 'package:semantic_butler_server/src/generated/agent_message.dart' as _i7;
+import 'package:semantic_butler_server/src/generated/search_filters.dart'
+    as _i8;
+import 'package:semantic_butler_server/src/generated/saved_search_preset.dart'
+    as _i9;
 
 class Endpoints extends _i1.EndpointDispatch {
   @override
@@ -39,7 +44,13 @@ class Endpoints extends _i1.EndpointDispatch {
           'fileSystem',
           null,
         ),
-      'greeting': _i5.GreetingEndpoint()
+      'health': _i5.HealthEndpoint()
+        ..initialize(
+          server,
+          'health',
+          null,
+        ),
+      'greeting': _i6.GreetingEndpoint()
         ..initialize(
           server,
           'greeting',
@@ -60,7 +71,7 @@ class Endpoints extends _i1.EndpointDispatch {
             ),
             'conversationHistory': _i1.ParameterDescription(
               name: 'conversationHistory',
-              type: _i1.getType<List<_i6.AgentMessage>?>(),
+              type: _i1.getType<List<_i7.AgentMessage>?>(),
               nullable: true,
             ),
           },
@@ -84,7 +95,7 @@ class Endpoints extends _i1.EndpointDispatch {
             ),
             'conversationHistory': _i1.ParameterDescription(
               name: 'conversationHistory',
-              type: _i1.getType<List<_i6.AgentMessage>?>(),
+              type: _i1.getType<List<_i7.AgentMessage>?>(),
               nullable: true,
             ),
           },
@@ -125,6 +136,16 @@ class Endpoints extends _i1.EndpointDispatch {
               type: _i1.getType<double>(),
               nullable: false,
             ),
+            'offset': _i1.ParameterDescription(
+              name: 'offset',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+            'filters': _i1.ParameterDescription(
+              name: 'filters',
+              type: _i1.getType<_i8.SearchFilters?>(),
+              nullable: true,
+            ),
           },
           call:
               (
@@ -136,6 +157,80 @@ class Endpoints extends _i1.EndpointDispatch {
                     params['query'],
                     limit: params['limit'],
                     threshold: params['threshold'],
+                    offset: params['offset'],
+                    filters: params['filters'],
+                  ),
+        ),
+        'getSearchSuggestions': _i1.MethodConnector(
+          name: 'getSearchSuggestions',
+          params: {
+            'query': _i1.ParameterDescription(
+              name: 'query',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'limit': _i1.ParameterDescription(
+              name: 'limit',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['butler'] as _i3.ButlerEndpoint)
+                  .getSearchSuggestions(
+                    session,
+                    params['query'],
+                    limit: params['limit'],
+                  ),
+        ),
+        'savePreset': _i1.MethodConnector(
+          name: 'savePreset',
+          params: {
+            'preset': _i1.ParameterDescription(
+              name: 'preset',
+              type: _i1.getType<_i9.SavedSearchPreset>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['butler'] as _i3.ButlerEndpoint).savePreset(
+                session,
+                params['preset'],
+              ),
+        ),
+        'getSavedPresets': _i1.MethodConnector(
+          name: 'getSavedPresets',
+          params: {},
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['butler'] as _i3.ButlerEndpoint)
+                  .getSavedPresets(session),
+        ),
+        'deletePreset': _i1.MethodConnector(
+          name: 'deletePreset',
+          params: {
+            'presetId': _i1.ParameterDescription(
+              name: 'presetId',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['butler'] as _i3.ButlerEndpoint).deletePreset(
+                    session,
+                    params['presetId'],
                   ),
         ),
         'startIndexing': _i1.MethodConnector(
@@ -177,6 +272,37 @@ class Endpoints extends _i1.EndpointDispatch {
               ) async => (endpoints['butler'] as _i3.ButlerEndpoint)
                   .getDatabaseStats(session),
         ),
+        'getErrorStats': _i1.MethodConnector(
+          name: 'getErrorStats',
+          params: {
+            'timeRange': _i1.ParameterDescription(
+              name: 'timeRange',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
+            'category': _i1.ParameterDescription(
+              name: 'category',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
+            'jobId': _i1.ParameterDescription(
+              name: 'jobId',
+              type: _i1.getType<int?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['butler'] as _i3.ButlerEndpoint).getErrorStats(
+                    session,
+                    timeRange: params['timeRange'],
+                    category: params['category'],
+                    jobId: params['jobId'],
+                  ),
+        ),
         'getSearchHistory': _i1.MethodConnector(
           name: 'getSearchHistory',
           params: {
@@ -184,6 +310,16 @@ class Endpoints extends _i1.EndpointDispatch {
               name: 'limit',
               type: _i1.getType<int>(),
               nullable: false,
+            ),
+            'offset': _i1.ParameterDescription(
+              name: 'offset',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+            'searchType': _i1.ParameterDescription(
+              name: 'searchType',
+              type: _i1.getType<String?>(),
+              nullable: true,
             ),
           },
           call:
@@ -194,6 +330,68 @@ class Endpoints extends _i1.EndpointDispatch {
                   (endpoints['butler'] as _i3.ButlerEndpoint).getSearchHistory(
                     session,
                     limit: params['limit'],
+                    offset: params['offset'],
+                    searchType: params['searchType'],
+                  ),
+        ),
+        'deleteSearchHistoryItem': _i1.MethodConnector(
+          name: 'deleteSearchHistoryItem',
+          params: {
+            'searchId': _i1.ParameterDescription(
+              name: 'searchId',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['butler'] as _i3.ButlerEndpoint)
+                  .deleteSearchHistoryItem(
+                    session,
+                    params['searchId'],
+                  ),
+        ),
+        'clearSearchHistory': _i1.MethodConnector(
+          name: 'clearSearchHistory',
+          params: {},
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['butler'] as _i3.ButlerEndpoint)
+                  .clearSearchHistory(session),
+        ),
+        'recordLocalSearch': _i1.MethodConnector(
+          name: 'recordLocalSearch',
+          params: {
+            'query': _i1.ParameterDescription(
+              name: 'query',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'directoryPath': _i1.ParameterDescription(
+              name: 'directoryPath',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'resultCount': _i1.ParameterDescription(
+              name: 'resultCount',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['butler'] as _i3.ButlerEndpoint).recordLocalSearch(
+                    session,
+                    params['query'],
+                    params['directoryPath'],
+                    params['resultCount'],
                   ),
         ),
         'getAIUsageStats': _i1.MethodConnector(
@@ -398,6 +596,521 @@ class Endpoints extends _i1.EndpointDispatch {
                     params['paths'],
                   ),
         ),
+        'getTopTags': _i1.MethodConnector(
+          name: 'getTopTags',
+          params: {
+            'category': _i1.ParameterDescription(
+              name: 'category',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
+            'limit': _i1.ParameterDescription(
+              name: 'limit',
+              type: _i1.getType<int?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['butler'] as _i3.ButlerEndpoint).getTopTags(
+                session,
+                category: params['category'],
+                limit: params['limit'],
+              ),
+        ),
+        'searchTags': _i1.MethodConnector(
+          name: 'searchTags',
+          params: {
+            'query': _i1.ParameterDescription(
+              name: 'query',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'category': _i1.ParameterDescription(
+              name: 'category',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
+            'limit': _i1.ParameterDescription(
+              name: 'limit',
+              type: _i1.getType<int?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['butler'] as _i3.ButlerEndpoint).searchTags(
+                session,
+                params['query'],
+                category: params['category'],
+                limit: params['limit'],
+              ),
+        ),
+        'mergeTags': _i1.MethodConnector(
+          name: 'mergeTags',
+          params: {
+            'sourceTags': _i1.ParameterDescription(
+              name: 'sourceTags',
+              type: _i1.getType<List<String>>(),
+              nullable: false,
+            ),
+            'targetTag': _i1.ParameterDescription(
+              name: 'targetTag',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'category': _i1.ParameterDescription(
+              name: 'category',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['butler'] as _i3.ButlerEndpoint).mergeTags(
+                session,
+                sourceTags: params['sourceTags'],
+                targetTag: params['targetTag'],
+                category: params['category'],
+              ),
+        ),
+        'renameTag': _i1.MethodConnector(
+          name: 'renameTag',
+          params: {
+            'oldTag': _i1.ParameterDescription(
+              name: 'oldTag',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'newTag': _i1.ParameterDescription(
+              name: 'newTag',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'category': _i1.ParameterDescription(
+              name: 'category',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['butler'] as _i3.ButlerEndpoint).renameTag(
+                session,
+                oldTag: params['oldTag'],
+                newTag: params['newTag'],
+                category: params['category'],
+              ),
+        ),
+        'getRelatedTags': _i1.MethodConnector(
+          name: 'getRelatedTags',
+          params: {
+            'tagValue': _i1.ParameterDescription(
+              name: 'tagValue',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'limit': _i1.ParameterDescription(
+              name: 'limit',
+              type: _i1.getType<int?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['butler'] as _i3.ButlerEndpoint).getRelatedTags(
+                    session,
+                    tagValue: params['tagValue'],
+                    limit: params['limit'],
+                  ),
+        ),
+        'getTagCategoryStats': _i1.MethodConnector(
+          name: 'getTagCategoryStats',
+          params: {},
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['butler'] as _i3.ButlerEndpoint)
+                  .getTagCategoryStats(session),
+        ),
+        'getAICostSummary': _i1.MethodConnector(
+          name: 'getAICostSummary',
+          params: {
+            'startDate': _i1.ParameterDescription(
+              name: 'startDate',
+              type: _i1.getType<DateTime?>(),
+              nullable: true,
+            ),
+            'endDate': _i1.ParameterDescription(
+              name: 'endDate',
+              type: _i1.getType<DateTime?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['butler'] as _i3.ButlerEndpoint).getAICostSummary(
+                    session,
+                    startDate: params['startDate'],
+                    endDate: params['endDate'],
+                  ),
+        ),
+        'checkBudget': _i1.MethodConnector(
+          name: 'checkBudget',
+          params: {
+            'budgetLimit': _i1.ParameterDescription(
+              name: 'budgetLimit',
+              type: _i1.getType<double>(),
+              nullable: false,
+            ),
+            'periodStart': _i1.ParameterDescription(
+              name: 'periodStart',
+              type: _i1.getType<DateTime?>(),
+              nullable: true,
+            ),
+            'periodEnd': _i1.ParameterDescription(
+              name: 'periodEnd',
+              type: _i1.getType<DateTime?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['butler'] as _i3.ButlerEndpoint).checkBudget(
+                    session,
+                    budgetLimit: params['budgetLimit'],
+                    periodStart: params['periodStart'],
+                    periodEnd: params['periodEnd'],
+                  ),
+        ),
+        'getProjectedCosts': _i1.MethodConnector(
+          name: 'getProjectedCosts',
+          params: {
+            'lookbackDays': _i1.ParameterDescription(
+              name: 'lookbackDays',
+              type: _i1.getType<int?>(),
+              nullable: true,
+            ),
+            'forecastDays': _i1.ParameterDescription(
+              name: 'forecastDays',
+              type: _i1.getType<int?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['butler'] as _i3.ButlerEndpoint).getProjectedCosts(
+                    session,
+                    lookbackDays: params['lookbackDays'],
+                    forecastDays: params['forecastDays'],
+                  ),
+        ),
+        'getDailyCosts': _i1.MethodConnector(
+          name: 'getDailyCosts',
+          params: {
+            'startDate': _i1.ParameterDescription(
+              name: 'startDate',
+              type: _i1.getType<DateTime>(),
+              nullable: false,
+            ),
+            'endDate': _i1.ParameterDescription(
+              name: 'endDate',
+              type: _i1.getType<DateTime>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['butler'] as _i3.ButlerEndpoint).getDailyCosts(
+                    session,
+                    startDate: params['startDate'],
+                    endDate: params['endDate'],
+                  ),
+        ),
+        'getCostByFeature': _i1.MethodConnector(
+          name: 'getCostByFeature',
+          params: {
+            'startDate': _i1.ParameterDescription(
+              name: 'startDate',
+              type: _i1.getType<DateTime?>(),
+              nullable: true,
+            ),
+            'endDate': _i1.ParameterDescription(
+              name: 'endDate',
+              type: _i1.getType<DateTime?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['butler'] as _i3.ButlerEndpoint).getCostByFeature(
+                    session,
+                    startDate: params['startDate'],
+                    endDate: params['endDate'],
+                  ),
+        ),
+        'getCostByModel': _i1.MethodConnector(
+          name: 'getCostByModel',
+          params: {
+            'startDate': _i1.ParameterDescription(
+              name: 'startDate',
+              type: _i1.getType<DateTime?>(),
+              nullable: true,
+            ),
+            'endDate': _i1.ParameterDescription(
+              name: 'endDate',
+              type: _i1.getType<DateTime?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['butler'] as _i3.ButlerEndpoint).getCostByModel(
+                    session,
+                    startDate: params['startDate'],
+                    endDate: params['endDate'],
+                  ),
+        ),
+        'recordAICost': _i1.MethodConnector(
+          name: 'recordAICost',
+          params: {
+            'feature': _i1.ParameterDescription(
+              name: 'feature',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'model': _i1.ParameterDescription(
+              name: 'model',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'inputTokens': _i1.ParameterDescription(
+              name: 'inputTokens',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+            'outputTokens': _i1.ParameterDescription(
+              name: 'outputTokens',
+              type: _i1.getType<int>(),
+              nullable: false,
+            ),
+            'cost': _i1.ParameterDescription(
+              name: 'cost',
+              type: _i1.getType<double>(),
+              nullable: false,
+            ),
+            'metadata': _i1.ParameterDescription(
+              name: 'metadata',
+              type: _i1.getType<Map<String, dynamic>?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['butler'] as _i3.ButlerEndpoint).recordAICost(
+                    session,
+                    feature: params['feature'],
+                    model: params['model'],
+                    inputTokens: params['inputTokens'],
+                    outputTokens: params['outputTokens'],
+                    cost: params['cost'],
+                    metadata: params['metadata'],
+                  ),
+        ),
+        'hybridSearch': _i1.MethodConnector(
+          name: 'hybridSearch',
+          params: {
+            'query': _i1.ParameterDescription(
+              name: 'query',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'threshold': _i1.ParameterDescription(
+              name: 'threshold',
+              type: _i1.getType<double?>(),
+              nullable: true,
+            ),
+            'limit': _i1.ParameterDescription(
+              name: 'limit',
+              type: _i1.getType<int?>(),
+              nullable: true,
+            ),
+            'offset': _i1.ParameterDescription(
+              name: 'offset',
+              type: _i1.getType<int?>(),
+              nullable: true,
+            ),
+            'semanticWeight': _i1.ParameterDescription(
+              name: 'semanticWeight',
+              type: _i1.getType<double?>(),
+              nullable: true,
+            ),
+            'keywordWeight': _i1.ParameterDescription(
+              name: 'keywordWeight',
+              type: _i1.getType<double?>(),
+              nullable: true,
+            ),
+            'filters': _i1.ParameterDescription(
+              name: 'filters',
+              type: _i1.getType<_i8.SearchFilters?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['butler'] as _i3.ButlerEndpoint).hybridSearch(
+                    session,
+                    params['query'],
+                    threshold: params['threshold'],
+                    limit: params['limit'],
+                    offset: params['offset'],
+                    semanticWeight: params['semanticWeight'],
+                    keywordWeight: params['keywordWeight'],
+                    filters: params['filters'],
+                  ),
+        ),
+        'getIndexHealthReport': _i1.MethodConnector(
+          name: 'getIndexHealthReport',
+          params: {},
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['butler'] as _i3.ButlerEndpoint)
+                  .getIndexHealthReport(session),
+        ),
+        'cleanupOrphanedFiles': _i1.MethodConnector(
+          name: 'cleanupOrphanedFiles',
+          params: {},
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['butler'] as _i3.ButlerEndpoint)
+                  .cleanupOrphanedFiles(session),
+        ),
+        'refreshStaleEntries': _i1.MethodConnector(
+          name: 'refreshStaleEntries',
+          params: {
+            'staleThresholdDays': _i1.ParameterDescription(
+              name: 'staleThresholdDays',
+              type: _i1.getType<int?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['butler'] as _i3.ButlerEndpoint)
+                  .refreshStaleEntries(
+                    session,
+                    staleThresholdDays: params['staleThresholdDays'],
+                  ),
+        ),
+        'removeDuplicates': _i1.MethodConnector(
+          name: 'removeDuplicates',
+          params: {
+            'keepNewest': _i1.ParameterDescription(
+              name: 'keepNewest',
+              type: _i1.getType<bool?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['butler'] as _i3.ButlerEndpoint).removeDuplicates(
+                    session,
+                    keepNewest: params['keepNewest'],
+                  ),
+        ),
+        'fixMissingEmbeddings': _i1.MethodConnector(
+          name: 'fixMissingEmbeddings',
+          params: {},
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['butler'] as _i3.ButlerEndpoint)
+                  .fixMissingEmbeddings(session),
+        ),
+        'summarizeFile': _i1.MethodConnector(
+          name: 'summarizeFile',
+          params: {
+            'filePath': _i1.ParameterDescription(
+              name: 'filePath',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['butler'] as _i3.ButlerEndpoint).summarizeFile(
+                    session,
+                    params['filePath'],
+                  ),
+        ),
+        'getOrganizationSuggestions': _i1.MethodConnector(
+          name: 'getOrganizationSuggestions',
+          params: {
+            'rootPath': _i1.ParameterDescription(
+              name: 'rootPath',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
+          },
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async => (endpoints['butler'] as _i3.ButlerEndpoint)
+                  .getOrganizationSuggestions(
+                    session,
+                    rootPath: params['rootPath'],
+                  ),
+        ),
         'streamIndexingProgress': _i1.MethodStreamConnector(
           name: 'streamIndexingProgress',
           params: {
@@ -419,6 +1132,39 @@ class Endpoints extends _i1.EndpointDispatch {
                     session,
                     params['jobId'],
                   ),
+        ),
+        'aiSearch': _i1.MethodStreamConnector(
+          name: 'aiSearch',
+          params: {
+            'query': _i1.ParameterDescription(
+              name: 'query',
+              type: _i1.getType<String>(),
+              nullable: false,
+            ),
+            'strategy': _i1.ParameterDescription(
+              name: 'strategy',
+              type: _i1.getType<String?>(),
+              nullable: true,
+            ),
+            'maxResults': _i1.ParameterDescription(
+              name: 'maxResults',
+              type: _i1.getType<int?>(),
+              nullable: true,
+            ),
+          },
+          streamParams: {},
+          returnType: _i1.MethodStreamReturnType.streamType,
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+                Map<String, Stream> streamParams,
+              ) => (endpoints['butler'] as _i3.ButlerEndpoint).aiSearch(
+                session,
+                params['query'],
+                strategy: params['strategy'],
+                maxResults: params['maxResults'],
+              ),
         ),
       },
     );
@@ -551,6 +1297,22 @@ class Endpoints extends _i1.EndpointDispatch {
         ),
       },
     );
+    connectors['health'] = _i1.EndpointConnector(
+      name: 'health',
+      endpoint: endpoints['health']!,
+      methodConnectors: {
+        'check': _i1.MethodConnector(
+          name: 'check',
+          params: {},
+          call:
+              (
+                _i1.Session session,
+                Map<String, dynamic> params,
+              ) async =>
+                  (endpoints['health'] as _i5.HealthEndpoint).check(session),
+        ),
+      },
+    );
     connectors['greeting'] = _i1.EndpointConnector(
       name: 'greeting',
       endpoint: endpoints['greeting']!,
@@ -568,7 +1330,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['greeting'] as _i5.GreetingEndpoint).hello(
+              ) async => (endpoints['greeting'] as _i6.GreetingEndpoint).hello(
                 session,
                 params['name'],
               ),

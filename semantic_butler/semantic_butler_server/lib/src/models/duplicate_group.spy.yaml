@@ -1,0 +1,13 @@
+### DuplicateGroup - represents a group of files with identical content
+class: DuplicateGroup
+fields:
+  ### SHA-256 content hash shared by all files in this group
+  contentHash: String
+  ### List of file paths in this duplicate group
+  files: List<DuplicateFile>
+  ### Total size of all duplicates combined (in bytes)
+  totalSizeBytes: int
+  ### Potential storage savings if duplicates are removed (keeps one file)
+  potentialSavingsBytes: int
+  ### Number of duplicate files in this group
+  fileCount: int

@@ -1,0 +1,11 @@
+### SimilarFile - info about a file within a similar content group
+class: SimilarFile
+fields:
+  ### Full file path
+  path: String
+  ### File name without path
+  fileName: String
+  ### Content preview (first 200 chars)
+  contentPreview: String?
+  ### Document category
+  category: String?

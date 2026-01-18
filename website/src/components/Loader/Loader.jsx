@@ -33,12 +33,12 @@ const Loader = ({ onFinished }) => {
   }, [onFinished]);
 
   return (
-    <div className="loader-wrapper" ref={loaderRef}>
+    <div className="loader-wrapper" ref={loaderRef} role="status" aria-label="Loading Semantic Butler" aria-live="polite">
       <div className="loader-content">
-        <Brain size={64} className="loader-icon pulse" />
+        <Brain size={64} className="loader-icon pulse" aria-hidden="true" />
         <h2 ref={textRef}>Semantic Butler</h2>
-        <div className="progress-container">
-          <div className="progress-bar" ref={progressRef}></div>
+        <div className="progress-container" aria-label="Loading progress">
+          <div className="progress-bar" ref={progressRef} role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
         </div>
       </div>
     </div>

@@ -1,0 +1,21 @@
+### Health check response model
+class: HealthCheck
+fields:
+  ### Overall system status: healthy, degraded, unhealthy
+  status: String
+  ### Database connectivity status
+  databaseHealthy: bool
+  ### pgvector extension availability
+  pgvectorHealthy: bool
+  ### File watcher service status
+  watcherHealthy: bool
+  ### Number of active file watchers
+  activeWatcherCount: int
+  ### Cache hit rate percentage (0-100)
+  cacheHitRate: double?
+  ### Average API response time in milliseconds
+  apiResponseTimeMs: double?
+  ### Timestamp of health check
+  checkedAt: DateTime
+  ### Additional details about watcher health
+  watcherDetails: String?

@@ -1,0 +1,9 @@
+Loaded environment: OPENROUTER_API_KEY is SET
+SERVERPOD version: 3.1.0, dart: 3.10.4 (stable) (Tue Dec 9 00:01:55 2025 -0800) on "windows_x64", time: 2026-01-17 20:55:58.255308Z
+runMode: development
+serverId: default
+role: monolith
+loggingMode: normal
+applyMigrations: true
+applyRepairMigration: false
+SERVERPOD initialized, time: 2026-01-17 20:55:58.257218Z

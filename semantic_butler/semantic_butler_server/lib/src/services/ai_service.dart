@@ -391,6 +391,72 @@ class DocumentTags {
     };
   }
 
+  bool containsTag(String tag) {
+    final normalized = tag.trim().toLowerCase();
+    if (primaryTopic.toLowerCase() == normalized) return true;
+    if (documentType.toLowerCase() == normalized) return true;
+    if (keywords.any((k) => k.toLowerCase() == normalized)) return true;
+    if (entities.any((e) => e.toLowerCase() == normalized)) return true;
+    if (language?.toLowerCase() == normalized) return true;
+    return false;
+  }
+
+  DocumentTags removeTag(String tag) {
+    final normalized = tag.trim().toLowerCase();
+
+    var newTopic = primaryTopic;
+    if (primaryTopic.toLowerCase() == normalized) newTopic = 'Unknown';
+
+    var newType = documentType;
+    if (documentType.toLowerCase() == normalized) newType = 'Document';
+
+    final newKeywords = keywords
+        .where((k) => k.toLowerCase() != normalized)
+        .toList();
+    final newEntities = entities
+        .where((e) => e.toLowerCase() != normalized)
+        .toList();
+
+    var newLanguage = language;
+    if (language?.toLowerCase() == normalized) newLanguage = null;
+
+    return copyWith(
+      primaryTopic: newTopic,
+      documentType: newType,
+      keywords: newKeywords,
+      entities: newEntities,
+      language: newLanguage,
+    );
+  }
+
+  DocumentTags addTag(String tag) {
+    if (containsTag(tag)) return this;
+    // Default to adding as keyword
+    return copyWith(keywords: [...keywords, tag]);
+  }
+
+  DocumentTags copyWith({
+    String? primaryTopic,
+    String? documentType,
+    List<String>? keywords,
+    List<String>? entities,
+    String? dateYear,
+    String? dateMonth,
+    String? language,
+    double? confidence,
+  }) {
+    return DocumentTags(
+      primaryTopic: primaryTopic ?? this.primaryTopic,
+      documentType: documentType ?? this.documentType,
+      keywords: keywords ?? this.keywords,
+      entities: entities ?? this.entities,
+      dateYear: dateYear ?? this.dateYear,
+      dateMonth: dateMonth ?? this.dateMonth,
+      language: language ?? this.language,
+      confidence: confidence ?? this.confidence,
+    );
+  }
+
   String toJson() => jsonEncode(toMap());
 
   factory DocumentTags.fromJson(String json) {

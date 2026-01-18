@@ -49,6 +49,11 @@ class AIModels {
   /// Cost: ~$0.25 per 1M input tokens
   static const String chatClaudeHaiku = 'anthropic/claude-3-haiku';
 
+  /// Claude 3.5 Haiku - Faster, excellent tool use
+  /// Best for: Agent reasoning, structured output, multi-tool chains
+  /// Cost: ~$1.00 per 1M input tokens
+  static const String chatClaude35Haiku = 'anthropic/claude-haiku-4.5';
+
   // ==========================================================================
   // CHAT MODELS - Quality (Complex Tasks)
   // ==========================================================================
@@ -72,12 +77,12 @@ class AIModels {
   // AGENT MODELS (Tool Use Optimized)
   // ==========================================================================
 
-  /// Default agent model - Claude 3.5 Sonnet
-  /// Excellent tool use, reasoning, and instruction following
-  static const String agentDefault = chatClaudeSonnet;
+  /// Default agent model - Claude 3.5 Haiku ("Haiku 4.5")
+  /// Excellent tool use, fast, cost-effective, great for chained tool calls
+  static const String agentDefault = chatClaude35Haiku;
 
-  /// Alternative agent model
-  static const String agentAlternative = chatGpt4o;
+  /// Alternative agent model - Claude 3.5 Sonnet for complex/critical tasks
+  static const String agentAlternative = chatClaudeSonnet;
 
   // ==========================================================================
   // OPEN SOURCE MODELS (Lower Cost)
@@ -142,6 +147,7 @@ class AIModels {
     chatGeminiFlash: ModelCost(input: 0.075, output: 0.30),
     chatGpt4oMini: ModelCost(input: 0.15, output: 0.60),
     chatClaudeHaiku: ModelCost(input: 0.25, output: 1.25),
+    chatClaude35Haiku: ModelCost(input: 1.00, output: 5.00),
     chatClaudeSonnet: ModelCost(input: 3.00, output: 15.00),
     chatGpt4o: ModelCost(input: 2.50, output: 10.00),
     chatClaudeOpus: ModelCost(input: 15.00, output: 75.00),

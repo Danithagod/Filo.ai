@@ -1,5 +1,5 @@
 .pricing-page {
-  padding-top: 180px;
+  padding-top: clamp(140px, 15vh, 180px);
   min-height: 100vh;
 }
 

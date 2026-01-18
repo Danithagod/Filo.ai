@@ -1,0 +1,11 @@
+### SimilarContentGroup - represents a group of semantically similar documents
+class: SimilarContentGroup
+fields:
+  ### Similarity score (0.0-1.0) for this group
+  similarityScore: double
+  ### List of similar files in this group
+  files: List<SimilarFile>
+  ### Number of files in this group
+  fileCount: int
+  ### Brief description of what makes these files similar
+  similarityReason: String?

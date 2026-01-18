@@ -20,10 +20,7 @@ const Background = () => {
         };
 
         window.addEventListener('resize', resize);
-        window.addEventListener('mousemove', (e) => {
-            mouse.x = e.x;
-            mouse.y = e.y;
-        });
+        window.addEventListener('mousemove', handleMouseMove);
 
         resize();
 
@@ -102,11 +99,12 @@ const Background = () => {
 
         return () => {
             window.removeEventListener('resize', resize);
+            window.removeEventListener('mousemove', handleMouseMove);
             cancelAnimationFrame(animationFrameId);
         };
     }, []);
 
-    return <canvas ref={canvasRef} className="bg-canvas" />;
+    return <canvas ref={canvasRef} className="bg-canvas" aria-hidden="true" />;
 };
 
 export default Background;

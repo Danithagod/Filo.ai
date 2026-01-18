@@ -1,6 +1,6 @@
 .about-page {
   min-height: 100vh;
-  padding: 120px 0 100px;
+  padding: clamp(80px, 10vh, 120px) 0 clamp(60px, 8vh, 100px);
 }
 
 .about-hero {

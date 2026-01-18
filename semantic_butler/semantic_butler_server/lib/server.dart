@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:dotenv/dotenv.dart';
 import 'package:serverpod/serverpod.dart';
 
+import 'src/endpoints/butler_endpoint.dart';
 import 'src/generated/endpoints.dart';
 import 'src/generated/protocol.dart';
 import 'src/web/routes/app_config_route.dart';
@@ -64,6 +65,19 @@ void run(List<String> args) async {
       '/app/**',
     );
   }
+  // Issue #16: Register shutdown hook for graceful cleanup
+  // Handle SIGINT (Ctrl+C) to dispose resources before exit
+  ProcessSignal.sigint.watch().listen((_) async {
+    stdout.writeln('Shutting down gracefully...');
+    await ButlerEndpoint.disposeAll();
+    stdout.writeln('Resources cleaned up. Exiting.');
+    exit(0);
+  });
+
+  // Initialize periodic cleanup of idle file watchers
+  // This prevents memory leaks from accumulated file watchers
+  ButlerEndpoint.initializeWatcherCleanup();
+  stdout.writeln('File watcher cleanup timer initialized.');
 
   // Start the server.
   await pod.start();

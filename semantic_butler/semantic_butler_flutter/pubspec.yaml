@@ -35,6 +35,8 @@ dependencies:
   serverpod_flutter: 3.1.0
   shared_preferences: ^2.5.4
   url_launcher: ^6.3.2
+  fl_chart: ^0.69.0
+  intl: ^0.20.2
 
 dev_dependencies:
   flutter_lints: '>=3.0.0 <7.0.0'

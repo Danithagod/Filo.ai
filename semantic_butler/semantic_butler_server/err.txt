@@ -1,0 +1,41 @@
+Failed to apply migration 20260117000000000.
+DatabaseQueryException: { message: expected 768 dimensions, not 3072, code: 22000 }
+2026-01-17 20:56:03.627902Z ERROR: Failed to apply database migrations.
+2026-01-17 20:56:03.627902Z ERROR: DatabaseQueryException: { message: expected 768 dimensions, not 3072, code: 22000 }
+package:postgres/src/v3/connection.dart 930                                    _PgResultStreamSubscription.handleError
+package:postgres/src/v3/connection.dart 530                                    PgConnectionImplementation._handleMessage
+dart:async/zone.dart 1538                                                      _rootRunUnary
+dart:async/zone.dart 1429                                                      _CustomZone.runUnary
+dart:async/zone.dart 1329                                                      _CustomZone.runUnaryGuarded
+dart:async/stream_impl.dart 381                                                _BufferingStreamSubscription._sendData
+dart:async/stream_impl.dart 312                                                _BufferingStreamSubscription._add
+dart:async/stream_controller.dart 798                                          _SyncStreamControllerDispatch._sendData
+dart:async/stream_controller.dart 663                                          _StreamController._add
+dart:async/stream_controller.dart 618                                          _StreamController.add
+dart:async/stream.dart 823                                                     Stream.asyncMap.<fn>.add
+dart:async/zone.dart 1538                                                      _rootRunUnary
+dart:async/zone.dart 1429                                                      _CustomZone.runUnary
+dart:async/stream_impl.dart 215                                                _BufferingStreamSubscription.resume
+===== asynchronous gap ===========================
+package:postgres/src/v3/connection.dart 871                                    new _PgResultStreamSubscription.simpleQueryProtocol
+package:postgres/src/v3/connection.dart 165                                    _PgSessionBase.execute
+package:postgres/src/pool/pool_impl.dart 309                                   _PoolConnection.execute
+package:postgres/src/pool/pool_impl.dart 64                                    PoolImplementation.execute.<fn>
+package:postgres/src/pool/pool_impl.dart 153                                   PoolImplementation.withConnection
+package:serverpod/src/database/adapters/postgres/database_connection.dart 527  DatabaseConnection._query
+package:serverpod/src/database/adapters/postgres/database_connection.dart 607  DatabaseConnection.simpleExecute
+package:serverpod/src/database/migrations/migration_manager.dart 182           MigrationManager._migrateToLatestModule
+package:serverpod/src/database/migrations/migration_manager.dart 83            MigrationManager.migrateToLatest.<fn>
+package:serverpod/src/database/migrations/migration_manager.dart 252           MigrationManager._withMigrationLock.<fn>
+package:postgres/src/v3/connection.dart 591                                    PgConnectionImplementation.runTx.<fn>
+package:pool/pool.dart 127                                                     Pool.withResource
+package:postgres/src/pool/pool_impl.dart 153                                   PoolImplementation.withConnection
+package:serverpod/src/database/database.dart 399                               Database.transaction
+package:serverpod/src/database/migrations/migration_manager.dart 245           MigrationManager._withMigrationLock
+package:serverpod/src/database/migrations/migration_manager.dart 70            MigrationManager.migrateToLatest
+package:serverpod/src/server/serverpod.dart 791                                Serverpod._applyMigrations
+package:serverpod/src/server/serverpod.dart 663                                Serverpod._unguardedStart
+package:serverpod/src/server/serverpod.dart 626                                Serverpod.start.<fn>
+package:serverpod/src/server/serverpod.dart 625                                Serverpod.start
+package:semantic_butler_server/server.dart 78                                  run
+

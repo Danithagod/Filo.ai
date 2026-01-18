@@ -4,7 +4,21 @@
       "Bash(dart analyze:*)",
       "Bash(flutter analyze:*)",
       "Bash(flutter pub get:*)",
-      "Bash(dart format:*)"
+      "Bash(dart format:*)",
+      "Bash(serverpod generate:*)",
+      "Bash(dart run:*)",
+      "Bash(dart pub run:*)",
+      "Bash(dir:*)",
+      "Bash(npx eslint:*)",
+      "Bash(dart test:*)",
+      "Bash(echo:*)",
+      "Bash(flutter test)",
+      "Bash(npm test)",
+      "Bash(npm test:*)",
+      "Bash(npm run lint)",
+      "Bash(dart compile exe:*)",
+      "Bash(flutter build:*)"
     ]
-  }
+  },
+  "outputStyle": "default"
 }

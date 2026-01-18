@@ -1,9 +1,10 @@
 import React, { useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { gsap } from 'gsap';
 import { Search, Cpu, Shield, Zap, Database, Tags, ChevronRight, Layout, Lock, Code } from 'lucide-react';
 import './Features.css';
 
-const Features = ({ show }) => {
+    const Features = ({ show }) => {
     useEffect(() => {
         if (show) {
             const tl = gsap.timeline({ defaults: { ease: 'power3.out', duration: 1 } });
@@ -20,6 +21,10 @@ const Features = ({ show }) => {
                     { opacity: 0, y: 50 },
                     { opacity: 1, y: 0, stagger: 0.3, duration: 1, delay: -0.4 }
                 );
+
+            return () => {
+                tl.kill();
+            };
         }
     }, [show]);
 
@@ -28,37 +33,37 @@ const Features = ({ show }) => {
             title: "Intelligent Search",
             icon: <Search size={40} />,
             features: [
-                { name: "Semantic Embedding", desc: "Files are converted into high-dimensional vectors for meaning-based retrieval." },
-                { name: "Hybrid Search", desc: "Combines keyword matching with semantic intent for perfect accuracy." },
-                { name: "Contextual Awareness", desc: "Butler understands the relationship between your documents." }
+                { name: "Semantic Embedding", desc: "Files are converted into high-dimensional vectors for meaning-based retrieval via pgvector." },
+                { name: "Hybrid Search", desc: "Combines keyword matching with semantic intent for superior retrieval accuracy." },
+                { name: "Contextual Awareness", desc: "Butler understands the relationship between your documents and their categories." }
             ]
         },
         {
-            title: "Local AI Orchestration",
+            title: "AI Orchestration",
             icon: <Cpu size={40} />,
             features: [
-                { name: "Task Automation", desc: "Natural language commands translate into complex file operations." },
-                { name: "Local LLM Integration", desc: "Compatible with Llama, Mistral, and GGUF models via Ollama." },
-                { name: "Zero Cloud Reliance", desc: "All reasoning and processing happens offline on your hardware." }
+                { name: "Task Automation", desc: "Natural language commands translate into complex, multi-step file operations." },
+                { name: "Multi-Model Inference", desc: "Access 200+ models including GPT-4o, Claude 3.5, and Gemini Pro via OpenRouter." },
+                { name: "Local-First Processing", desc: "All file extraction, indexing, and management happens on your local hardware." }
             ]
         },
         {
             title: "Security & Performance",
             icon: <Shield size={40} />,
             features: [
-                { name: "Rust Core", desc: "Lightning fast indexing and low memory footprint powered by Rust." },
-                { name: "End-to-End Privacy", desc: "Your data never touches our servers. Period." },
-                { name: "Hardware Acceleration", desc: "Utilizes GPU and NPU for local embedding and inference." }
+                { name: "Serverpod Backend", desc: "High-performance Dart-based server ensures rapid indexing and low latency." },
+                { name: "Privacy-Focused", desc: "Your document structure and sensitive file content are managed locally." },
+                { name: "Hardware Optimized", desc: "Designed for desktop platforms with native support for Windows, macOS, and Linux." }
             ]
         }
     ];
 
     return (
-        <div className="features-page" style={{ opacity: show ? 1 : 0 }}>
+        <div className={`features-page page-content${show ? ' visible' : ''}`}>
             <section className="features-hero">
                 <div className="container">
                     <h1 className="hero-title">Powerful <span className="text-gradient">Capabilities</span></h1>
-                    <p className="hero-subtitle">Deep dive into the technology that powers your local semantic brain.</p>
+                    <p className="hero-subtitle">Deep dive into the technology that powers your intelligent desktop assistant.</p>
                 </div>
             </section>
 
@@ -82,8 +87,8 @@ const Features = ({ show }) => {
             <section className="features-cta container">
                 <div className="cta-glass glass-card">
                     <h2>Ready to transform your workflow?</h2>
-                    <p>Download Semantic Butler today and experience true local intelligence.</p>
-                    <button className="btn-primary-large">Get Started Now <ChevronRight size={20} /></button>
+                    <p>Download Semantic Butler today and experience true desktop intelligence.</p>
+                    <Link to="/pricing" className="btn-primary-large">Get Started Now <ChevronRight size={20} /></Link>
                 </div>
             </section>
         </div>

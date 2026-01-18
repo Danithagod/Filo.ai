@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { gsap } from 'gsap';
 import { Check, Zap, Shield, Crown } from 'lucide-react';
 import './Pricing.css';
@@ -6,13 +7,17 @@ import './Pricing.css';
 const Pricing = ({ show }) => {
   useEffect(() => {
     if (show) {
-      gsap.from('.pricing-card', {
+      const animation = gsap.from('.pricing-card', {
         y: 50,
         opacity: 0,
         duration: 0.8,
         stagger: 0.2,
         ease: 'power3.out'
       });
+
+      return () => {
+        animation.kill();
+      };
     }
   }, [show]);
 
@@ -22,31 +27,31 @@ const Pricing = ({ show }) => {
       price: '$0',
       description: 'Perfect for personal file organization.',
       icon: <Zap size={24} />,
-      features: ['Up to 10,000 files', 'Standard Semantic Search', 'Community Support', 'Local Processing']
+      features: ['Up to 5,000 indexed files', 'Standard Semantic Search', 'Community Support', 'Local File Extraction']
     },
     {
       name: 'Pro',
       price: '$12',
       description: 'For power users and professionals.',
       icon: <Shield size={24} />,
-      features: ['Unlimited files', 'Advanced AI Agents', 'Priority Support', 'Custom Tagging Logic', 'API Access'],
+      features: ['Unlimited indexed files', 'Advanced AI Agents', 'Multi-Model Support (OpenRouter)', 'Detailed Cost Dashboard', 'Priority Support'],
       popular: true
     },
     {
-      name: 'Team',
-      price: '$49',
-      description: 'Collaborative AI for small teams.',
+      name: 'Enterprise',
+      price: '$39',
+      description: 'Advanced features for complex workflows.',
       icon: <Crown size={24} />,
-      features: ['Shared Semantic Index', 'Team Analytics', 'Admin Dashboard', 'SSO Integration', 'Dedicated Manager']
+      features: ['Smart Index Health Monitoring', 'Unlimited Search Presets', 'Custom Tagging Taxonomy', 'Dedicated Local Support']
     }
   ];
 
   return (
-    <div className="pricing-page" style={{ opacity: show ? 1 : 0 }}>
+    <div className={`pricing-page page-content${show ? ' visible' : ''}`}>
       <section className="pricing-hero">
         <div className="container">
           <h1 className="hero-title">Simple, Transparent <span className="text-gradient">Pricing</span></h1>
-          <p className="hero-subtitle">Choose the plan that fits your local intelligence needs.</p>
+          <p className="hero-subtitle">Choose the plan that fits your digital workspace needs.</p>
         </div>
       </section>
 
@@ -70,9 +75,9 @@ const Pricing = ({ show }) => {
                     <li key={j}><Check size={16} /> {feature}</li>
                   ))}
                 </ul>
-                <button className={`btn-tier ${tier.popular ? 'btn-primary' : 'btn-secondary'}`}>
+                <Link to="/pricing" className={`btn-tier ${tier.popular ? 'btn-primary' : 'btn-secondary'}`}>
                   Get Started
-                </button>
+                </Link>
               </div>
             ))}
           </div>

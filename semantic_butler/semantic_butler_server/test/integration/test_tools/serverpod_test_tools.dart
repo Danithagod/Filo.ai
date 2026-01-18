@@ -21,26 +21,39 @@ import 'package:semantic_butler_server/src/generated/agent_message.dart' as _i5;
 import 'package:semantic_butler_server/src/generated/agent_response.dart'
     as _i6;
 import 'package:semantic_butler_server/src/generated/search_result.dart' as _i7;
-import 'package:semantic_butler_server/src/generated/indexing_job.dart' as _i8;
-import 'package:semantic_butler_server/src/generated/indexing_status.dart'
+import 'package:semantic_butler_server/src/generated/search_filters.dart'
+    as _i8;
+import 'package:semantic_butler_server/src/generated/search_suggestion.dart'
     as _i9;
-import 'package:semantic_butler_server/src/generated/database_stats.dart'
+import 'package:semantic_butler_server/src/generated/saved_search_preset.dart'
     as _i10;
-import 'package:semantic_butler_server/src/generated/search_history.dart'
-    as _i11;
-import 'package:semantic_butler_server/src/generated/indexing_progress.dart'
+import 'package:semantic_butler_server/src/generated/indexing_job.dart' as _i11;
+import 'package:semantic_butler_server/src/generated/indexing_status.dart'
     as _i12;
-import 'package:semantic_butler_server/src/generated/watched_folder.dart'
+import 'package:semantic_butler_server/src/generated/database_stats.dart'
     as _i13;
-import 'package:semantic_butler_server/src/generated/ignore_pattern.dart'
-    as _i14;
-import 'package:semantic_butler_server/src/generated/file_system_entry.dart'
+import 'package:semantic_butler_server/src/generated/error_stats.dart' as _i14;
+import 'package:semantic_butler_server/src/generated/search_history.dart'
     as _i15;
-import 'package:semantic_butler_server/src/generated/drive_info.dart' as _i16;
-import 'package:semantic_butler_server/src/generated/file_operation_result.dart'
+import 'package:semantic_butler_server/src/generated/indexing_progress.dart'
+    as _i16;
+import 'package:semantic_butler_server/src/generated/watched_folder.dart'
     as _i17;
-import 'package:semantic_butler_server/src/generated/greetings/greeting.dart'
+import 'package:semantic_butler_server/src/generated/ignore_pattern.dart'
     as _i18;
+import 'package:semantic_butler_server/src/generated/tag_taxonomy.dart' as _i19;
+import 'package:semantic_butler_server/src/generated/ai_search_progress.dart'
+    as _i20;
+import 'package:semantic_butler_server/src/generated/organization_suggestions.dart'
+    as _i21;
+import 'package:semantic_butler_server/src/generated/file_system_entry.dart'
+    as _i22;
+import 'package:semantic_butler_server/src/generated/drive_info.dart' as _i23;
+import 'package:semantic_butler_server/src/generated/file_operation_result.dart'
+    as _i24;
+import 'package:semantic_butler_server/src/generated/health_check.dart' as _i25;
+import 'package:semantic_butler_server/src/generated/greetings/greeting.dart'
+    as _i26;
 import 'package:semantic_butler_server/src/generated/protocol.dart';
 import 'package:semantic_butler_server/src/generated/endpoints.dart';
 export 'package:serverpod_test/serverpod_test_public_exports.dart';
@@ -154,6 +167,8 @@ class TestEndpoints {
 
   late final _FileSystemEndpoint fileSystem;
 
+  late final _HealthEndpoint health;
+
   late final _GreetingEndpoint greeting;
 }
 
@@ -173,6 +188,10 @@ class _InternalTestEndpoints extends TestEndpoints
       serializationManager,
     );
     fileSystem = _FileSystemEndpoint(
+      endpoints,
+      serializationManager,
+    );
+    health = _HealthEndpoint(
       endpoints,
       serializationManager,
     );
@@ -281,6 +300,8 @@ class _ButlerEndpoint {
     String query, {
     required int limit,
     required double threshold,
+    required int offset,
+    _i8.SearchFilters? filters,
   }) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
       var _localUniqueSession =
@@ -297,6 +318,8 @@ class _ButlerEndpoint {
             'query': query,
             'limit': limit,
             'threshold': threshold,
+            'offset': offset,
+            'filters': filters,
           }),
           serializationManager: _serializationManager,
         );
@@ -313,7 +336,134 @@ class _ButlerEndpoint {
     });
   }
 
-  _i3.Future<_i8.IndexingJob> startIndexing(
+  _i3.Future<List<_i9.SearchSuggestion>> getSearchSuggestions(
+    _i1.TestSessionBuilder sessionBuilder,
+    String query, {
+    required int limit,
+  }) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'getSearchSuggestions',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'getSearchSuggestions',
+          parameters: _i1.testObjectToJson({
+            'query': query,
+            'limit': limit,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<List<_i9.SearchSuggestion>>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<_i10.SavedSearchPreset> savePreset(
+    _i1.TestSessionBuilder sessionBuilder,
+    _i10.SavedSearchPreset preset,
+  ) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'savePreset',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'savePreset',
+          parameters: _i1.testObjectToJson({'preset': preset}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<_i10.SavedSearchPreset>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<List<_i10.SavedSearchPreset>> getSavedPresets(
+    _i1.TestSessionBuilder sessionBuilder,
+  ) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'getSavedPresets',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'getSavedPresets',
+          parameters: _i1.testObjectToJson({}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<List<_i10.SavedSearchPreset>>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<bool> deletePreset(
+    _i1.TestSessionBuilder sessionBuilder,
+    int presetId,
+  ) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'deletePreset',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'deletePreset',
+          parameters: _i1.testObjectToJson({'presetId': presetId}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<bool>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<_i11.IndexingJob> startIndexing(
     _i1.TestSessionBuilder sessionBuilder,
     String folderPath,
   ) async {
@@ -336,7 +486,7 @@ class _ButlerEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<_i8.IndexingJob>);
+                as _i3.Future<_i11.IndexingJob>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -344,7 +494,7 @@ class _ButlerEndpoint {
     });
   }
 
-  _i3.Future<_i9.IndexingStatus> getIndexingStatus(
+  _i3.Future<_i12.IndexingStatus> getIndexingStatus(
     _i1.TestSessionBuilder sessionBuilder,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
@@ -366,7 +516,7 @@ class _ButlerEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<_i9.IndexingStatus>);
+                as _i3.Future<_i12.IndexingStatus>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -374,7 +524,7 @@ class _ButlerEndpoint {
     });
   }
 
-  _i3.Future<_i10.DatabaseStats> getDatabaseStats(
+  _i3.Future<_i13.DatabaseStats> getDatabaseStats(
     _i1.TestSessionBuilder sessionBuilder,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
@@ -396,7 +546,7 @@ class _ButlerEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<_i10.DatabaseStats>);
+                as _i3.Future<_i13.DatabaseStats>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -404,9 +554,48 @@ class _ButlerEndpoint {
     });
   }
 
-  _i3.Future<List<_i11.SearchHistory>> getSearchHistory(
+  _i3.Future<_i14.ErrorStats> getErrorStats(
+    _i1.TestSessionBuilder sessionBuilder, {
+    String? timeRange,
+    String? category,
+    int? jobId,
+  }) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'getErrorStats',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'getErrorStats',
+          parameters: _i1.testObjectToJson({
+            'timeRange': timeRange,
+            'category': category,
+            'jobId': jobId,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<_i14.ErrorStats>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<List<_i15.SearchHistory>> getSearchHistory(
     _i1.TestSessionBuilder sessionBuilder, {
     required int limit,
+    required int offset,
+    String? searchType,
   }) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
       var _localUniqueSession =
@@ -419,7 +608,11 @@ class _ButlerEndpoint {
           createSessionCallback: (_) => _localUniqueSession,
           endpointPath: 'butler',
           methodName: 'getSearchHistory',
-          parameters: _i1.testObjectToJson({'limit': limit}),
+          parameters: _i1.testObjectToJson({
+            'limit': limit,
+            'offset': offset,
+            'searchType': searchType,
+          }),
           serializationManager: _serializationManager,
         );
         var _localReturnValue =
@@ -427,7 +620,105 @@ class _ButlerEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<List<_i11.SearchHistory>>);
+                as _i3.Future<List<_i15.SearchHistory>>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<bool> deleteSearchHistoryItem(
+    _i1.TestSessionBuilder sessionBuilder,
+    int searchId,
+  ) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'deleteSearchHistoryItem',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'deleteSearchHistoryItem',
+          parameters: _i1.testObjectToJson({'searchId': searchId}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<bool>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<int> clearSearchHistory(
+    _i1.TestSessionBuilder sessionBuilder,
+  ) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'clearSearchHistory',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'clearSearchHistory',
+          parameters: _i1.testObjectToJson({}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<int>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<void> recordLocalSearch(
+    _i1.TestSessionBuilder sessionBuilder,
+    String query,
+    String directoryPath,
+    int resultCount,
+  ) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'recordLocalSearch',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'recordLocalSearch',
+          parameters: _i1.testObjectToJson({
+            'query': query,
+            'directoryPath': directoryPath,
+            'resultCount': resultCount,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<void>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -493,12 +784,12 @@ class _ButlerEndpoint {
     });
   }
 
-  _i3.Stream<_i12.IndexingProgress> streamIndexingProgress(
+  _i3.Stream<_i16.IndexingProgress> streamIndexingProgress(
     _i1.TestSessionBuilder sessionBuilder,
     int jobId,
   ) {
     var _localTestStreamManager =
-        _i1.TestStreamManager<_i12.IndexingProgress>();
+        _i1.TestStreamManager<_i16.IndexingProgress>();
     _i1.callStreamFunctionAndHandleExceptions(
       () async {
         var _localUniqueSession =
@@ -526,7 +817,7 @@ class _ButlerEndpoint {
     return _localTestStreamManager.outputStreamController.stream;
   }
 
-  _i3.Future<_i13.WatchedFolder> enableSmartIndexing(
+  _i3.Future<_i17.WatchedFolder> enableSmartIndexing(
     _i1.TestSessionBuilder sessionBuilder,
     String folderPath,
   ) async {
@@ -549,7 +840,7 @@ class _ButlerEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<_i13.WatchedFolder>);
+                as _i3.Future<_i17.WatchedFolder>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -588,7 +879,7 @@ class _ButlerEndpoint {
     });
   }
 
-  _i3.Future<List<_i13.WatchedFolder>> getWatchedFolders(
+  _i3.Future<List<_i17.WatchedFolder>> getWatchedFolders(
     _i1.TestSessionBuilder sessionBuilder,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
@@ -610,7 +901,7 @@ class _ButlerEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<List<_i13.WatchedFolder>>);
+                as _i3.Future<List<_i17.WatchedFolder>>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -618,7 +909,7 @@ class _ButlerEndpoint {
     });
   }
 
-  _i3.Future<_i13.WatchedFolder?> toggleSmartIndexing(
+  _i3.Future<_i17.WatchedFolder?> toggleSmartIndexing(
     _i1.TestSessionBuilder sessionBuilder,
     String folderPath,
   ) async {
@@ -641,7 +932,7 @@ class _ButlerEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<_i13.WatchedFolder?>);
+                as _i3.Future<_i17.WatchedFolder?>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -649,7 +940,7 @@ class _ButlerEndpoint {
     });
   }
 
-  _i3.Future<_i14.IgnorePattern> addIgnorePattern(
+  _i3.Future<_i18.IgnorePattern> addIgnorePattern(
     _i1.TestSessionBuilder sessionBuilder,
     String pattern, {
     required String patternType,
@@ -678,7 +969,7 @@ class _ButlerEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<_i14.IgnorePattern>);
+                as _i3.Future<_i18.IgnorePattern>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -717,7 +1008,7 @@ class _ButlerEndpoint {
     });
   }
 
-  _i3.Future<List<_i14.IgnorePattern>> listIgnorePatterns(
+  _i3.Future<List<_i18.IgnorePattern>> listIgnorePatterns(
     _i1.TestSessionBuilder sessionBuilder,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
@@ -739,7 +1030,7 @@ class _ButlerEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<List<_i14.IgnorePattern>>);
+                as _i3.Future<List<_i18.IgnorePattern>>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -842,6 +1133,772 @@ class _ButlerEndpoint {
       }
     });
   }
+
+  _i3.Future<List<_i19.TagTaxonomy>> getTopTags(
+    _i1.TestSessionBuilder sessionBuilder, {
+    String? category,
+    int? limit,
+  }) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'getTopTags',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'getTopTags',
+          parameters: _i1.testObjectToJson({
+            'category': category,
+            'limit': limit,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<List<_i19.TagTaxonomy>>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<List<_i19.TagTaxonomy>> searchTags(
+    _i1.TestSessionBuilder sessionBuilder,
+    String query, {
+    String? category,
+    int? limit,
+  }) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'searchTags',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'searchTags',
+          parameters: _i1.testObjectToJson({
+            'query': query,
+            'category': category,
+            'limit': limit,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<List<_i19.TagTaxonomy>>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<int> mergeTags(
+    _i1.TestSessionBuilder sessionBuilder, {
+    required List<String> sourceTags,
+    required String targetTag,
+    String? category,
+  }) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'mergeTags',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'mergeTags',
+          parameters: _i1.testObjectToJson({
+            'sourceTags': sourceTags,
+            'targetTag': targetTag,
+            'category': category,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<int>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<int> renameTag(
+    _i1.TestSessionBuilder sessionBuilder, {
+    required String oldTag,
+    required String newTag,
+    String? category,
+  }) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'renameTag',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'renameTag',
+          parameters: _i1.testObjectToJson({
+            'oldTag': oldTag,
+            'newTag': newTag,
+            'category': category,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<int>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<List<Map<String, dynamic>>> getRelatedTags(
+    _i1.TestSessionBuilder sessionBuilder, {
+    required String tagValue,
+    int? limit,
+  }) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'getRelatedTags',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'getRelatedTags',
+          parameters: _i1.testObjectToJson({
+            'tagValue': tagValue,
+            'limit': limit,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<List<Map<String, dynamic>>>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<Map<String, dynamic>> getTagCategoryStats(
+    _i1.TestSessionBuilder sessionBuilder,
+  ) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'getTagCategoryStats',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'getTagCategoryStats',
+          parameters: _i1.testObjectToJson({}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<Map<String, dynamic>>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<Map<String, dynamic>> getAICostSummary(
+    _i1.TestSessionBuilder sessionBuilder, {
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'getAICostSummary',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'getAICostSummary',
+          parameters: _i1.testObjectToJson({
+            'startDate': startDate,
+            'endDate': endDate,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<Map<String, dynamic>>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<Map<String, dynamic>> checkBudget(
+    _i1.TestSessionBuilder sessionBuilder, {
+    required double budgetLimit,
+    DateTime? periodStart,
+    DateTime? periodEnd,
+  }) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'checkBudget',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'checkBudget',
+          parameters: _i1.testObjectToJson({
+            'budgetLimit': budgetLimit,
+            'periodStart': periodStart,
+            'periodEnd': periodEnd,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<Map<String, dynamic>>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<Map<String, dynamic>> getProjectedCosts(
+    _i1.TestSessionBuilder sessionBuilder, {
+    int? lookbackDays,
+    int? forecastDays,
+  }) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'getProjectedCosts',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'getProjectedCosts',
+          parameters: _i1.testObjectToJson({
+            'lookbackDays': lookbackDays,
+            'forecastDays': forecastDays,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<Map<String, dynamic>>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<List<Map<String, dynamic>>> getDailyCosts(
+    _i1.TestSessionBuilder sessionBuilder, {
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'getDailyCosts',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'getDailyCosts',
+          parameters: _i1.testObjectToJson({
+            'startDate': startDate,
+            'endDate': endDate,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<List<Map<String, dynamic>>>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<Map<String, double>> getCostByFeature(
+    _i1.TestSessionBuilder sessionBuilder, {
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'getCostByFeature',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'getCostByFeature',
+          parameters: _i1.testObjectToJson({
+            'startDate': startDate,
+            'endDate': endDate,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<Map<String, double>>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<Map<String, double>> getCostByModel(
+    _i1.TestSessionBuilder sessionBuilder, {
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'getCostByModel',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'getCostByModel',
+          parameters: _i1.testObjectToJson({
+            'startDate': startDate,
+            'endDate': endDate,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<Map<String, double>>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<void> recordAICost(
+    _i1.TestSessionBuilder sessionBuilder, {
+    required String feature,
+    required String model,
+    required int inputTokens,
+    required int outputTokens,
+    required double cost,
+    Map<String, dynamic>? metadata,
+  }) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'recordAICost',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'recordAICost',
+          parameters: _i1.testObjectToJson({
+            'feature': feature,
+            'model': model,
+            'inputTokens': inputTokens,
+            'outputTokens': outputTokens,
+            'cost': cost,
+            'metadata': metadata,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<void>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<List<_i7.SearchResult>> hybridSearch(
+    _i1.TestSessionBuilder sessionBuilder,
+    String query, {
+    double? threshold,
+    int? limit,
+    int? offset,
+    double? semanticWeight,
+    double? keywordWeight,
+    _i8.SearchFilters? filters,
+  }) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'hybridSearch',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'hybridSearch',
+          parameters: _i1.testObjectToJson({
+            'query': query,
+            'threshold': threshold,
+            'limit': limit,
+            'offset': offset,
+            'semanticWeight': semanticWeight,
+            'keywordWeight': keywordWeight,
+            'filters': filters,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<List<_i7.SearchResult>>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<Map<String, dynamic>> getIndexHealthReport(
+    _i1.TestSessionBuilder sessionBuilder,
+  ) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'getIndexHealthReport',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'getIndexHealthReport',
+          parameters: _i1.testObjectToJson({}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<Map<String, dynamic>>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<int> cleanupOrphanedFiles(
+    _i1.TestSessionBuilder sessionBuilder,
+  ) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'cleanupOrphanedFiles',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'cleanupOrphanedFiles',
+          parameters: _i1.testObjectToJson({}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<int>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<int> refreshStaleEntries(
+    _i1.TestSessionBuilder sessionBuilder, {
+    int? staleThresholdDays,
+  }) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'refreshStaleEntries',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'refreshStaleEntries',
+          parameters: _i1.testObjectToJson({
+            'staleThresholdDays': staleThresholdDays,
+          }),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<int>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<int> removeDuplicates(
+    _i1.TestSessionBuilder sessionBuilder, {
+    bool? keepNewest,
+  }) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'removeDuplicates',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'removeDuplicates',
+          parameters: _i1.testObjectToJson({'keepNewest': keepNewest}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<int>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<int> fixMissingEmbeddings(
+    _i1.TestSessionBuilder sessionBuilder,
+  ) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'fixMissingEmbeddings',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'fixMissingEmbeddings',
+          parameters: _i1.testObjectToJson({}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<int>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Stream<_i20.AISearchProgress> aiSearch(
+    _i1.TestSessionBuilder sessionBuilder,
+    String query, {
+    String? strategy,
+    int? maxResults,
+  }) {
+    var _localTestStreamManager =
+        _i1.TestStreamManager<_i20.AISearchProgress>();
+    _i1.callStreamFunctionAndHandleExceptions(
+      () async {
+        var _localUniqueSession =
+            (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+              endpoint: 'butler',
+              method: 'aiSearch',
+            );
+        var _localCallContext = await _endpointDispatch
+            .getMethodStreamCallContext(
+              createSessionCallback: (_) => _localUniqueSession,
+              endpointPath: 'butler',
+              methodName: 'aiSearch',
+              arguments: {
+                'query': query,
+                'strategy': strategy,
+                'maxResults': maxResults,
+              },
+              requestedInputStreams: [],
+              serializationManager: _serializationManager,
+            );
+        await _localTestStreamManager.callStreamMethod(
+          _localCallContext,
+          _localUniqueSession,
+          {},
+        );
+      },
+      _localTestStreamManager.outputStreamController,
+    );
+    return _localTestStreamManager.outputStreamController.stream;
+  }
+
+  _i3.Future<String> summarizeFile(
+    _i1.TestSessionBuilder sessionBuilder,
+    String filePath,
+  ) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'summarizeFile',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'summarizeFile',
+          parameters: _i1.testObjectToJson({'filePath': filePath}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<String>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+
+  _i3.Future<_i21.OrganizationSuggestions> getOrganizationSuggestions(
+    _i1.TestSessionBuilder sessionBuilder, {
+    String? rootPath,
+  }) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'butler',
+            method: 'getOrganizationSuggestions',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'butler',
+          methodName: 'getOrganizationSuggestions',
+          parameters: _i1.testObjectToJson({'rootPath': rootPath}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<_i21.OrganizationSuggestions>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
 }
 
 class _FileSystemEndpoint {
@@ -854,7 +1911,7 @@ class _FileSystemEndpoint {
 
   final _i2.SerializationManager _serializationManager;
 
-  _i3.Future<List<_i15.FileSystemEntry>> listDirectory(
+  _i3.Future<List<_i22.FileSystemEntry>> listDirectory(
     _i1.TestSessionBuilder sessionBuilder,
     String path,
   ) async {
@@ -877,7 +1934,7 @@ class _FileSystemEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<List<_i15.FileSystemEntry>>);
+                as _i3.Future<List<_i22.FileSystemEntry>>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -885,7 +1942,7 @@ class _FileSystemEndpoint {
     });
   }
 
-  _i3.Future<List<_i16.DriveInfo>> getDrives(
+  _i3.Future<List<_i23.DriveInfo>> getDrives(
     _i1.TestSessionBuilder sessionBuilder,
   ) async {
     return _i1.callAwaitableFunctionAndHandleExceptions(() async {
@@ -907,7 +1964,7 @@ class _FileSystemEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<List<_i16.DriveInfo>>);
+                as _i3.Future<List<_i23.DriveInfo>>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -915,7 +1972,7 @@ class _FileSystemEndpoint {
     });
   }
 
-  _i3.Future<_i17.FileOperationResult> rename(
+  _i3.Future<_i24.FileOperationResult> rename(
     _i1.TestSessionBuilder sessionBuilder,
     String path,
     String newName,
@@ -944,7 +2001,7 @@ class _FileSystemEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<_i17.FileOperationResult>);
+                as _i3.Future<_i24.FileOperationResult>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -952,7 +2009,7 @@ class _FileSystemEndpoint {
     });
   }
 
-  _i3.Future<_i17.FileOperationResult> move(
+  _i3.Future<_i24.FileOperationResult> move(
     _i1.TestSessionBuilder sessionBuilder,
     String sourcePath,
     String destFolder,
@@ -979,7 +2036,7 @@ class _FileSystemEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<_i17.FileOperationResult>);
+                as _i3.Future<_i24.FileOperationResult>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -987,7 +2044,7 @@ class _FileSystemEndpoint {
     });
   }
 
-  _i3.Future<_i17.FileOperationResult> delete(
+  _i3.Future<_i24.FileOperationResult> delete(
     _i1.TestSessionBuilder sessionBuilder,
     String path,
   ) async {
@@ -1010,7 +2067,7 @@ class _FileSystemEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<_i17.FileOperationResult>);
+                as _i3.Future<_i24.FileOperationResult>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -1018,7 +2075,7 @@ class _FileSystemEndpoint {
     });
   }
 
-  _i3.Future<_i17.FileOperationResult> createFolder(
+  _i3.Future<_i24.FileOperationResult> createFolder(
     _i1.TestSessionBuilder sessionBuilder,
     String path,
   ) async {
@@ -1041,7 +2098,48 @@ class _FileSystemEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<_i17.FileOperationResult>);
+                as _i3.Future<_i24.FileOperationResult>);
+        return _localReturnValue;
+      } finally {
+        await _localUniqueSession.close();
+      }
+    });
+  }
+}
+
+class _HealthEndpoint {
+  _HealthEndpoint(
+    this._endpointDispatch,
+    this._serializationManager,
+  );
+
+  final _i2.EndpointDispatch _endpointDispatch;
+
+  final _i2.SerializationManager _serializationManager;
+
+  _i3.Future<_i25.HealthCheck> check(
+    _i1.TestSessionBuilder sessionBuilder,
+  ) async {
+    return _i1.callAwaitableFunctionAndHandleExceptions(() async {
+      var _localUniqueSession =
+          (sessionBuilder as _i1.InternalTestSessionBuilder).internalBuild(
+            endpoint: 'health',
+            method: 'check',
+          );
+      try {
+        var _localCallContext = await _endpointDispatch.getMethodCallContext(
+          createSessionCallback: (_) => _localUniqueSession,
+          endpointPath: 'health',
+          methodName: 'check',
+          parameters: _i1.testObjectToJson({}),
+          serializationManager: _serializationManager,
+        );
+        var _localReturnValue =
+            await (_localCallContext.method.call(
+                  _localUniqueSession,
+                  _localCallContext.arguments,
+                )
+                as _i3.Future<_i25.HealthCheck>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();
@@ -1060,7 +2158,7 @@ class _GreetingEndpoint {
 
   final _i2.SerializationManager _serializationManager;
 
-  _i3.Future<_i18.Greeting> hello(
+  _i3.Future<_i26.Greeting> hello(
     _i1.TestSessionBuilder sessionBuilder,
     String name,
   ) async {
@@ -1083,7 +2181,7 @@ class _GreetingEndpoint {
                   _localUniqueSession,
                   _localCallContext.arguments,
                 )
-                as _i3.Future<_i18.Greeting>);
+                as _i3.Future<_i26.Greeting>);
         return _localReturnValue;
       } finally {
         await _localUniqueSession.close();

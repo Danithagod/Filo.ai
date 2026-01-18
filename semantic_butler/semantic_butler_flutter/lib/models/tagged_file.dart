@@ -1,3 +1,5 @@
+import 'dart:io';
+
 /// Model for a file tagged in chat via @-mention
 class TaggedFile {
   final String path;
@@ -12,8 +14,9 @@ class TaggedFile {
     this.content,
   });
 
-  /// Get display name (just filename)
-  String get displayName => name.isNotEmpty ? name : path.split('/').last;
+  /// Get display name (just filename) - uses platform-aware path separator
+  String get displayName =>
+      name.isNotEmpty ? name : path.split(Platform.pathSeparator).last;
 
   @override
   bool operator ==(Object other) =>

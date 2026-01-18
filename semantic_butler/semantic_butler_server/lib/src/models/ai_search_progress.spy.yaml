@@ -1,0 +1,18 @@
+### AISearchProgress DTO - streaming progress updates for AI search
+### Used for real-time feedback during AI-powered file search
+class: AISearchProgress
+fields:
+  ### Progress type: 'thinking', 'searching', 'found', 'result', 'complete', 'error'
+  type: String
+  ### Human-readable progress message
+  message: String?
+  ### Search source: 'semantic', 'terminal', 'combined'
+  source: String?
+  ### Current drive being searched (for terminal search)
+  drive: String?
+  ### Optional partial or final results
+  results: List<AISearchResult>?
+  ### Progress percentage (0.0 to 1.0)
+  progress: double?
+  ### Error message if type is 'error'
+  error: String?

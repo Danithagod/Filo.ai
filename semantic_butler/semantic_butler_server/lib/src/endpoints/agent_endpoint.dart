@@ -81,77 +81,97 @@ class AgentEndpoint extends Endpoint {
   /// System prompt for the agent
   static const String systemPrompt = '''
 You are Semantic Butler, an intelligent file search and organization assistant.
-You help users find, organize, and understand their documents using semantic search.
-You can also help organize files by renaming, moving, deleting, and creating folders.
-You have access to the local file system and can execute terminal commands.
+You have full access to the local file system and can execute terminal commands.
 
-You have access to the following tools:
+# AVAILABLE TOOLS
 
 **Search & Discovery:**
-1. **search_files** - Semantic search on indexed documents
-   Parameters: query (string), limit (int, optional)
-
-2. **grep_search** - Search file contents for text patterns (like grep/findstr)
-   Parameters: pattern (string), path (string), recursive (bool), ignore_case (bool)
-
-3. **find_files** - Find files by name pattern across drives
-   Parameters: pattern (string), directory (string, optional), recursive (bool)
-
-4. **list_directory** - List contents of a directory
-   Parameters: path (string)
-
-5. **get_drives** - List all available drives on the system
+- `search_files(query, limit)` - Semantic search on indexed documents
+- `grep_search(pattern, path, recursive, ignore_case)` - Search file contents
+- `find_files(pattern, directory, recursive)` - Quick find files/folders by name
+- `deep_search(pattern, directory, folders_only)` - RECOMMENDED: PowerShell deep search with 2-min timeout
+- `list_directory(path)` - List directory contents
+- `get_drives()` - List all available drives
+- `run_command(command, working_directory)` - Execute safe shell commands
 
 **File Information:**
-6. **get_document_details** - Get details about an indexed document
-   Parameters: document_id (int)
-
-7. **read_file_contents** - Read the contents of any text file
-   Parameters: path (string)
-
-8. **summarize_document** - Generate AI summary of a document
-   Parameters: document_id (int), max_words (int, optional)
-
-9. **find_related** - Find semantically similar documents
-   Parameters: document_id (int), limit (int, optional)
-
-10. **get_indexing_status** - Check indexing status and statistics
+- `get_document_details(document_id)` - Get indexed document details
+- `read_file_contents(path)` - Read any text file
+- `summarize_document(document_id, max_words)` - AI summary
+- `find_related(document_id, limit)` - Find similar documents
+- `get_indexing_status()` - Check indexing stats
 
 **File Organization:**
-11. **rename_file** - Rename a file
-    Parameters: current_path (string), new_name (string)
+- `rename_file(current_path, new_name)`, `rename_folder(current_path, new_name)`
+- `move_file(source_path, destination_folder)`
+- `delete_file(path)` - CAUTION: permanent
+- `create_folder(path)`
+- `batch_operations(operations)` - Multiple operations at once
 
-12. **rename_folder** - Rename a folder
-    Parameters: current_path (string), new_name (string)
+# MANDATORY SEARCH PROTOCOL
 
-13. **move_file** - Move a file to a different folder
-    Parameters: source_path (string), destination_folder (string)
+When asked to find a file or folder, follow this procedure:
 
-14. **delete_file** - Delete a file or folder (CAUTION: permanent)
-    Parameters: path (string)
+**Step 1: Get all drives**
+Call `get_drives()` to discover available drives (C:, D:, E:, etc.)
 
-15. **create_folder** - Create a new folder
-    Parameters: path (string)
+**Step 2: Deep search each drive**
+For each drive, call `deep_search(pattern, directory, folders_only)`:
+- Pattern: just the name without wildcards (auto-added)
+- Example: For "Gemma 2", use `deep_search("gemma2", "D:\\", folders_only=true)`
+- This uses PowerShell internally and has a 2-minute timeout
 
-**Terminal Access:**
-16. **run_command** - Execute a shell command (read-only commands only)
-    Parameters: command (string), working_directory (string, optional)
+**Step 3: Try variations**
+If not found, try:
+- Without spaces: "gemma2" instead of "Gemma 2"
+- Different case: "gemma", "GEMMA"
+- Partial: just "gemma"
 
-**Safe Operations:**
-17. **batch_operations** - Execute multiple file operations (rename, move, copy, delete, create) in one go.
-    Parameters: operations (list of objects with type, source_path, and optional new_name/destination_path)
+**Step 4: ONLY ask user after exhausting ALL options**
+You may ONLY ask the user for help if:
+- You have searched ALL available drives with deep_search
+- You have tried multiple name variations
+- You provide a summary of what you searched
 
-When responding:
-- Be helpful and conversational
-- USE MEMORY: If you renamed or moved a file, remember its NEW path for future tools in the same conversation.
-- RETRY STRATEGY: If an operation fails because a path is not found, do NOT just ask the user. Try to:
-  1. Use `list_directory` on the parent folder to see if you have the right name.
-  2. Use `find_files` or `grep_search` to locate the missing item.
-  3. Suggest the most likely correct path to the user.
-- Explain what you're doing when using tools
-- For file operations, ALWAYS confirm before destructive operations
-- If an operation fails, explain why and suggest alternatives
-- Use appropriate path separators for the OS (Windows: backslash, Unix: forward slash)
+# RESPONSE GUIDELINES
+
+1. **Think out loud**: Explain which tools you're about to use and why
+2. **Use tools aggressively**: Don't ask for confirmation before searching
+3. **Remember context**: If you moved/renamed something, use the NEW path
+4. **Be persistent**: Try at least 3 different search strategies before giving up
+5. **Confirm destructive operations**: ONLY ask before delete/move/rename
+6. **Windows paths**: Use backslashes (C:\\Users\\...)
+
+# OUTPUT FORMAT
+
+Structure your responses using these XML tags for consistent parsing:
+
+<thinking>
+Your internal reasoning process. Explain what you're about to do.
+This will be shown in a collapsible section.
+</thinking>
+
+<result type="folder" path="C:\\path\\to\\folder">
+<item type="file" name="example.py" size="1.2KB"/>
+<item type="folder" name="subfolder"/>
+</result>
+
+<message>
+Your conversational response to the user.
+Use plain text here - NO markdown formatting like **bold** or *italic*.
+Just write naturally.
+</message>
+
+<status type="success">Found 5 files in the Gemma 2 folder</status>
+<status type="error">Could not access the folder</status>
+<status type="warning">Some files were skipped</status>
+
+RULES:
+- ALWAYS wrap file listings in <result> tags
+- NEVER use markdown formatting (no **, no *, no #)
+- Keep <message> content conversational and plain
+- Use <thinking> for your reasoning process
+- Use <status> for brief action outcomes
 ''';
 
   /// Tool definitions for function calling
@@ -426,6 +446,33 @@ When responding:
             'recursive': {
               'type': 'boolean',
               'description': 'Search recursively (default: true)',
+            },
+          },
+          'required': ['pattern'],
+        },
+      ),
+    ),
+    Tool(
+      function: ToolFunction(
+        name: 'deep_search',
+        description:
+            'Deep search for files/folders using PowerShell. Better for finding items in deep directory trees. Has 2-minute timeout.',
+        parameters: {
+          'type': 'object',
+          'properties': {
+            'pattern': {
+              'type': 'string',
+              'description':
+                  'Name pattern to search for (e.g., "gemma", "*.pdf")',
+            },
+            'directory': {
+              'type': 'string',
+              'description': 'Drive or directory to search in (e.g., "D:\\\\")',
+            },
+            'folders_only': {
+              'type': 'boolean',
+              'description':
+                  'Search only for folders, not files (default: false)',
             },
           },
           'required': ['pattern'],
@@ -982,6 +1029,13 @@ When responding:
           recursive: args['recursive'] as bool? ?? true,
         );
 
+      case 'deep_search':
+        return await _toolDeepSearch(
+          args['pattern'] as String,
+          directory: args['directory'] as String?,
+          foldersOnly: args['folders_only'] as bool? ?? false,
+        );
+
       case 'read_file_contents':
         return await _toolReadFileContents(
           args['path'] as String,
@@ -1452,24 +1506,37 @@ When responding:
     bool recursive = true,
   }) async {
     try {
-      final result = await _terminal.findFiles(
+      final results = await _terminal.findFiles(
         pattern,
         directory: directory,
         recursive: recursive,
       );
 
-      final files = result.stdout
+      final files = results.stdout
           .split('\n')
           .where((l) => l.trim().isNotEmpty)
           .toList();
 
+      if (files.isEmpty && results.success) {
+        return {
+          'success': true,
+          'pattern': pattern,
+          'directory': directory ?? (_terminal.isWindows ? 'C:\\' : '/'),
+          'files': [],
+          'totalCount': 0,
+          'message':
+              'No files or folders matching "$pattern" were found in this location. If this is a drive, try another one or different search terms.',
+        };
+      }
+
       return {
-        'success': result.success,
+        'success': results.success,
         'pattern': pattern,
         'directory': directory ?? (_terminal.isWindows ? 'C:\\' : '/'),
         'files': files.take(100).toList(), // Limit to 100 results
         'totalCount': files.length,
-        'truncated': files.length > 100 || result.truncated,
+        'truncated': files.length > 100 || results.truncated,
+        'error': results.success ? null : results.stderr,
       };
     } on TerminalSecurityException catch (e) {
       return {
@@ -1480,6 +1547,53 @@ When responding:
       return {
         'success': false,
         'error': 'Find failed: $e',
+      };
+    }
+  }
+
+  /// Tool: Deep search using PowerShell (2-minute timeout)
+  Future<Map<String, dynamic>> _toolDeepSearch(
+    String pattern, {
+    String? directory,
+    bool foldersOnly = false,
+  }) async {
+    try {
+      final results = await _terminal.deepSearch(
+        pattern,
+        directory: directory,
+        foldersOnly: foldersOnly,
+      );
+
+      final files = results.stdout
+          .split('\n')
+          .where((l) => l.trim().isNotEmpty)
+          .toList();
+
+      if (files.isEmpty && results.success) {
+        return {
+          'success': true,
+          'pattern': pattern,
+          'directory': directory ?? 'C:\\',
+          'files': [],
+          'totalCount': 0,
+          'message':
+              'No files or folders matching "$pattern" were found in this location. Try another drive.',
+        };
+      }
+
+      return {
+        'success': results.success,
+        'pattern': pattern,
+        'directory': directory ?? 'C:\\',
+        'files': files,
+        'totalCount': files.length,
+        'truncated': results.truncated,
+        'error': results.success ? null : results.stderr,
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'error': 'Deep search failed: $e',
       };
     }
   }

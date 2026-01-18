@@ -11,7 +11,10 @@ final watchedFoldersProvider =
 
 class WatchedFoldersNotifier extends Notifier<List<WatchedFolder>> {
   bool _isLoading = false;
+  String? _error;
+
   bool get isLoading => _isLoading;
+  String? get error => _error;
 
   @override
   List<WatchedFolder> build() {
@@ -23,11 +26,13 @@ class WatchedFoldersNotifier extends Notifier<List<WatchedFolder>> {
   Future<void> load() async {
     if (_isLoading) return;
     _isLoading = true;
+    _error = null; // Clear previous error
 
     try {
       final folders = await client.butler.getWatchedFolders();
       state = folders;
     } catch (e) {
+      _error = e.toString();
       AppLogger.error('Failed to load watched folders: $e', tag: 'Provider');
     } finally {
       _isLoading = false;

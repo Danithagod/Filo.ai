@@ -1,0 +1,13 @@
+### DuplicateFile - info about a file within a duplicate group
+class: DuplicateFile
+fields:
+  ### Full file path
+  path: String
+  ### File name without path
+  fileName: String
+  ### File size in bytes
+  sizeBytes: int
+  ### When the file was last modified
+  modifiedAt: DateTime?
+  ### Whether this file is currently indexed
+  isIndexed: bool

@@ -3,10 +3,18 @@ agent:
   - chat:
 butler:
   - semanticSearch:
+  - getSearchSuggestions:
+  - savePreset:
+  - getSavedPresets:
+  - deletePreset:
   - startIndexing:
   - getIndexingStatus:
   - getDatabaseStats:
+  - getErrorStats:
   - getSearchHistory:
+  - deleteSearchHistoryItem:
+  - clearSearchHistory:
+  - recordLocalSearch:
   - getAIUsageStats:
   - clearIndex:
   - streamIndexingProgress:
@@ -20,6 +28,28 @@ butler:
   - getIgnorePatternStrings:
   - removeFromIndex:
   - removeMultipleFromIndex:
+  - getTopTags:
+  - searchTags:
+  - mergeTags:
+  - renameTag:
+  - getRelatedTags:
+  - getTagCategoryStats:
+  - getAICostSummary:
+  - checkBudget:
+  - getProjectedCosts:
+  - getDailyCosts:
+  - getCostByFeature:
+  - getCostByModel:
+  - recordAICost:
+  - hybridSearch:
+  - getIndexHealthReport:
+  - cleanupOrphanedFiles:
+  - refreshStaleEntries:
+  - removeDuplicates:
+  - fixMissingEmbeddings:
+  - aiSearch:
+  - summarizeFile:
+  - getOrganizationSuggestions:
 fileSystem:
   - listDirectory:
   - getDrives:
@@ -27,5 +57,7 @@ fileSystem:
   - move:
   - delete:
   - createFolder:
+health:
+  - check:
 greeting:
   - hello:

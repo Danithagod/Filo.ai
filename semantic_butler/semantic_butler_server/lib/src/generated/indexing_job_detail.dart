@@ -23,6 +23,7 @@ abstract class IndexingJobDetail
     this.startedAt,
     this.completedAt,
     this.errorMessage,
+    this.errorCategory,
   });
 
   factory IndexingJobDetail({
@@ -33,6 +34,7 @@ abstract class IndexingJobDetail
     DateTime? startedAt,
     DateTime? completedAt,
     String? errorMessage,
+    String? errorCategory,
   }) = _IndexingJobDetailImpl;
 
   factory IndexingJobDetail.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -50,6 +52,7 @@ abstract class IndexingJobDetail
               jsonSerialization['completedAt'],
             ),
       errorMessage: jsonSerialization['errorMessage'] as String?,
+      errorCategory: jsonSerialization['errorCategory'] as String?,
     );
   }
 
@@ -78,6 +81,9 @@ abstract class IndexingJobDetail
   /// Error message if processing failed
   String? errorMessage;
 
+  /// Error category if processing failed (e.g., APITimeout, CorruptFile, NetworkError)
+  String? errorCategory;
+
   @override
   _i1.Table<int?> get table => t;
 
@@ -92,6 +98,7 @@ abstract class IndexingJobDetail
     DateTime? startedAt,
     DateTime? completedAt,
     String? errorMessage,
+    String? errorCategory,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -104,6 +111,7 @@ abstract class IndexingJobDetail
       if (startedAt != null) 'startedAt': startedAt?.toJson(),
       if (completedAt != null) 'completedAt': completedAt?.toJson(),
       if (errorMessage != null) 'errorMessage': errorMessage,
+      if (errorCategory != null) 'errorCategory': errorCategory,
     };
   }
 
@@ -118,6 +126,7 @@ abstract class IndexingJobDetail
       if (startedAt != null) 'startedAt': startedAt?.toJson(),
       if (completedAt != null) 'completedAt': completedAt?.toJson(),
       if (errorMessage != null) 'errorMessage': errorMessage,
+      if (errorCategory != null) 'errorCategory': errorCategory,
     };
   }
 
@@ -162,6 +171,7 @@ class _IndexingJobDetailImpl extends IndexingJobDetail {
     DateTime? startedAt,
     DateTime? completedAt,
     String? errorMessage,
+    String? errorCategory,
   }) : super._(
          id: id,
          jobId: jobId,
@@ -170,6 +180,7 @@ class _IndexingJobDetailImpl extends IndexingJobDetail {
          startedAt: startedAt,
          completedAt: completedAt,
          errorMessage: errorMessage,
+         errorCategory: errorCategory,
        );
 
   /// Returns a shallow copy of this [IndexingJobDetail]
@@ -184,6 +195,7 @@ class _IndexingJobDetailImpl extends IndexingJobDetail {
     Object? startedAt = _Undefined,
     Object? completedAt = _Undefined,
     Object? errorMessage = _Undefined,
+    Object? errorCategory = _Undefined,
   }) {
     return IndexingJobDetail(
       id: id is int? ? id : this.id,
@@ -193,6 +205,9 @@ class _IndexingJobDetailImpl extends IndexingJobDetail {
       startedAt: startedAt is DateTime? ? startedAt : this.startedAt,
       completedAt: completedAt is DateTime? ? completedAt : this.completedAt,
       errorMessage: errorMessage is String? ? errorMessage : this.errorMessage,
+      errorCategory: errorCategory is String?
+          ? errorCategory
+          : this.errorCategory,
     );
   }
 }
@@ -233,6 +248,12 @@ class IndexingJobDetailUpdateTable
         table.errorMessage,
         value,
       );
+
+  _i1.ColumnValue<String, String> errorCategory(String? value) =>
+      _i1.ColumnValue(
+        table.errorCategory,
+        value,
+      );
 }
 
 class IndexingJobDetailTable extends _i1.Table<int?> {
@@ -263,6 +284,10 @@ class IndexingJobDetailTable extends _i1.Table<int?> {
       'errorMessage',
       this,
     );
+    errorCategory = _i1.ColumnString(
+      'errorCategory',
+      this,
+    );
   }
 
   late final IndexingJobDetailUpdateTable updateTable;
@@ -285,6 +310,9 @@ class IndexingJobDetailTable extends _i1.Table<int?> {
   /// Error message if processing failed
   late final _i1.ColumnString errorMessage;
 
+  /// Error category if processing failed (e.g., APITimeout, CorruptFile, NetworkError)
+  late final _i1.ColumnString errorCategory;
+
   @override
   List<_i1.Column> get columns => [
     id,
@@ -294,6 +322,7 @@ class IndexingJobDetailTable extends _i1.Table<int?> {
     startedAt,
     completedAt,
     errorMessage,
+    errorCategory,
   ];
 }
 

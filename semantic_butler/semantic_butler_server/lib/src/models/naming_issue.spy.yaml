@@ -1,0 +1,15 @@
+### NamingIssue - represents a file naming convention issue
+class: NamingIssue
+fields:
+  ### Type of issue: inconsistent_case, spaces_in_name, invalid_characters, mixed_conventions
+  issueType: String
+  ### Human-readable description of the issue
+  description: String
+  ### Severity level: info, warning, error
+  severity: String
+  ### List of file paths affected by this issue
+  affectedFiles: List<String>
+  ### Number of files affected
+  affectedCount: int
+  ### Suggested fix or recommendation
+  suggestedFix: String?

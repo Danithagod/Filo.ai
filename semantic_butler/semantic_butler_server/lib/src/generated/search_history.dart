@@ -22,6 +22,8 @@ abstract class SearchHistory
     this.topResultId,
     required this.queryTimeMs,
     required this.searchedAt,
+    this.searchType,
+    this.directoryContext,
   });
 
   factory SearchHistory({
@@ -31,6 +33,8 @@ abstract class SearchHistory
     int? topResultId,
     required int queryTimeMs,
     required DateTime searchedAt,
+    String? searchType,
+    String? directoryContext,
   }) = _SearchHistoryImpl;
 
   factory SearchHistory.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -43,6 +47,8 @@ abstract class SearchHistory
       searchedAt: _i1.DateTimeJsonExtension.fromJson(
         jsonSerialization['searchedAt'],
       ),
+      searchType: jsonSerialization['searchType'] as String?,
+      directoryContext: jsonSerialization['directoryContext'] as String?,
     );
   }
 
@@ -68,6 +74,12 @@ abstract class SearchHistory
   /// When the search was executed
   DateTime searchedAt;
 
+  /// Type of search: 'semantic' or 'local'
+  String? searchType;
+
+  /// Directory path for local searches (null for semantic)
+  String? directoryContext;
+
   @override
   _i1.Table<int?> get table => t;
 
@@ -81,6 +93,8 @@ abstract class SearchHistory
     int? topResultId,
     int? queryTimeMs,
     DateTime? searchedAt,
+    String? searchType,
+    String? directoryContext,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -92,6 +106,8 @@ abstract class SearchHistory
       if (topResultId != null) 'topResultId': topResultId,
       'queryTimeMs': queryTimeMs,
       'searchedAt': searchedAt.toJson(),
+      if (searchType != null) 'searchType': searchType,
+      if (directoryContext != null) 'directoryContext': directoryContext,
     };
   }
 
@@ -105,6 +121,8 @@ abstract class SearchHistory
       if (topResultId != null) 'topResultId': topResultId,
       'queryTimeMs': queryTimeMs,
       'searchedAt': searchedAt.toJson(),
+      if (searchType != null) 'searchType': searchType,
+      if (directoryContext != null) 'directoryContext': directoryContext,
     };
   }
 
@@ -148,6 +166,8 @@ class _SearchHistoryImpl extends SearchHistory {
     int? topResultId,
     required int queryTimeMs,
     required DateTime searchedAt,
+    String? searchType,
+    String? directoryContext,
   }) : super._(
          id: id,
          query: query,
@@ -155,6 +175,8 @@ class _SearchHistoryImpl extends SearchHistory {
          topResultId: topResultId,
          queryTimeMs: queryTimeMs,
          searchedAt: searchedAt,
+         searchType: searchType,
+         directoryContext: directoryContext,
        );
 
   /// Returns a shallow copy of this [SearchHistory]
@@ -168,6 +190,8 @@ class _SearchHistoryImpl extends SearchHistory {
     Object? topResultId = _Undefined,
     int? queryTimeMs,
     DateTime? searchedAt,
+    Object? searchType = _Undefined,
+    Object? directoryContext = _Undefined,
   }) {
     return SearchHistory(
       id: id is int? ? id : this.id,
@@ -176,6 +200,10 @@ class _SearchHistoryImpl extends SearchHistory {
       topResultId: topResultId is int? ? topResultId : this.topResultId,
       queryTimeMs: queryTimeMs ?? this.queryTimeMs,
       searchedAt: searchedAt ?? this.searchedAt,
+      searchType: searchType is String? ? searchType : this.searchType,
+      directoryContext: directoryContext is String?
+          ? directoryContext
+          : this.directoryContext,
     );
   }
 }
@@ -208,6 +236,17 @@ class SearchHistoryUpdateTable extends _i1.UpdateTable<SearchHistoryTable> {
         table.searchedAt,
         value,
       );
+
+  _i1.ColumnValue<String, String> searchType(String? value) => _i1.ColumnValue(
+    table.searchType,
+    value,
+  );
+
+  _i1.ColumnValue<String, String> directoryContext(String? value) =>
+      _i1.ColumnValue(
+        table.directoryContext,
+        value,
+      );
 }
 
 class SearchHistoryTable extends _i1.Table<int?> {
@@ -234,6 +273,14 @@ class SearchHistoryTable extends _i1.Table<int?> {
       'searchedAt',
       this,
     );
+    searchType = _i1.ColumnString(
+      'searchType',
+      this,
+    );
+    directoryContext = _i1.ColumnString(
+      'directoryContext',
+      this,
+    );
   }
 
   late final SearchHistoryUpdateTable updateTable;
@@ -253,6 +300,12 @@ class SearchHistoryTable extends _i1.Table<int?> {
   /// When the search was executed
   late final _i1.ColumnDateTime searchedAt;
 
+  /// Type of search: 'semantic' or 'local'
+  late final _i1.ColumnString searchType;
+
+  /// Directory path for local searches (null for semantic)
+  late final _i1.ColumnString directoryContext;
+
   @override
   List<_i1.Column> get columns => [
     id,
@@ -261,6 +314,8 @@ class SearchHistoryTable extends _i1.Table<int?> {
     topResultId,
     queryTimeMs,
     searchedAt,
+    searchType,
+    directoryContext,
   ];
 }
 

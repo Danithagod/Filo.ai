@@ -1,0 +1,26 @@
+### AISearchResult DTO - returned from AI-powered search
+### Combines results from semantic index and terminal-based file discovery
+class: AISearchResult
+fields:
+  ### Full file path
+  path: String
+  ### File name
+  fileName: String
+  ### Whether this is a directory
+  isDirectory: bool
+  ### Source of the result: 'index', 'terminal', 'both'
+  source: String
+  ### Relevance score (0.0 to 1.0) - may be null for terminal results
+  relevanceScore: double?
+  ### Content preview snippet
+  contentPreview: String?
+  ### How the file was found: 'semantic', 'deep_search', 'find_files', 'grep_search'
+  foundVia: String?
+  ### Human-readable explanation of why this matched
+  matchReason: String?
+  ### File size in bytes (if available)
+  fileSizeBytes: int?
+  ### MIME type (if available)
+  mimeType: String?
+  ### Tags from index (if available)
+  tags: List<String>?

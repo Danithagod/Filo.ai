@@ -1,0 +1,9 @@
+### ErrorCategoryCount model - counts for a specific error category
+class: ErrorCategoryCount
+fields:
+  ### Error category name (e.g., "APITimeout", "CorruptFile")
+  category: String
+  ### Number of errors in this category
+  count: int
+  ### Percentage of total errors (0.0 to 100.0)
+  percentage: double

@@ -14,6 +14,8 @@ fields:
   completedAt: DateTime?
   ### Error message if processing failed
   errorMessage: String?
+  ### Error category if processing failed (e.g., APITimeout, CorruptFile, NetworkError)
+  errorCategory: String?
 indexes:
   idx_job_detail_job:
     fields: jobId
@@ -21,3 +23,5 @@ indexes:
     fields: status
   idx_job_detail_path:
     fields: filePath
+  idx_job_detail_error_category:
+    fields: errorCategory

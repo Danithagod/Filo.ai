@@ -26,6 +26,7 @@ abstract class IndexingJob
     this.startedAt,
     this.completedAt,
     this.errorMessage,
+    this.errorCategory,
   });
 
   factory IndexingJob({
@@ -39,6 +40,7 @@ abstract class IndexingJob
     DateTime? startedAt,
     DateTime? completedAt,
     String? errorMessage,
+    String? errorCategory,
   }) = _IndexingJobImpl;
 
   factory IndexingJob.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -59,6 +61,7 @@ abstract class IndexingJob
               jsonSerialization['completedAt'],
             ),
       errorMessage: jsonSerialization['errorMessage'] as String?,
+      errorCategory: jsonSerialization['errorCategory'] as String?,
     );
   }
 
@@ -96,6 +99,9 @@ abstract class IndexingJob
   /// Error message if job failed
   String? errorMessage;
 
+  /// Error category for failed files
+  String? errorCategory;
+
   @override
   _i1.Table<int?> get table => t;
 
@@ -113,6 +119,7 @@ abstract class IndexingJob
     DateTime? startedAt,
     DateTime? completedAt,
     String? errorMessage,
+    String? errorCategory,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -128,6 +135,7 @@ abstract class IndexingJob
       if (startedAt != null) 'startedAt': startedAt?.toJson(),
       if (completedAt != null) 'completedAt': completedAt?.toJson(),
       if (errorMessage != null) 'errorMessage': errorMessage,
+      if (errorCategory != null) 'errorCategory': errorCategory,
     };
   }
 
@@ -145,6 +153,7 @@ abstract class IndexingJob
       if (startedAt != null) 'startedAt': startedAt?.toJson(),
       if (completedAt != null) 'completedAt': completedAt?.toJson(),
       if (errorMessage != null) 'errorMessage': errorMessage,
+      if (errorCategory != null) 'errorCategory': errorCategory,
     };
   }
 
@@ -192,6 +201,7 @@ class _IndexingJobImpl extends IndexingJob {
     DateTime? startedAt,
     DateTime? completedAt,
     String? errorMessage,
+    String? errorCategory,
   }) : super._(
          id: id,
          folderPath: folderPath,
@@ -203,6 +213,7 @@ class _IndexingJobImpl extends IndexingJob {
          startedAt: startedAt,
          completedAt: completedAt,
          errorMessage: errorMessage,
+         errorCategory: errorCategory,
        );
 
   /// Returns a shallow copy of this [IndexingJob]
@@ -220,6 +231,7 @@ class _IndexingJobImpl extends IndexingJob {
     Object? startedAt = _Undefined,
     Object? completedAt = _Undefined,
     Object? errorMessage = _Undefined,
+    Object? errorCategory = _Undefined,
   }) {
     return IndexingJob(
       id: id is int? ? id : this.id,
@@ -232,6 +244,9 @@ class _IndexingJobImpl extends IndexingJob {
       startedAt: startedAt is DateTime? ? startedAt : this.startedAt,
       completedAt: completedAt is DateTime? ? completedAt : this.completedAt,
       errorMessage: errorMessage is String? ? errorMessage : this.errorMessage,
+      errorCategory: errorCategory is String?
+          ? errorCategory
+          : this.errorCategory,
     );
   }
 }
@@ -286,6 +301,12 @@ class IndexingJobUpdateTable extends _i1.UpdateTable<IndexingJobTable> {
         table.errorMessage,
         value,
       );
+
+  _i1.ColumnValue<String, String> errorCategory(String? value) =>
+      _i1.ColumnValue(
+        table.errorCategory,
+        value,
+      );
 }
 
 class IndexingJobTable extends _i1.Table<int?> {
@@ -327,6 +348,10 @@ class IndexingJobTable extends _i1.Table<int?> {
       'errorMessage',
       this,
     );
+    errorCategory = _i1.ColumnString(
+      'errorCategory',
+      this,
+    );
   }
 
   late final IndexingJobUpdateTable updateTable;
@@ -358,6 +383,9 @@ class IndexingJobTable extends _i1.Table<int?> {
   /// Error message if job failed
   late final _i1.ColumnString errorMessage;
 
+  /// Error category for failed files
+  late final _i1.ColumnString errorCategory;
+
   @override
   List<_i1.Column> get columns => [
     id,
@@ -370,6 +398,7 @@ class IndexingJobTable extends _i1.Table<int?> {
     startedAt,
     completedAt,
     errorMessage,
+    errorCategory,
   ];
 }
 

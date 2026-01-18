@@ -1,0 +1,14 @@
+# Robots.txt for Semantic Butler
+
+User-agent: *
+Allow: /
+
+# Disallow specific paths if needed
+# Disallow: /api/
+# Disallow: /admin/
+
+# Sitemap location
+Sitemap: https://semanticbutler.com/sitemap.xml
+
+# Crawl delay (optional)
+Crawl-delay: 1

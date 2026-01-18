@@ -1,0 +1,20 @@
+{
+  "name": "Semantic Butler",
+  "short_name": "Semantic Butler",
+  "description": "Private AI for your local data",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f0e13",
+  "theme_color": "#6750A4",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities"],
+  "screenshots": []
+}

@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, Link } from 'react-router-dom';
 import Lenis from 'lenis';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Background from './components/Background/Background';
 import Navbar from './components/Navbar/Navbar';
 import Loader from './components/Loader/Loader';
+import NavLoader from './components/NavLoader/NavLoader';
 import Home from './pages/Home/Home';
 import Features from './pages/Features/Features';
 import About from './pages/About/About';
+import Pricing from './pages/Pricing/Pricing';
+import NotFound from './pages/NotFound/NotFound';
 import './App.css';
 
 // ScrollToTop component to reset scroll on navigation
@@ -25,6 +28,14 @@ gsap.registerPlugin(ScrollTrigger);
 
 function App() {
   const [loading, setLoading] = useState(true);
+  const [navigating, setNavigating] = useState(false);
+  const location = useLocation();
+
+  useEffect(() => {
+    setNavigating(true);
+    const timeout = setTimeout(() => setNavigating(false), 500);
+    return () => clearTimeout(timeout);
+  }, [location.pathname]);
 
   useEffect(() => {
     const lenis = new Lenis({
@@ -43,28 +54,34 @@ function App() {
       ScrollTrigger.update();
     });
 
+    let rafId;
     function raf(time) {
       lenis.raf(time);
-      requestAnimationFrame(raf);
+      rafId = requestAnimationFrame(raf);
     }
 
-    requestAnimationFrame(raf);
+    rafId = requestAnimationFrame(raf);
 
     // Initial refresh
-    setTimeout(() => {
+    const refreshTimeout = setTimeout(() => {
       ScrollTrigger.refresh();
     }, 500);
 
     return () => {
       lenis.destroy();
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+      }
+      clearTimeout(refreshTimeout);
     };
   }, []);
 
   return (
-    <Router>
+    <>
       <ScrollToTop />
       <div className="app-container">
         {loading && <Loader onFinished={() => setLoading(false)} />}
+        {navigating && <NavLoader />}
 
         <Background />
         <Navbar show={!loading} />
@@ -74,34 +91,35 @@ function App() {
             <Route path="/" element={<Home show={!loading} />} />
             <Route path="/features" element={<Features show={!loading} />} />
             <Route path="/about" element={<About show={!loading} />} />
+            <Route path="/pricing" element={<Pricing show={!loading} />} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
 
-        <footer className="footer">
+        <footer className="footer" role="contentinfo">
           <div className="container footer-grid">
             <div className="footer-brand">
               <div className="logo">Semantic Butler</div>
               <p>Private AI for your local data.</p>
             </div>
-            <div className="footer-links">
+            <nav className="footer-links" aria-label="Footer navigation">
               <div className="link-group">
                 <h4>Product</h4>
-                <a href="/features">Features</a>
-                <a href="/download">Download</a>
+                <Link to="/features">Features</Link>
+                <Link to="/pricing">Pricing</Link>
+                <Link to="/about">About</Link>
               </div>
               <div className="link-group">
                 <h4>Resources</h4>
-                <a href="/docs">Documentation</a>
-                <a href="/github">GitHub</a>
-                <a href="/api">API Reference</a>
+                <a href="https://github.com" target="_blank" rel="noopener noreferrer">GitHub</a>
+                <a href="https://docs.semanticbutler.com" target="_blank" rel="noopener noreferrer">Documentation</a>
               </div>
               <div className="link-group">
-                <h4>Company</h4>
-                <a href="/about">About</a>
-                <a href="/privacy">Privacy</a>
-                <a href="/terms">Terms</a>
+                <h4>Legal</h4>
+                <a href="/about#privacy">Privacy</a>
+                <a href="/about#terms">Terms</a>
               </div>
-            </div>
+            </nav>
           </div>
           <div className="footer-bottom">
             <div className="container">
@@ -110,7 +128,7 @@ function App() {
           </div>
         </footer>
       </div>
-    </Router>
+    </>
   );
 }
 

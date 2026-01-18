@@ -277,10 +277,10 @@ class FileOperationsService {
     // Check for dangerous PowerShell-specific characters/patterns
     final dangerousPatterns = [
       '\x00', // Null byte
-      '\$(',  // Command substitution
-      '`',    // Backtick (escape character in PowerShell)
-      '\n',   // Newline
-      '\r',   // Carriage return
+      '\$(', // Command substitution
+      '`', // Backtick (escape character in PowerShell)
+      '\n', // Newline
+      '\r', // Carriage return
     ];
 
     for (final pattern in dangerousPatterns) {
@@ -325,7 +325,8 @@ class FileOperationsService {
           break;
         }
         decodeIterations++;
-      } while (decodedPath != previousPath && decodeIterations < maxDecodeIterations);
+      } while (decodedPath != previousPath &&
+          decodeIterations < maxDecodeIterations);
 
       // Also check for hex-encoded characters (e.g., 0x2e for '.')
       if (RegExp(r'0x[0-9a-fA-F]{2}').hasMatch(decodedPath)) {
@@ -567,7 +568,35 @@ class FileOperationsService {
 
       // Perform move
       if (entity is File) {
-        await entity.rename(newPath);
+        try {
+          // Try atomic rename first (fast, works on same filesystem)
+          await entity.rename(newPath);
+        } catch (e) {
+          // If rename fails (cross-filesystem), use copy+delete with progress
+          final fileSize = await entity.length();
+          const largeFileThreshold = 10 * 1024 * 1024; // 10 MB
+
+          if (fileSize > largeFileThreshold) {
+            // Use streaming copy for large files
+            await _copyFileWithProgress(
+              entity,
+              newPath,
+              fileSize,
+              (copied, total) {
+                // final percent = (copied / total * 100).toStringAsFixed(1);
+                // print('Move progress: $percent% ($copied / $total bytes)');
+              },
+              preserveMetadata: true,
+            );
+          } else {
+            await entity.copy(newPath);
+            // Preserve metadata for small files
+            await _preserveFileMetadata(entity.path, newPath);
+          }
+
+          // Delete source after successful copy
+          await entity.delete();
+        }
       } else if (entity is Directory) {
         await entity.rename(newPath);
       }
@@ -598,10 +627,12 @@ class FileOperationsService {
     }
   }
 
-  /// Move a file or folder to the trash/recycle bin
+  /// Move a file or folder to the system trash/recycle bin
   ///
   /// On Windows: Uses PowerShell to move to Recycle Bin
-  /// On other platforms: Currently falls back to permanent delete
+  /// On macOS: Uses osascript to move to Trash
+  /// On Linux: Uses gio trash or manual FreeDesktop.org Trash spec
+  /// On other platforms: Falls back to permanent delete
   Future<FileOperationResult> moveToTrash(
     String filePath, {
     bool dryRun = false,
@@ -651,8 +682,12 @@ class FileOperationsService {
             command,
           );
         }
+      } else if (Platform.isMacOS) {
+        return await _moveToMacOSTrash(resolvedPath, command);
+      } else if (Platform.isLinux) {
+        return await _moveToLinuxTrash(resolvedPath, command);
       } else {
-        // Fallback for other platforms (could use 'trash-cli' if available)
+        // Fallback for other platforms
         await deleteFile(filePath);
         return _successResult(
           command,
@@ -666,6 +701,109 @@ class FileOperationsService {
       );
     } catch (e) {
       return _errorResult('Failed to move to trash: $e', command);
+    }
+  }
+
+  /// Move file to macOS Trash using osascript
+  Future<FileOperationResult> _moveToMacOSTrash(
+    String resolvedPath,
+    String command,
+  ) async {
+    try {
+      final absPath = path.absolute(resolvedPath);
+      final result = await Process.run('osascript', [
+        '-e',
+        'tell application "Finder" to move POSIX file "$absPath" to trash',
+      ]);
+
+      if (result.exitCode == 0) {
+        return _successResult(
+          command,
+          output: 'Moved to Trash: ${path.basename(absPath)}',
+          newPath: '~/.Trash/${path.basename(absPath)}',
+        );
+      }
+
+      return _errorResult(
+        'AppleScript failed: ${result.stderr}',
+        command,
+      );
+    } catch (e) {
+      return _errorResult('Failed to move to macOS Trash: $e', command);
+    }
+  }
+
+  /// Move file to Linux Trash using gio or manual FreeDesktop.org Trash spec
+  Future<FileOperationResult> _moveToLinuxTrash(
+    String resolvedPath,
+    String command,
+  ) async {
+    try {
+      final absPath = path.absolute(resolvedPath);
+
+      // Try gio first (GNOME/FreeDesktop standard)
+      try {
+        final result = await Process.run('gio', ['trash', absPath]);
+        if (result.exitCode == 0) {
+          return _successResult(
+            command,
+            output: 'Moved to Trash: ${path.basename(absPath)}',
+            newPath: '~/.local/share/Trash/files/${path.basename(absPath)}',
+          );
+        }
+      } catch (e) {
+        // gio not available, fall through to manual implementation
+      }
+
+      // Fallback: Manual implementation using FreeDesktop.org Trash spec
+      final homeDir =
+          Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
+      if (homeDir == null) {
+        return _errorResult('Cannot determine home directory', command);
+      }
+
+      final trashFilesDir = path.join(
+        homeDir,
+        '.local',
+        'share',
+        'Trash',
+        'files',
+      );
+      final trashInfoDir = path.join(
+        homeDir,
+        '.local',
+        'share',
+        'Trash',
+        'info',
+      );
+
+      // Create trash directories if they don't exist
+      await Directory(trashFilesDir).create(recursive: true);
+      await Directory(trashInfoDir).create(recursive: true);
+
+      final fileName = path.basename(absPath);
+      final newPath = path.join(trashFilesDir, fileName);
+      final infoPath = path.join(trashInfoDir, '$fileName.trashinfo');
+
+      // Move file to trash
+      await File(absPath).rename(newPath);
+
+      // Create .trashinfo file
+      final trashInfo =
+          '''
+[Trash Info]
+Path=$absPath
+DeletionDate=${DateTime.now().toUtc().toIso8601String()}
+''';
+      await File(infoPath).writeAsString(trashInfo);
+
+      return _successResult(
+        command,
+        output: 'Moved to Trash: $fileName',
+        newPath: newPath,
+      );
+    } catch (e) {
+      return _errorResult('Failed to move to Linux Trash: $e', command);
     }
   }
 
@@ -914,8 +1052,29 @@ class FileOperationsService {
         );
       }
 
-      // Copy file
-      await file.copy(newPath);
+      // Check file size to decide on streaming vs direct copy
+      final fileSize = await file.length();
+      const largeFileThreshold = 10 * 1024 * 1024; // 10 MB
+
+      if (fileSize > largeFileThreshold) {
+        // Use streaming copy for large files
+        await _copyFileWithProgress(
+          file,
+          newPath,
+          fileSize,
+          (copied, total) {
+            // Progress callback - can be extended to emit events
+            // final percent = (copied / total * 100).toStringAsFixed(1);
+            // print('Copy progress: $percent% ($copied / $total bytes)');
+          },
+          preserveMetadata: true,
+        );
+      } else {
+        // Direct copy for small files
+        await file.copy(newPath);
+        // Preserve metadata for small files too
+        await _preserveFileMetadata(resolvedSourcePath, newPath);
+      }
 
       return _successResult(
         command,
@@ -925,6 +1084,107 @@ class FileOperationsService {
       );
     } catch (e) {
       return _errorResult('Failed to copy: $e', command);
+    }
+  }
+
+  /// Copy file with progress tracking for large files
+  /// Copies in 1MB chunks and calls progress callback
+  Future<void> _copyFileWithProgress(
+    File sourceFile,
+    String destPath,
+    int totalSize,
+    void Function(int copied, int total)? onProgress, {
+    bool preserveMetadata = true,
+  }) async {
+    final source = await sourceFile.open(mode: FileMode.read);
+    final dest = await File(destPath).open(mode: FileMode.write);
+
+    const chunkSize = 1024 * 1024; // 1 MB chunks
+    int copiedBytes = 0;
+
+    try {
+      while (copiedBytes < totalSize) {
+        final remainingBytes = totalSize - copiedBytes;
+        final bytesToRead = remainingBytes < chunkSize
+            ? remainingBytes
+            : chunkSize;
+
+        final chunk = await source.read(bytesToRead);
+        if (chunk.isEmpty) break;
+
+        await dest.writeFrom(chunk);
+        copiedBytes += chunk.length;
+
+        // Call progress callback
+        onProgress?.call(copiedBytes, totalSize);
+      }
+    } finally {
+      await source.close();
+      await dest.close();
+
+      // Preserve metadata after copy completes
+      if (preserveMetadata) {
+        await _preserveFileMetadata(sourceFile.path, destPath);
+      }
+    }
+  }
+
+  /// Preserve file metadata (timestamps, permissions, ownership)
+  /// from source to destination file
+  Future<void> _preserveFileMetadata(
+    String sourcePath,
+    String destPath,
+  ) async {
+    try {
+      final sourceStat = await FileStat.stat(sourcePath);
+      final destFile = File(destPath);
+
+      // Preserve timestamps
+      await destFile.setLastModified(sourceStat.modified);
+      await destFile.setLastAccessed(sourceStat.accessed);
+
+      // Preserve permissions and ownership on Unix systems
+      if (!Platform.isWindows) {
+        await _preserveUnixMetadata(sourcePath, destPath);
+      }
+    } catch (e) {
+      // Log error but don't fail the operation
+      // print('Warning: Failed to preserve metadata: $e');
+    }
+  }
+
+  /// Preserve Unix-specific metadata (permissions, ownership)
+  Future<void> _preserveUnixMetadata(
+    String sourcePath,
+    String destPath,
+  ) async {
+    try {
+      // Get file mode (permissions)
+      final modeResult = await Process.run('stat', ['-c', '%a', sourcePath]);
+      if (modeResult.exitCode == 0) {
+        final mode = modeResult.stdout.toString().trim();
+        await Process.run('chmod', [mode, destPath]);
+      }
+
+      // Get and set ownership (requires appropriate permissions)
+      // This may fail if not run as root - that's OK
+      final ownerResult = await Process.run('stat', [
+        '-c',
+        '%U:%G',
+        sourcePath,
+      ]);
+      if (ownerResult.exitCode == 0) {
+        final owner = ownerResult.stdout.toString().trim();
+        await Process.run('chown', [owner, destPath]).catchError((e) {
+          // Ownership change often requires elevated privileges
+          // Log but don't fail
+          // print('Note: Could not change ownership to $owner (may require sudo)');
+          return ProcessResult(0, 0, '', '');
+        });
+      }
+    } catch (e) {
+      // Silently catch errors - metadata preservation is best-effort
+      // print('Warning: Failed to preserve Unix metadata: $e');
     }
   }
 

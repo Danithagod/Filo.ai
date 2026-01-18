@@ -20,6 +20,8 @@ fields:
   completedAt: DateTime?
   ### Error message if job failed
   errorMessage: String?
+  ### Error category for failed files
+  errorCategory: String?
 indexes:
   indexing_job_status:
     fields: status

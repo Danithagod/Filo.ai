@@ -12,6 +12,12 @@ fields:
   queryTimeMs: int
   ### When the search was executed
   searchedAt: DateTime
+  ### Type of search: 'semantic' or 'local'
+  searchType: String?
+  ### Directory path for local searches (null for semantic)
+  directoryContext: String?
 indexes:
   search_history_queried_at:
     fields: searchedAt
+  search_history_type:
+    fields: searchType

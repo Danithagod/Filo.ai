@@ -1,0 +1,13 @@
+### ErrorStats model - aggregated error statistics
+class: ErrorStats
+fields:
+  ### Total number of errors
+  totalErrors: int
+  ### Breakdown by error category
+  byCategory: List<ErrorCategoryCount>
+  ### Time range filter applied (e.g., "24h", "7d", "30d", "all")
+  timeRange: String?
+  ### Optional job ID filter applied
+  jobId: int?
+  ### When these stats were generated
+  generatedAt: DateTime

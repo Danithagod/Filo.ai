@@ -1,0 +1,6 @@
+class: SearchSuggestion
+fields:
+  text: String
+  type: String # 'history', 'tag', 'file', 'preset'
+  score: double
+  metadata: String? # Optional extra data (e.g., tag category or preset ID)

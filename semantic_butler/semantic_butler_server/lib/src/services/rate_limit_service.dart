@@ -1,3 +1,5 @@
+import 'dart:async';
+
 /// Token bucket rate limiter for API protection
 ///
 /// Implements the token bucket algorithm to prevent abuse and DoS attacks.
@@ -6,10 +8,53 @@ class RateLimitService {
   /// Singleton instance
   static final RateLimitService instance = RateLimitService._();
 
-  RateLimitService._();
+  /// Periodic cleanup timer
+  Timer? _cleanupTimer;
+
+  /// Maximum idle time before a bucket is cleaned up (2 hours)
+  static const Duration _maxIdleTime = Duration(hours: 2);
+
+  RateLimitService._() {
+    // Start periodic cleanup every hour
+    _startPeriodicCleanup();
+  }
 
   /// Token buckets per client: key -> bucket
   final Map<String, _TokenBucket> _buckets = {};
+
+  /// Start periodic cleanup of old buckets
+  void _startPeriodicCleanup() {
+    _cleanupTimer?.cancel();
+    _cleanupTimer = Timer.periodic(
+      const Duration(hours: 1),
+      (_) => cleanupOldBuckets(),
+    );
+  }
+
+  /// Stop the cleanup timer (call on server shutdown)
+  void stopCleanup() {
+    _cleanupTimer?.cancel();
+    _cleanupTimer = null;
+  }
+
+  /// Clean up buckets that haven't been accessed recently
+  void cleanupOldBuckets() {
+    final now = DateTime.now();
+    final keysToRemove = <String>[];
+
+    for (final entry in _buckets.entries) {
+      if (now.difference(entry.value.lastRefill) > _maxIdleTime) {
+        keysToRemove.add(entry.key);
+      }
+    }
+
+    for (final key in keysToRemove) {
+      _buckets.remove(key);
+    }
+  }
+
+  /// Get current number of buckets (for monitoring)
+  int get bucketCount => _buckets.length;
 
   /// Default rate limit: 60 requests per minute
   static const int defaultTokensPerMinute = 60;

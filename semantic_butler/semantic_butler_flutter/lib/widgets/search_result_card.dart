@@ -8,6 +8,8 @@ class SearchResultCard extends StatelessWidget {
   final String preview;
   final double relevanceScore;
   final List<String> tags;
+  final bool isSelected;
+  final VoidCallback? onTap;
 
   const SearchResultCard({
     super.key,
@@ -16,27 +18,89 @@ class SearchResultCard extends StatelessWidget {
     required this.preview,
     required this.relevanceScore,
     required this.tags,
+    this.isSelected = false,
+    this.onTap,
   });
 
   Future<void> _openFile(BuildContext context) async {
     try {
       final uri = Uri.file(path);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri);
-      } else {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Cannot open: $path')),
-          );
-        }
+      // Attempt to launch directly - canLaunchUrl is often unreliable on desktop
+      final launched = await launchUrl(uri);
+      if (!launched && context.mounted) {
+        _showErrorDialog(
+          context,
+          'Cannot Open File',
+          'The system could not open the file. It might be missing or there is no application associated with this type.\n\nPath: $path',
+        );
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+        _showErrorDialog(
+          context,
+          'Error Opening File',
+          'An error occurred while trying to open the file.\n\n$e',
         );
       }
     }
+  }
+
+  void _showErrorDialog(BuildContext context, String title, String message) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: Icon(Icons.error_outline, color: colorScheme.error),
+        title: Text(title),
+        content: SelectableText(
+          message,
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Show dialog with all tags when user clicks "show more"
+  void _showAllTags(BuildContext context, List<String> allTags) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: Icon(Icons.label_outline, color: colorScheme.primary),
+        title: const Text('All Tags'),
+        content: SizedBox(
+          width: 300,
+          child: SingleChildScrollView(
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: allTags
+                  .map(
+                    (tag) => Chip(
+                      label: Text(tag),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -44,11 +108,23 @@ class SearchResultCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
+    // Cache calculations for performance (Issue 7.2)
+    final fileIcon = _getFileIcon(title);
+    final fileColor = _getFileColor(title);
+    final scoreColor = _getScoreColor(relevanceScore);
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      elevation: isSelected ? 4 : 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: isSelected
+            ? BorderSide(color: colorScheme.primary, width: 2)
+            : BorderSide.none,
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () => _openFile(context),
+        onTap: onTap ?? () => _openFile(context),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -61,12 +137,12 @@ class SearchResultCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: _getFileColor(title).withValues(alpha: 0.12),
+                      color: fileColor.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(
-                      _getFileIcon(title),
-                      color: _getFileColor(title),
+                      fileIcon,
+                      color: fileColor,
                       size: 20,
                     ),
                   ),
@@ -104,15 +180,13 @@ class SearchResultCard extends StatelessWidget {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: _getScoreColor(
-                        relevanceScore,
-                      ).withValues(alpha: 0.12),
+                      color: scoreColor.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(
                       '${(relevanceScore * 100).toInt()}%',
                       style: textTheme.labelMedium?.copyWith(
-                        color: _getScoreColor(relevanceScore),
+                        color: scoreColor,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -134,24 +208,34 @@ class SearchResultCard extends StatelessWidget {
                 ),
               ],
 
-              // Tags
+              // Tags with "show more" indicator
               if (tags.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: tags
-                      .take(5)
-                      .map(
-                        (tag) => Chip(
-                          label: Text(tag),
-                          visualDensity: VisualDensity.compact,
-                          padding: EdgeInsets.zero,
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
+                  children: [
+                    ...tags
+                        .take(5)
+                        .map(
+                          (tag) => Chip(
+                            label: Text(tag),
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                          ),
                         ),
-                      )
-                      .toList(),
+                    // Show "more" indicator if there are additional tags
+                    if (tags.length > 5)
+                      ActionChip(
+                        label: Text('+${tags.length - 5} more'),
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        onPressed: () => _showAllTags(context, tags),
+                      ),
+                  ],
                 ),
               ],
             ],
