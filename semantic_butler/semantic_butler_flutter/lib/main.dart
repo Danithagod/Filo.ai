@@ -4,31 +4,34 @@ import 'package:semantic_butler_client/semantic_butler_client.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
 import 'package:serverpod_flutter/serverpod_flutter.dart';
 
 import 'config/app_config.dart';
-import 'screens/home_screen.dart';
 import 'theme/app_theme.dart';
 import 'widgets/window_title_bar.dart';
+import 'services/settings_service.dart';
 import 'utils/app_logger.dart';
 import 'package:bitsdojo_window/bitsdojo_window.dart';
+import 'services/shortcut_manager.dart' as sm;
+import 'services/shortcut_manager.dart'
+    show FocusSearchIntent, NavigateTabIntent;
+import 'providers/navigation_provider.dart';
+import 'screens/search_results_screen.dart';
+import 'screens/splash_landing_screen.dart';
 
-/// Global Serverpod client (kept for backward compatibility)
-/// Prefer using clientProvider for new code
-late final Client client;
+/// Internal Serverpod client instance
+/// Set during app initialization and accessed via clientProvider
+Client? _clientInstance;
 
 /// Riverpod provider for Serverpod client
 /// Use this for proper dependency injection and testability
 final clientProvider = Provider<Client>((ref) {
-  // Return the initialized client
-  // This provider should only be accessed after client is initialized
-  return client;
-});
-
-/// Provider for server URL configuration
-final serverUrlProvider = StateProvider<String>((ref) {
-  return 'http://127.0.0.1:8080/';
+  if (_clientInstance == null) {
+    throw StateError(
+      'Client not initialized. Ensure app startup completes before accessing clientProvider.',
+    );
+  }
+  return _clientInstance!;
 });
 
 void main() async {
@@ -72,7 +75,7 @@ void main() async {
       AppLogger.info('Connecting to server: $serverUrl', tag: 'Init');
 
       // Initialize Serverpod client with longer timeout for AI API calls
-      client = Client(
+      _clientInstance = Client(
         serverUrl,
         connectionTimeout: const Duration(
           seconds: 120,
@@ -135,31 +138,165 @@ void main() async {
   );
 }
 
-class SemanticButlerApp extends StatelessWidget {
+class SemanticButlerApp extends ConsumerWidget {
   const SemanticButlerApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     AppLogger.lifecycle('Building SemanticButlerApp');
-    return MaterialApp(
-      title: 'Semantic Butler',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.dark,
-      home: const HomeScreen(),
-      navigatorObservers: [_LoggingNavigatorObserver()],
-      builder: (context, child) {
-        return Material(
-          color: Theme.of(context).colorScheme.surface,
-          child: Column(
-            children: [
-              const WindowTitleBar(),
-              Expanded(child: child ?? const SizedBox()),
-            ],
+    final settingsAsync = ref.watch(settingsProvider);
+
+    return settingsAsync.when(
+      loading: () => MaterialApp(
+        title: 'Semantic Butler',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.darkTheme,
+        home: const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        ),
+      ),
+      error: (error, stack) => MaterialApp(
+        title: 'Semantic Butler',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.darkTheme,
+        home: Scaffold(
+          body: Center(
+            child: Text('Error loading settings: $error'),
           ),
+        ),
+      ),
+      data: (settings) => Shortcuts(
+        shortcuts: sm.ShortcutManager.shortcuts,
+        child: Actions(
+          actions: <Type, Action<Intent>>{
+            FocusSearchIntent: CallbackAction<FocusSearchIntent>(
+              onInvoke: (_) => _handleGlobalSearch(context, ref),
+            ),
+            NavigateTabIntent: CallbackAction<NavigateTabIntent>(
+              onInvoke: (intent) {
+                FocusManager.instance.primaryFocus?.unfocus();
+                ref.read(navigationProvider.notifier).navigateTo(intent.index);
+                return null;
+              },
+            ),
+          },
+          child: Focus(
+            autofocus: false, // Don't steal focus from initial screen
+            child: MaterialApp(
+              title: 'Semantic Butler',
+              debugShowCheckedModeBanner: false,
+              theme: AppTheme.lightTheme,
+              darkTheme: AppTheme.darkTheme,
+              themeMode: settings.themeMode,
+              home: const SplashLandingScreen(),
+              navigatorObservers: [_LoggingNavigatorObserver()],
+              builder: (context, child) {
+                return AnimatedTheme(
+                  data: Theme.of(context),
+                  duration: const Duration(milliseconds: 300),
+                  child: Builder(
+                    builder: (context) {
+                      return Material(
+                        color: Theme.of(context).colorScheme.surface,
+                        child: Column(
+                          children: [
+                            const WindowTitleBar(),
+                            Expanded(child: child ?? const SizedBox()),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _handleGlobalSearch(BuildContext context, WidgetRef ref) {
+    final navState = ref.read(navigationProvider);
+    // If not on home screen, navigate to home first to provide context
+    if (navState.selectedIndex != 0) {
+      ref.read(navigationProvider.notifier).navigateTo(0);
+      // Wait for navigation to complete before showing search
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        showSearch(
+          context: context,
+          delegate: _GlobalSearchDelegate(ref),
         );
+      });
+    } else {
+      showSearch(
+        context: context,
+        delegate: _GlobalSearchDelegate(ref),
+      );
+    }
+  }
+}
+
+/// A global search delegate that provides a quick search UI from anywhere in the app
+class _GlobalSearchDelegate extends SearchDelegate<String> {
+  final WidgetRef ref;
+
+  _GlobalSearchDelegate(this.ref);
+
+  @override
+  List<Widget>? buildActions(BuildContext context) {
+    return [
+      IconButton(
+        icon: const Icon(Icons.clear),
+        onPressed: () {
+          query = '';
+        },
+      ),
+    ];
+  }
+
+  @override
+  Widget? buildLeading(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () {
+        close(context, '');
       },
+    );
+  }
+
+  @override
+  Widget buildResults(BuildContext context) {
+    if (query.trim().isEmpty) return const SizedBox();
+
+    // Navigate to SearchResultsScreen when user submits search
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => SearchResultsScreen(
+            query: query,
+            initialMode: SearchMode.hybrid,
+          ),
+        ),
+      );
+    });
+
+    return const Center(child: CircularProgressIndicator());
+  }
+
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    // This could show recent searches or suggestions
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.search, size: 64, color: Colors.grey),
+          SizedBox(height: 16),
+          Text('Enter keywords to search your files'),
+        ],
+      ),
     );
   }
 }

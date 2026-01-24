@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../main.dart';
 import '../../utils/app_logger.dart';
 
 /// Dashboard for tracking AI API costs and budget
-class AICostDashboard extends StatefulWidget {
+class AICostDashboard extends ConsumerStatefulWidget {
   const AICostDashboard({super.key});
 
   @override
-  State<AICostDashboard> createState() => _AICostDashboardState();
+  ConsumerState<AICostDashboard> createState() => _AICostDashboardState();
 }
 
-class _AICostDashboardState extends State<AICostDashboard> {
+class _AICostDashboardState extends ConsumerState<AICostDashboard> {
   bool _isLoading = true;
   Map<String, dynamic>? _costSummary;
   Map<String, dynamic>? _budgetStatus;
@@ -35,27 +36,29 @@ class _AICostDashboardState extends State<AICostDashboard> {
       final now = DateTime.now();
       final startDate = now.subtract(Duration(days: _lookbackDays));
 
+      final apiClient = ref.read(clientProvider);
+
       // Load cost summary
-      final summary = await client.butler.getAICostSummary(
+      final summary = await apiClient.butler.getAICostSummary(
         startDate: startDate,
         endDate: now,
       );
 
       // Load budget status
-      final budget = await client.butler.checkBudget(
+      final budget = await apiClient.butler.checkBudget(
         budgetLimit: _budgetLimit,
         periodStart: startDate,
         periodEnd: now,
       );
 
       // Load projection
-      final projection = await client.butler.getProjectedCosts(
+      final projection = await apiClient.butler.getProjectedCosts(
         lookbackDays: _lookbackDays,
         forecastDays: 30,
       );
 
       // Load daily costs for chart
-      final dailyCosts = await client.butler.getDailyCosts(
+      final dailyCosts = await apiClient.butler.getDailyCosts(
         startDate: startDate,
         endDate: now,
       );
@@ -68,14 +71,21 @@ class _AICostDashboardState extends State<AICostDashboard> {
         _isLoading = false;
       });
     } catch (e) {
-      AppLogger.error('Failed to load cost dashboard: $e', tag: 'CostDashboard');
+      AppLogger.error(
+        'Failed to load cost dashboard: $e',
+        tag: 'CostDashboard',
+      );
       setState(() => _isLoading = false);
     }
   }
 
   Future<void> _showBudgetSettingsDialog() async {
-    final budgetController = TextEditingController(text: _budgetLimit.toString());
-    final daysController = TextEditingController(text: _lookbackDays.toString());
+    final budgetController = TextEditingController(
+      text: _budgetLimit.toString(),
+    );
+    final daysController = TextEditingController(
+      text: _lookbackDays.toString(),
+    );
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -299,7 +309,10 @@ class _AICostDashboardState extends State<AICostDashboard> {
           children: [
             Row(
               children: [
-                Icon(Icons.attach_money, color: Theme.of(context).colorScheme.primary),
+                Icon(
+                  Icons.attach_money,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
                 const SizedBox(width: 8),
                 const Text(
                   'Total Cost',
@@ -401,7 +414,10 @@ class _AICostDashboardState extends State<AICostDashboard> {
           children: [
             Row(
               children: [
-                Icon(Icons.trending_up, color: Theme.of(context).colorScheme.tertiary),
+                Icon(
+                  Icons.trending_up,
+                  color: Theme.of(context).colorScheme.tertiary,
+                ),
                 const SizedBox(width: 8),
                 const Text(
                   'Projection',
@@ -489,8 +505,12 @@ class _AICostDashboardState extends State<AICostDashboard> {
                     },
                   ),
                 ),
-                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                topTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
               ),
               borderData: FlBorderData(show: true),
               lineBarsData: [
@@ -502,7 +522,9 @@ class _AICostDashboardState extends State<AICostDashboard> {
                   dotData: const FlDotData(show: false),
                   belowBarData: BarAreaData(
                     show: true,
-                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.1),
                   ),
                 ),
               ],
@@ -553,8 +575,9 @@ class _AICostDashboardState extends State<AICostDashboard> {
                   const SizedBox(height: 4),
                   LinearProgressIndicator(
                     value: percentage / 100,
-                    backgroundColor:
-                        Theme.of(context).colorScheme.surfaceContainerHighest,
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                   ),
                   const SizedBox(height: 2),
                   Text(

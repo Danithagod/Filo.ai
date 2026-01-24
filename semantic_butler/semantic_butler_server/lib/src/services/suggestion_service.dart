@@ -56,7 +56,32 @@ class SuggestionService {
     */
 
     // 3. History Suggestions
-    // TODO: Query SearchHistory table
+    try {
+      final history = await SearchHistory.db.find(
+        session,
+        where: (t) => t.query.ilike('%$query%'),
+        limit: 5,
+        orderBy: (t) => t.searchedAt,
+        orderDescending: true,
+      );
+
+      final uniqueQueries = <String>{};
+      for (final h in history) {
+        if (uniqueQueries.contains(h.query)) continue;
+        uniqueQueries.add(h.query);
+
+        suggestions.add(
+          SearchSuggestion(
+            text: h.query,
+            type: 'history',
+            score: 0.8,
+            metadata: 'Recent Search',
+          ),
+        );
+      }
+    } catch (e) {
+      // Ignore errors
+    }
 
     return suggestions.take(limit).toList();
   }

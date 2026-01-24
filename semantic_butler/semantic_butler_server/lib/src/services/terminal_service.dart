@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../utils/error_sanitizer.dart';
 
 /// Service for executing shell commands securely
 ///
@@ -170,7 +171,7 @@ class TerminalService {
       return CommandResult(
         command: command,
         stdout: stdoutBuffer.toString(),
-        stderr: finalStderr,
+        stderr: ErrorSanitizer.sanitizeMessage(finalStderr),
         exitCode: finalExitCode,
         truncated: truncated,
         workingDirectory: workingDirectory,
@@ -179,7 +180,7 @@ class TerminalService {
       return CommandResult(
         command: command,
         stdout: '',
-        stderr: 'Command timed out: ${e.message}',
+        stderr: ErrorSanitizer.sanitizeException(e),
         exitCode: -1,
         truncated: false,
         timedOut: true,
@@ -189,7 +190,7 @@ class TerminalService {
       return CommandResult(
         command: command,
         stdout: '',
-        stderr: 'Failed to execute command: $e',
+        stderr: ErrorSanitizer.sanitizeException(e),
         exitCode: -1,
         truncated: false,
         workingDirectory: workingDirectory,
@@ -364,9 +365,15 @@ class TerminalService {
       return findFiles(pattern, directory: directory, recursive: true);
     }
 
-    // Sanitize inputs
-    var sanitizedPattern = _sanitizeArgument(pattern);
-    final searchDir = directory != null ? _sanitizeArgument(directory) : 'C:\\';
+    // Validate and sanitize inputs with additional checks for PowerShell
+    _validatePowerShellInput(pattern);
+    final searchDir = directory != null
+        ? _validatePowerShellPath(directory)
+        : 'C:\\';
+
+    // Sanitize pattern by removing ALL special characters that could be used in injection
+    // Only keep alphanumeric, spaces, hyphens, underscores, dots, and wildcards
+    var sanitizedPattern = pattern.replaceAll(RegExp(r'[^\w\s\-\.\*]'), '');
 
     // Handle whitespace: create multiple search patterns
     // "Gemma 2" -> try "gemma2", "gemma*2", "gemma 2"
@@ -392,23 +399,37 @@ class TerminalService {
       patterns.add('*$spacesToWildcards*');
     }
 
-    // Build PowerShell command that tries all patterns
+    // Build PowerShell command using encoded arguments instead of string interpolation
     final itemType = foldersOnly ? '-Directory' : '';
 
-    // Create a PowerShell script that tries each pattern
-    final psCommand =
-        '''
+    // Use argument list approach instead of inline script for better security
+    // Build filters as separate arguments
+    final args = <String>[
+      '-NoProfile',
+      '-NonInteractive',
+    ];
+
+    // Build the script with pattern literals instead of variables
+    final patternLiterals = patterns
+        .map((p) => "'${_escapePowerShellArgument(p)}'")
+        .join(', ');
+
+    final psCommand = '''
+\$filters = @($patternLiterals)
 \$results = @()
-foreach (\$filter in @(${patterns.map((p) => '"$p"').join(', ')})) {
-  \$results += Get-ChildItem -Path "$searchDir" -Filter \$filter $itemType -Recurse -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
+foreach (\$f in \$filters) {
+  \$results += Get-ChildItem -Path '$searchDir' -Filter \$f $itemType -Recurse -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
 }
 \$results | Select-Object -First 50 -Unique
 ''';
 
+    args.add('-Command');
+    args.add(psCommand);
+
     try {
       final process = await Process.start(
         'powershell.exe',
-        ['-NoProfile', '-NonInteractive', '-Command', psCommand],
+        args,
         runInShell: false,
       );
 
@@ -534,6 +555,71 @@ foreach (\$filter in @(${patterns.map((p) => '"$p"').join(', ')})) {
     }
   }
 
+  /// Validate PowerShell-specific input for dangerous patterns
+  void _validatePowerShellInput(String input) {
+    // Check for PowerShell-specific injection patterns
+    final dangerousPatterns = [
+      r'$', // Variable expansion
+      r'`', // Escape character
+      r'\$', // Command substitution
+      r'@\(', // Array subexpression
+      r'\$\{', // Script block start
+      r'\|', // Pipe
+      r';', // Command separator
+      r'&', // Call operator
+      r'>', // Redirect
+      r'<', // Redirect
+      r'\.\.', // Parent path (double-dot)
+    ];
+
+    for (final pattern in dangerousPatterns) {
+      if (input.contains(RegExp(pattern))) {
+        throw TerminalSecurityException(
+          'PowerShell input contains dangerous pattern: $pattern',
+        );
+      }
+    }
+
+    // Only allow alphanumeric, spaces, hyphens, underscores, dots, and wildcards
+    if (!RegExp(r'^[\w\s\-\.\*\?]*$').hasMatch(input)) {
+      throw TerminalSecurityException(
+        'PowerShell input contains invalid characters',
+      );
+    }
+  }
+
+  /// Validate and sanitize a PowerShell path
+  String _validatePowerShellPath(String path) {
+    // Remove any null bytes
+    var sanitized = path.replaceAll('\x00', '');
+
+    // Only allow valid Windows path characters
+    // Allow: letters, numbers, spaces, hyphens, underscores, dots, colons, backslashes, forward slashes
+    if (!RegExp(r'^[a-zA-Z]:\\[\w\s\-\./\\]*$').hasMatch(sanitized) &&
+        !RegExp(r'^[\w\s\-\./\\]+$').hasMatch(sanitized)) {
+      throw TerminalSecurityException(
+        'Invalid path format: $path',
+      );
+    }
+
+    // Check for path traversal
+    if (sanitized.contains('..')) {
+      throw TerminalSecurityException(
+        'Path traversal not allowed',
+      );
+    }
+
+    return sanitized;
+  }
+
+  /// Escape a PowerShell argument for safe use in single-quoted strings
+  String _escapePowerShellArgument(String arg) {
+    // In PowerShell single-quoted strings, only single quotes need escaping (by doubling)
+    // Remove any other potentially dangerous characters first
+    final cleaned = arg.replaceAll(RegExp(r"[^\w\s\-\.\*\?\[\]]"), '');
+    return cleaned.replaceAll("'", "''");
+  }
+
   /// Sanitize a command argument to prevent injection attacks
   ///
   /// Removes or escapes special shell characters that could be used for injection:
@@ -560,6 +646,7 @@ foreach (\$filter in @(${patterns.map((p) => '"$p"').join(', ')})) {
       '\$', // Variable expansion
       '<', // Redirect
       '>', // Redirect
+      '"', // Double quote (prevents shell breakout)
       '\n', // Newline (command separator)
       '\r', // Carriage return
     ];

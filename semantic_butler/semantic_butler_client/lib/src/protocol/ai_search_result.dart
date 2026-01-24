@@ -28,6 +28,7 @@ abstract class AISearchResult implements _i1.SerializableModel {
     this.fileSizeBytes,
     this.mimeType,
     this.tags,
+    this.indexedAt,
   });
 
   factory AISearchResult({
@@ -42,6 +43,7 @@ abstract class AISearchResult implements _i1.SerializableModel {
     int? fileSizeBytes,
     String? mimeType,
     List<String>? tags,
+    DateTime? indexedAt,
   }) = _AISearchResultImpl;
 
   factory AISearchResult.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -59,6 +61,9 @@ abstract class AISearchResult implements _i1.SerializableModel {
       tags: jsonSerialization['tags'] == null
           ? null
           : _i2.Protocol().deserialize<List<String>>(jsonSerialization['tags']),
+      indexedAt: jsonSerialization['indexedAt'] == null
+          ? null
+          : _i1.DateTimeJsonExtension.fromJson(jsonSerialization['indexedAt']),
     );
   }
 
@@ -95,6 +100,9 @@ abstract class AISearchResult implements _i1.SerializableModel {
   /// Tags from index (if available)
   List<String>? tags;
 
+  /// Date indexed or found (if available)
+  DateTime? indexedAt;
+
   /// Returns a shallow copy of this [AISearchResult]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
@@ -110,6 +118,7 @@ abstract class AISearchResult implements _i1.SerializableModel {
     int? fileSizeBytes,
     String? mimeType,
     List<String>? tags,
+    DateTime? indexedAt,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -126,6 +135,7 @@ abstract class AISearchResult implements _i1.SerializableModel {
       if (fileSizeBytes != null) 'fileSizeBytes': fileSizeBytes,
       if (mimeType != null) 'mimeType': mimeType,
       if (tags != null) 'tags': tags?.toJson(),
+      if (indexedAt != null) 'indexedAt': indexedAt?.toJson(),
     };
   }
 
@@ -150,6 +160,7 @@ class _AISearchResultImpl extends AISearchResult {
     int? fileSizeBytes,
     String? mimeType,
     List<String>? tags,
+    DateTime? indexedAt,
   }) : super._(
          path: path,
          fileName: fileName,
@@ -162,6 +173,7 @@ class _AISearchResultImpl extends AISearchResult {
          fileSizeBytes: fileSizeBytes,
          mimeType: mimeType,
          tags: tags,
+         indexedAt: indexedAt,
        );
 
   /// Returns a shallow copy of this [AISearchResult]
@@ -180,6 +192,7 @@ class _AISearchResultImpl extends AISearchResult {
     Object? fileSizeBytes = _Undefined,
     Object? mimeType = _Undefined,
     Object? tags = _Undefined,
+    Object? indexedAt = _Undefined,
   }) {
     return AISearchResult(
       path: path ?? this.path,
@@ -197,6 +210,7 @@ class _AISearchResultImpl extends AISearchResult {
       fileSizeBytes: fileSizeBytes is int? ? fileSizeBytes : this.fileSizeBytes,
       mimeType: mimeType is String? ? mimeType : this.mimeType,
       tags: tags is List<String>? ? tags : this.tags?.map((e0) => e0).toList(),
+      indexedAt: indexedAt is DateTime? ? indexedAt : this.indexedAt,
     );
   }
 }

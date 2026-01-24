@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:semantic_butler_client/semantic_butler_client.dart';
 import '../../main.dart';
 import '../../utils/app_logger.dart';
 
 /// Dialog for managing tags with merge, rename, and hierarchy features
-class TagManagerDialog extends StatefulWidget {
+class TagManagerDialog extends ConsumerStatefulWidget {
   const TagManagerDialog({super.key});
 
   @override
-  State<TagManagerDialog> createState() => _TagManagerDialogState();
+  ConsumerState<TagManagerDialog> createState() => _TagManagerDialogState();
 }
 
-class _TagManagerDialogState extends State<TagManagerDialog>
+class _TagManagerDialogState extends ConsumerState<TagManagerDialog>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   List<TagTaxonomy> _allTags = [];
@@ -40,8 +41,9 @@ class _TagManagerDialogState extends State<TagManagerDialog>
     setState(() => _isLoading = true);
 
     try {
+      final apiClient = ref.read(clientProvider);
       // Load all tags
-      final tags = await client.butler.getTopTags(limit: 500);
+      final tags = await apiClient.butler.getTopTags(limit: 500);
 
       // Group by category
       final byCategory = <String, List<TagTaxonomy>>{};
@@ -117,10 +119,12 @@ class _TagManagerDialogState extends State<TagManagerDialog>
               spacing: 4,
               runSpacing: 4,
               children: _selectedTags
-                  .map((tag) => Chip(
-                        label: Text(tag),
-                        visualDensity: VisualDensity.compact,
-                      ))
+                  .map(
+                    (tag) => Chip(
+                      label: Text(tag),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  )
                   .toList(),
             ),
             const SizedBox(height: 16),
@@ -137,8 +141,8 @@ class _TagManagerDialogState extends State<TagManagerDialog>
             Text(
               'All files with the selected tags will be updated to use the target tag.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -166,8 +170,9 @@ class _TagManagerDialogState extends State<TagManagerDialog>
 
   Future<void> _performMerge(String targetTag) async {
     try {
+      final apiClient = ref.read(clientProvider);
       final sourceTags = _selectedTags.toList();
-      final filesUpdated = await client.butler.mergeTags(
+      final filesUpdated = await apiClient.butler.mergeTags(
         sourceTags: sourceTags,
         targetTag: targetTag,
         category: _selectedCategory != 'all' ? _selectedCategory : null,
@@ -242,7 +247,8 @@ class _TagManagerDialogState extends State<TagManagerDialog>
 
   Future<void> _performRename(TagTaxonomy tag, String newName) async {
     try {
-      final filesUpdated = await client.butler.renameTag(
+      final apiClient = ref.read(clientProvider);
+      final filesUpdated = await apiClient.butler.renameTag(
         oldTag: tag.tagValue,
         newTag: newName,
         category: tag.category,
@@ -271,7 +277,8 @@ class _TagManagerDialogState extends State<TagManagerDialog>
   }
 
   Future<void> _showRelatedTags(TagTaxonomy tag) async {
-    final relatedTags = await client.butler.getRelatedTags(
+    final apiClient = ref.read(clientProvider);
+    final relatedTags = await apiClient.butler.getRelatedTags(
       tagValue: tag.tagValue,
       limit: 20,
     );
@@ -351,8 +358,10 @@ class _TagManagerDialogState extends State<TagManagerDialog>
                   if (_isMergeMode) const SizedBox(width: 8),
                   OutlinedButton.icon(
                     onPressed: _toggleMergeMode,
-                    icon: Icon(_isMergeMode ? Icons.close : Icons.merge,
-                        size: 18),
+                    icon: Icon(
+                      _isMergeMode ? Icons.close : Icons.merge,
+                      size: 18,
+                    ),
                     label: Text(_isMergeMode ? 'Cancel' : 'Merge Mode'),
                   ),
                   const SizedBox(width: 8),
@@ -371,7 +380,12 @@ class _TagManagerDialogState extends State<TagManagerDialog>
               isScrollable: true,
               onTap: (index) {
                 setState(() {
-                  _selectedCategory = ['all', 'topic', 'entity', 'keyword'][index];
+                  _selectedCategory = [
+                    'all',
+                    'topic',
+                    'entity',
+                    'keyword',
+                  ][index];
                 });
               },
               tabs: const [
@@ -388,97 +402,98 @@ class _TagManagerDialogState extends State<TagManagerDialog>
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _displayedTags.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.label_off_outlined,
-                                size: 64,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No tags found',
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                            ],
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.label_off_outlined,
+                            size: 64,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
-                        )
-                      : ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _displayedTags.length,
-                          itemBuilder: (context, index) {
-                            final tag = _displayedTags[index];
-                            final isSelected =
-                                _selectedTags.contains(tag.tagValue);
+                          const SizedBox(height: 16),
+                          Text(
+                            'No tags found',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      key: PageStorageKey<String>('tag_manager_list_$_selectedCategory'),
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _displayedTags.length,
+                      itemBuilder: (context, index) {
+                        final tag = _displayedTags[index];
+                        final isSelected = _selectedTags.contains(tag.tagValue);
 
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              child: ListTile(
-                                leading: _isMergeMode
-                                    ? Checkbox(
-                                        value: isSelected,
-                                        onChanged: (_) =>
-                                            _toggleTagSelection(tag.tagValue),
-                                      )
-                                    : CircleAvatar(
-                                        child: Text('${tag.frequency}'),
-                                      ),
-                                title: Text(
-                                  tag.tagValue,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w500),
-                                ),
-                                subtitle: Text(
-                                  '${tag.category} • Used ${tag.frequency} time(s)',
-                                ),
-                                trailing: _isMergeMode
-                                    ? null
-                                    : PopupMenuButton<String>(
-                                        onSelected: (value) async {
-                                          switch (value) {
-                                            case 'rename':
-                                              await _showRenameDialog(tag);
-                                              break;
-                                            case 'related':
-                                              await _showRelatedTags(tag);
-                                              break;
-                                          }
-                                        },
-                                        itemBuilder: (context) => [
-                                          const PopupMenuItem(
-                                            value: 'rename',
-                                            child: Row(
-                                              children: [
-                                                Icon(Icons.edit, size: 18),
-                                                SizedBox(width: 8),
-                                                Text('Rename'),
-                                              ],
-                                            ),
-                                          ),
-                                          const PopupMenuItem(
-                                            value: 'related',
-                                            child: Row(
-                                              children: [
-                                                Icon(Icons.hub, size: 18),
-                                                SizedBox(width: 8),
-                                                Text('Related Tags'),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                onTap: _isMergeMode
-                                    ? () => _toggleTagSelection(tag.tagValue)
-                                    : null,
-                                selected: isSelected,
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: ListTile(
+                            leading: _isMergeMode
+                                ? Checkbox(
+                                    value: isSelected,
+                                    onChanged: (_) =>
+                                        _toggleTagSelection(tag.tagValue),
+                                  )
+                                : CircleAvatar(
+                                    child: Text('${tag.frequency}'),
+                                  ),
+                            title: Text(
+                              tag.tagValue,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w500,
                               ),
-                            );
-                          },
-                        ),
+                            ),
+                            subtitle: Text(
+                              '${tag.category} • Used ${tag.frequency} time(s)',
+                            ),
+                            trailing: _isMergeMode
+                                ? null
+                                : PopupMenuButton<String>(
+                                    onSelected: (value) async {
+                                      switch (value) {
+                                        case 'rename':
+                                          await _showRenameDialog(tag);
+                                          break;
+                                        case 'related':
+                                          await _showRelatedTags(tag);
+                                          break;
+                                      }
+                                    },
+                                    itemBuilder: (context) => [
+                                      const PopupMenuItem(
+                                        value: 'rename',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.edit, size: 18),
+                                            SizedBox(width: 8),
+                                            Text('Rename'),
+                                          ],
+                                        ),
+                                      ),
+                                      const PopupMenuItem(
+                                        value: 'related',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.hub, size: 18),
+                                            SizedBox(width: 8),
+                                            Text('Related Tags'),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                            onTap: _isMergeMode
+                                ? () => _toggleTagSelection(tag.tagValue)
+                                : null,
+                            selected: isSelected,
+                          ),
+                        );
+                      },
+                    ),
             ),
           ],
         ),

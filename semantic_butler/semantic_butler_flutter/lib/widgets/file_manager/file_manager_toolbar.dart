@@ -73,7 +73,7 @@ class _FileManagerToolbarState extends State<FileManagerToolbar> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
       child: Row(
         children: [
           if (widget.isSearching) ...[

@@ -43,9 +43,9 @@ class _CompactIndexCardState extends ConsumerState<CompactIndexCard> {
     final textTheme = Theme.of(context).textTheme;
     final job = widget.job;
 
-    final watchedFolders = ref.watch(watchedFoldersProvider);
-    final isSmartIndexing = watchedFolders.any(
-      (f) => f.path == job.folderPath && f.isEnabled,
+    // Use selector to avoid rebuilds when other folders change
+    final isSmartIndexing = ref.watch(
+      isFolderSmartlyWatchedProvider(job.folderPath),
     );
 
     final bool isRunning = job.status == 'running' || job.status == 'queued';
@@ -99,7 +99,7 @@ class _CompactIndexCardState extends ConsumerState<CompactIndexCard> {
                       child: Container(
                         decoration: BoxDecoration(
                           color: colorScheme.primaryContainer.withValues(
-                            alpha: 0.3,
+                            alpha: 0.35,
                           ),
                         ),
                         child: Center(
@@ -211,7 +211,7 @@ class _CompactIndexCardState extends ConsumerState<CompactIndexCard> {
                     child: Container(
                       height: 2,
                       decoration: BoxDecoration(
-                        color: accentColor.withAlpha(30),
+                        color: accentColor.withValues(alpha: 30 / 255),
                       ),
                       child: FractionallySizedBox(
                         alignment: Alignment.centerLeft,
@@ -221,7 +221,7 @@ class _CompactIndexCardState extends ConsumerState<CompactIndexCard> {
                             color: accentColor,
                             boxShadow: [
                               BoxShadow(
-                                color: accentColor.withAlpha(100),
+                                color: accentColor.withValues(alpha: 100 / 255),
                                 blurRadius: 4,
                                 spreadRadius: 0,
                               ),
@@ -327,9 +327,9 @@ class _CompactIndexCardState extends ConsumerState<CompactIndexCard> {
     final textTheme = Theme.of(context).textTheme;
     final job = widget.job;
 
-    final watchedFolders = ref.watch(watchedFoldersProvider);
-    final isSmartIndexing = watchedFolders.any(
-      (f) => f.path == job.folderPath && f.isEnabled,
+    // Use selector to avoid rebuilds when other folders change
+    final isSmartIndexing = ref.watch(
+      isFolderSmartlyWatchedProvider(job.folderPath),
     );
 
     final bool isRunning = job.status == 'running' || job.status == 'queued';
@@ -775,7 +775,8 @@ class _CompactIndexCardState extends ConsumerState<CompactIndexCard> {
         'Removing folder from index: ${widget.job.folderPath}',
         tag: 'CompactIndexCard',
       );
-      await client.butler.removeFromIndex(path: widget.job.folderPath);
+      final apiClient = ref.read(clientProvider);
+      await apiClient.butler.removeFromIndex(path: widget.job.folderPath);
 
       // Small delay to ensure DB sync before refresh (safety measure)
       await Future.delayed(const Duration(milliseconds: 500));
@@ -805,7 +806,8 @@ class _CompactIndexCardState extends ConsumerState<CompactIndexCard> {
         'Re-indexing folder: ${widget.job.folderPath}',
         tag: 'CompactIndexCard',
       );
-      await client.butler.startIndexing(widget.job.folderPath);
+      final apiClient = ref.read(clientProvider);
+      await apiClient.butler.startIndexing(widget.job.folderPath);
       if (mounted) {
         await widget.onRefresh?.call();
       }

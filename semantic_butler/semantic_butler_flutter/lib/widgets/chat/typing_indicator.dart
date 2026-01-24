@@ -64,8 +64,7 @@ class _TypingIndicatorState extends State<TypingIndicator>
                   mainAxisSize: MainAxisSize.min,
                   children: List.generate(3, (index) {
                     final delay = index * 0.2;
-                    final value =
-                        ((_controller.value + delay) % 1.0 * 2 - 1);
+                    final value = ((_controller.value + delay) % 1.0 * 2 - 1);
                     final offset = (value.abs() - 0.5).abs() * 6;
                     return Container(
                       margin: EdgeInsets.only(right: index < 2 ? 4 : 0),

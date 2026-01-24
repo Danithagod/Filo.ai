@@ -32,7 +32,9 @@ class StatsCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.12),
+                    color: color.withValues(
+                      alpha: 0.1,
+                    ), // Changed from 0.12 to 0.1
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(

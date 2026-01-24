@@ -41,24 +41,28 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
             ),
           ),
           const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Semantic Butler',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Semantic Butler',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              Text(
-                isLoading ? 'Thinking...' : 'Ready to help',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: isLoading
-                      ? colorScheme.primary
-                      : colorScheme.onSurfaceVariant,
+                Text(
+                  isLoading ? 'Thinking...' : 'Ready to help',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: isLoading
+                        ? colorScheme.primary
+                        : colorScheme.onSurfaceVariant,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),

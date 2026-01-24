@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:path/path.dart' as path;
 import '../generated/protocol.dart';
+import '../utils/error_sanitizer.dart';
 
 /// Error types for file operations
 /// Used for better error handling and UI display
@@ -55,7 +56,7 @@ class FileOperationsService {
   }) {
     return FileOperationResult(
       success: false,
-      error: error,
+      error: ErrorSanitizer.sanitizeMessage(error),
       command: command,
       errorType: errorType ?? FileOperationErrorType.other,
     );

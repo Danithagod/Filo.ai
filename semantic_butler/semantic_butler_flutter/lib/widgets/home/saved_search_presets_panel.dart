@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:semantic_butler_client/semantic_butler_client.dart';
-
-import '../../main.dart';
+import '../../main.dart'; // For clientProvider
 import '../../utils/app_logger.dart';
 import '../../screens/search_results_screen.dart';
 
 /// Panel for managing and executing saved search presets
-class SavedSearchPresetsPanel extends StatefulWidget {
+class SavedSearchPresetsPanel extends ConsumerStatefulWidget {
   const SavedSearchPresetsPanel({super.key});
 
   @override
-  State<SavedSearchPresetsPanel> createState() =>
+  ConsumerState<SavedSearchPresetsPanel> createState() =>
       _SavedSearchPresetsPanelState();
 }
 
-class _SavedSearchPresetsPanelState extends State<SavedSearchPresetsPanel> {
+class _SavedSearchPresetsPanelState
+    extends ConsumerState<SavedSearchPresetsPanel> {
   List<SavedSearchPreset> _presets = [];
   bool _isLoading = true;
   String? _error;
@@ -60,7 +61,8 @@ class _SavedSearchPresetsPanelState extends State<SavedSearchPresetsPanel> {
       // Endpoint currently doesn't support filtering by category in the signature generated
       // We'll fetch all and filter client side if needed, or update backend later.
       // Using generic getSavedPresets()
-      final presets = await client.butler.getSavedPresets();
+      final apiClient = ref.read(clientProvider);
+      final presets = await apiClient.butler.getSavedPresets();
 
       if (!mounted || requestId != _lastLoadRequestId) return;
 
@@ -194,7 +196,8 @@ class _SavedSearchPresetsPanelState extends State<SavedSearchPresetsPanel> {
         createdAt: DateTime.now(),
       );
 
-      await client.butler.savePreset(preset);
+      final apiClient = ref.read(clientProvider);
+      await apiClient.butler.savePreset(preset);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -259,7 +262,8 @@ class _SavedSearchPresetsPanelState extends State<SavedSearchPresetsPanel> {
     _isOperating = true;
 
     try {
-      await client.butler.deletePreset(presetId);
+      final apiClient = ref.read(clientProvider);
+      await apiClient.butler.deletePreset(presetId);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -436,6 +440,9 @@ class _SavedSearchPresetsPanelState extends State<SavedSearchPresetsPanel> {
                 : ConstrainedBox(
                     constraints: const BoxConstraints(maxHeight: 400),
                     child: ListView.separated(
+                      key: const PageStorageKey<String>(
+                        'saved_search_presets_list',
+                      ),
                       shrinkWrap: true,
                       itemCount: _presets.length,
                       separatorBuilder: (context, index) =>

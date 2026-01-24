@@ -80,98 +80,50 @@ class AgentEndpoint extends Endpoint {
 
   /// System prompt for the agent
   static const String systemPrompt = '''
-You are Semantic Butler, an intelligent file search and organization assistant.
-You have full access to the local file system and can execute terminal commands.
+You are Semantic Butler, a high-performance file assistant.
+You have access to the local file system and can execute terminal commands.
 
-# AVAILABLE TOOLS
+# SEARCH PROTOCOL (FOLLOW STRICTLY)
 
-**Search & Discovery:**
-- `search_files(query, limit)` - Semantic search on indexed documents
-- `grep_search(pattern, path, recursive, ignore_case)` - Search file contents
-- `find_files(pattern, directory, recursive)` - Quick find files/folders by name
-- `deep_search(pattern, directory, folders_only)` - RECOMMENDED: PowerShell deep search with 2-min timeout
-- `list_directory(path)` - List directory contents
-- `get_drives()` - List all available drives
-- `run_command(command, working_directory)` - Execute safe shell commands
+If the user asks for a file or folder and you don't know the exact path:
 
-**File Information:**
-- `get_document_details(document_id)` - Get indexed document details
-- `read_file_contents(path)` - Read any text file
-- `summarize_document(document_id, max_words)` - AI summary
-- `find_related(document_id, limit)` - Find similar documents
-- `get_indexing_status()` - Check indexing stats
-
-**File Organization:**
-- `rename_file(current_path, new_name)`, `rename_folder(current_path, new_name)`
-- `move_file(source_path, destination_folder)`
-- `delete_file(path)` - CAUTION: permanent
-- `create_folder(path)`
-- `batch_operations(operations)` - Multiple operations at once
-
-# MANDATORY SEARCH PROTOCOL
-
-When asked to find a file or folder, follow this procedure:
-
-**Step 1: Get all drives**
-Call `get_drives()` to discover available drives (C:, D:, E:, etc.)
-
-**Step 2: Deep search each drive**
-For each drive, call `deep_search(pattern, directory, folders_only)`:
-- Pattern: just the name without wildcards (auto-added)
-- Example: For "Gemma 2", use `deep_search("gemma2", "D:\\", folders_only=true)`
-- This uses PowerShell internally and has a 2-minute timeout
-
-**Step 3: Try variations**
-If not found, try:
-- Without spaces: "gemma2" instead of "Gemma 2"
-- Different case: "gemma", "GEMMA"
-- Partial: just "gemma"
-
-**Step 4: ONLY ask user after exhausting ALL options**
-You may ONLY ask the user for help if:
-- You have searched ALL available drives with deep_search
-- You have tried multiple name variations
-- You provide a summary of what you searched
-
-# RESPONSE GUIDELINES
-
-1. **Think out loud**: Explain which tools you're about to use and why
-2. **Use tools aggressively**: Don't ask for confirmation before searching
-3. **Remember context**: If you moved/renamed something, use the NEW path
-4. **Be persistent**: Try at least 3 different search strategies before giving up
-5. **Confirm destructive operations**: ONLY ask before delete/move/rename
-6. **Windows paths**: Use backslashes (C:\\Users\\...)
+1. **DISCOVER DRIVES**: Always call `get_drives()` first to see all available storage (C:, D:, E:, etc.).
+2. **DEEP SEARCH EACH DRIVE**: Use `deep_search(pattern, directory, folders_only)` for EVERY drive found.
+   - For a folder named "Gemma 2", try `deep_search("gemma", "D:\\", folders_only=true)`.
+3. **TRY VARIATIONS**: If first search fails, try variations:
+   - Partial names: "gemma" instead of "Gemma 2"
+   - Removing spaces: "gemma2"
+   - Using wildcards: "*gemma*"
+4. **USE TERMINAL**: If tools fail, use `run_command("dir /s /b *gemma*", working_directory: "D:\\")`.
+5. **ONLY ASK USER AS LAST RESORT**: You must try at least 3 different drives/patterns before giving up.
 
 # OUTPUT FORMAT
 
-Structure your responses using these XML tags for consistent parsing:
+You MUST structure your response exactly like this template:
 
 <thinking>
-Your internal reasoning process. Explain what you're about to do.
-This will be shown in a collapsible section.
+Identify the drives, choose search patterns, and explain your strategy.
 </thinking>
 
-<result type="folder" path="C:\\path\\to\\folder">
-<item type="file" name="example.py" size="1.2KB"/>
-<item type="folder" name="subfolder"/>
-</result>
+[Optional Call to Tools here]
 
 <message>
-Your conversational response to the user.
-Use plain text here - NO markdown formatting like **bold** or *italic*.
-Just write naturally.
+Your natural language response. NO markdown (no **, no #).
 </message>
 
-<status type="success">Found 5 files in the Gemma 2 folder</status>
-<status type="error">Could not access the folder</status>
-<status type="warning">Some files were skipped</status>
+<status type="success/warning/info/error">
+Brief summary of action result.
+</status>
 
-RULES:
-- ALWAYS wrap file listings in <result> tags
-- NEVER use markdown formatting (no **, no *, no #)
-- Keep <message> content conversational and plain
-- Use <thinking> for your reasoning process
-- Use <status> for brief action outcomes
+<result type="file/folder" path="...">
+[Optional child items if listing directory]
+</result>
+
+# STRICTURES
+- NEVER output text outside of the XML tags defined above.
+- NEVER use markdown like **bold** in the <message> tag.
+- ALWAYS use backslashes for Windows paths (e.g., C:\\Users\\...).
+- If searching for a folder, set `folders_only: true` in tools.
 ''';
 
   /// Tool definitions for function calling
@@ -936,124 +888,128 @@ RULES:
       };
     }
 
-    switch (function.name) {
-      case 'search_files':
-        return await _toolSearchFiles(
-          session,
-          args['query'] as String,
-          limit: args['limit'] as int? ?? 10,
-        );
+    final result = await () async {
+      switch (function.name) {
+        case 'search_files':
+          return await _toolSearchFiles(
+            session,
+            args['query'] as String,
+            limit: args['limit'] as int? ?? 10,
+          );
 
-      case 'get_document_details':
-        return await _toolGetDocumentDetails(
-          session,
-          args['document_id'] as int,
-        );
+        case 'get_document_details':
+          return await _toolGetDocumentDetails(
+            session,
+            args['document_id'] as int,
+          );
 
-      case 'summarize_document':
-        return await _toolSummarizeDocument(
-          session,
-          args['document_id'] as int,
-          maxWords: args['max_words'] as int? ?? 200,
-        );
+        case 'summarize_document':
+          return await _toolSummarizeDocument(
+            session,
+            args['document_id'] as int,
+            maxWords: args['max_words'] as int? ?? 200,
+          );
 
-      case 'find_related':
-        return await _toolFindRelated(
-          session,
-          args['document_id'] as int,
-          limit: args['limit'] as int? ?? 5,
-        );
+        case 'find_related':
+          return await _toolFindRelated(
+            session,
+            args['document_id'] as int,
+            limit: args['limit'] as int? ?? 5,
+          );
 
-      case 'get_indexing_status':
-        return await _toolGetIndexingStatus(session);
+        case 'get_indexing_status':
+          return await _toolGetIndexingStatus(session);
 
-      // File organization tools
-      case 'rename_file':
-        return await _toolRenameFile(
-          session,
-          args['current_path'] as String,
-          args['new_name'] as String,
-        );
+        // File organization tools
+        case 'rename_file':
+          return await _toolRenameFile(
+            session,
+            args['current_path'] as String,
+            args['new_name'] as String,
+          );
 
-      case 'rename_folder':
-        return await _toolRenameFolder(
-          session,
-          args['current_path'] as String,
-          args['new_name'] as String,
-        );
+        case 'rename_folder':
+          return await _toolRenameFolder(
+            session,
+            args['current_path'] as String,
+            args['new_name'] as String,
+          );
 
-      case 'move_file':
-        return await _toolMoveFile(
-          session,
-          args['source_path'] as String,
-          args['destination_folder'] as String,
-        );
+        case 'move_file':
+          return await _toolMoveFile(
+            session,
+            args['source_path'] as String,
+            args['destination_folder'] as String,
+          );
 
-      case 'delete_file':
-        return await _toolDeleteFile(
-          session,
-          args['path'] as String,
-        );
+        case 'delete_file':
+          return await _toolDeleteFile(
+            session,
+            args['path'] as String,
+          );
 
-      case 'create_folder':
-        return await _toolCreateFolder(
-          session,
-          args['path'] as String,
-        );
+        case 'create_folder':
+          return await _toolCreateFolder(
+            session,
+            args['path'] as String,
+          );
 
-      case 'list_directory':
-        return await _toolListDirectory(
-          session,
-          args['path'] as String,
-        );
+        case 'list_directory':
+          return await _toolListDirectory(
+            session,
+            args['path'] as String,
+          );
 
-      // Terminal access tools
-      case 'run_command':
-        return await _toolRunCommand(
-          args['command'] as String,
-          workingDirectory: args['working_directory'] as String?,
-        );
+        // Terminal access tools
+        case 'run_command':
+          return await _toolRunCommand(
+            args['command'] as String,
+            workingDirectory: args['working_directory'] as String?,
+          );
 
-      case 'grep_search':
-        return await _toolGrepSearch(
-          args['pattern'] as String,
-          args['path'] as String,
-          recursive: args['recursive'] as bool? ?? true,
-          ignoreCase: args['ignore_case'] as bool? ?? true,
-        );
+        case 'grep_search':
+          return await _toolGrepSearch(
+            args['pattern'] as String,
+            args['path'] as String,
+            recursive: args['recursive'] as bool? ?? true,
+            ignoreCase: args['ignore_case'] as bool? ?? true,
+          );
 
-      case 'find_files':
-        return await _toolFindFiles(
-          args['pattern'] as String,
-          directory: args['directory'] as String?,
-          recursive: args['recursive'] as bool? ?? true,
-        );
+        case 'find_files':
+          return await _toolFindFiles(
+            args['pattern'] as String,
+            directory: args['directory'] as String?,
+            recursive: args['recursive'] as bool? ?? true,
+          );
 
-      case 'deep_search':
-        return await _toolDeepSearch(
-          args['pattern'] as String,
-          directory: args['directory'] as String?,
-          foldersOnly: args['folders_only'] as bool? ?? false,
-        );
+        case 'deep_search':
+          return await _toolDeepSearch(
+            args['pattern'] as String,
+            directory: args['directory'] as String?,
+            foldersOnly: args['folders_only'] as bool? ?? false,
+          );
 
-      case 'read_file_contents':
-        return await _toolReadFileContents(
-          args['path'] as String,
-        );
+        case 'read_file_contents':
+          return await _toolReadFileContents(
+            args['path'] as String,
+          );
 
-      case 'batch_operations':
-        return await _toolBatchOperations(
-          session,
-          args['operations'] as List,
-          rollbackOnError: args['rollback_on_error'] as bool? ?? true,
-        );
+        case 'batch_operations':
+          return await _toolBatchOperations(
+            session,
+            args['operations'] as List,
+            rollbackOnError: args['rollback_on_error'] as bool? ?? true,
+          );
 
-      case 'get_drives':
-        return await _toolGetDrives();
+        case 'get_drives':
+          return await _toolGetDrives();
 
-      default:
-        return {'error': 'Unknown tool: ${function.name}'};
-    }
+        default:
+          return {'error': 'Unknown tool: ${function.name}'};
+      }
+    }();
+
+    return ErrorSanitizer.sanitizeErrorDetails(result);
   }
 
   /// Tool: Search files
@@ -1475,15 +1431,14 @@ RULES:
         ignoreCase: ignoreCase,
       );
 
+      final lines = _parseLineResults(result.stdout);
+
       return {
         'success': result.success,
         'pattern': pattern,
         'path': path,
         'output': result.output,
-        'matchCount': result.stdout
-            .split('\n')
-            .where((l) => l.isNotEmpty)
-            .length,
+        'matchCount': lines.length,
         'truncated': result.truncated,
       };
     } on TerminalSecurityException catch (e) {
@@ -1512,10 +1467,7 @@ RULES:
         recursive: recursive,
       );
 
-      final files = results.stdout
-          .split('\n')
-          .where((l) => l.trim().isNotEmpty)
-          .toList();
+      final files = _parseLineResults(results.stdout);
 
       if (files.isEmpty && results.success) {
         return {
@@ -1564,10 +1516,7 @@ RULES:
         foldersOnly: foldersOnly,
       );
 
-      final files = results.stdout
-          .split('\n')
-          .where((l) => l.trim().isNotEmpty)
-          .toList();
+      final files = _parseLineResults(results.stdout);
 
       if (files.isEmpty && results.success) {
         return {
@@ -1585,9 +1534,9 @@ RULES:
         'success': results.success,
         'pattern': pattern,
         'directory': directory ?? 'C:\\',
-        'files': files,
+        'files': files.take(100).toList(), // Limit to 100 results
         'totalCount': files.length,
-        'truncated': results.truncated,
+        'truncated': files.length > 100 || results.truncated,
         'error': results.success ? null : results.stderr,
       };
     } catch (e) {
@@ -1725,5 +1674,15 @@ RULES:
         'error': 'Batch execution failed: $e',
       };
     }
+  }
+
+  /// Helper to parse multi-line terminal output into a list of trimmed strings
+  List<String> _parseLineResults(String output) {
+    if (output.trim().isEmpty) return [];
+    return output
+        .split('\n')
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty)
+        .toList();
   }
 }

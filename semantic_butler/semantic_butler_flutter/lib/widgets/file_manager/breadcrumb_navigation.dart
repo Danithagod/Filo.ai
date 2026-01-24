@@ -11,8 +11,10 @@ class BreadcrumbNavigation extends StatelessWidget {
 
   /// Maximum segments to show before collapsing (first N + last M)
   static const int _maxVisibleSegments = 5;
+
   /// Segments to show at start when collapsed
   static const int _startSegments = 2;
+
   /// Segments to show at end when collapsed
   static const int _endSegments = 2;
 

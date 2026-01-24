@@ -96,16 +96,16 @@ class _StatsCardState extends State<StatsCard>
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+          color: colorScheme.outlineVariant.withValues(alpha: 0.15),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -143,7 +143,7 @@ class _StatsCardState extends State<StatsCard>
           ),
           const SizedBox(height: 20),
           TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0, end: widget.numericValue),
+            tween: Tween<double>(begin: 0.0, end: widget.numericValue),
             duration: const Duration(seconds: 1),
             curve: Curves.easeOutCubic,
             builder: (context, value, child) {

@@ -13,7 +13,7 @@ void main() {
               (sessionBuilder as serverpod_test.InternalTestSessionBuilder)
                   .internalBuild(endpoint: 'butler', method: 'startIndexing');
           final session2 =
-              (sessionBuilder as serverpod_test.InternalTestSessionBuilder)
+              (sessionBuilder)
                   .internalBuild(endpoint: 'butler', method: 'startIndexing');
           final resourceId = 'test_resource_1';
 
@@ -61,7 +61,7 @@ void main() {
             (sessionBuilder as serverpod_test.InternalTestSessionBuilder)
                 .internalBuild(endpoint: 'butler', method: 'startIndexing');
         final session2 =
-            (sessionBuilder as serverpod_test.InternalTestSessionBuilder)
+            (sessionBuilder)
                 .internalBuild(endpoint: 'butler', method: 'startIndexing');
         final resourceId = 'test_resource_2';
 
@@ -114,7 +114,7 @@ void main() {
             (sessionBuilder as serverpod_test.InternalTestSessionBuilder)
                 .internalBuild(endpoint: 'butler', method: 'startIndexing');
         final session2 =
-            (sessionBuilder as serverpod_test.InternalTestSessionBuilder)
+            (sessionBuilder)
                 .internalBuild(endpoint: 'butler', method: 'startIndexing');
         final resourceId = 'test_resource_4';
 

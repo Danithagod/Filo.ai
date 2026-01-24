@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:semantic_butler_client/semantic_butler_client.dart';
-import 'package:path/path.dart' as p;
+import '../../utils/file_display_helper.dart';
 
 /// List view item for a file or folder
 class FileListItem extends StatefulWidget {
   final FileSystemEntry entry;
   final VoidCallback onTap;
   final VoidCallback onContextMenu;
+  final bool isHighlighted;
 
   const FileListItem({
     super.key,
     required this.entry,
     required this.onTap,
     required this.onContextMenu,
+    this.isHighlighted = false,
   });
 
   @override
@@ -37,14 +39,21 @@ class _FileListItemState extends State<FileListItem> {
           duration: const Duration(milliseconds: 200),
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: _isHovered
-                ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.5)
-                : Colors.transparent,
+            color: widget.isHighlighted
+                ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+                : (_isHovered
+                      ? colorScheme.surfaceContainerHighest.withValues(
+                          alpha: 0.5,
+                        )
+                      : Colors.transparent),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: _isHovered
-                  ? colorScheme.outlineVariant.withValues(alpha: 0.5)
-                  : Colors.transparent,
+              color: widget.isHighlighted
+                  ? colorScheme.primary
+                  : (_isHovered
+                        ? colorScheme.outlineVariant.withValues(alpha: 0.5)
+                        : Colors.transparent),
+              width: widget.isHighlighted ? 2 : 1,
             ),
           ),
           child: InkWell(
@@ -90,7 +99,7 @@ class _FileListItemState extends State<FileListItem> {
                     child: Icon(
                       widget.entry.isDirectory
                           ? Icons.folder_rounded
-                          : _getIconForFile(widget.entry.name),
+                          : FileDisplayHelper.getIconForFile(widget.entry.name),
                       color: widget.entry.isDirectory
                           ? colorScheme.primary
                           : colorScheme.onSurfaceVariant,
@@ -119,7 +128,9 @@ class _FileListItemState extends State<FileListItem> {
                             Text(
                               widget.entry.isDirectory
                                   ? 'Folder'
-                                  : _formatSize(widget.entry.size),
+                                  : FileDisplayHelper.formatSize(
+                                      widget.entry.size,
+                                    ),
                               style: textTheme.bodySmall?.copyWith(
                                 color: colorScheme.onSurfaceVariant.withValues(
                                   alpha: 0.7,
@@ -206,45 +217,6 @@ class _FileListItemState extends State<FileListItem> {
         ),
       ),
     );
-  }
-
-  IconData _getIconForFile(String filename) {
-    final ext = p.extension(filename).toLowerCase();
-    switch (ext) {
-      case '.pdf':
-        return Icons.picture_as_pdf_rounded;
-      case '.doc':
-      case '.docx':
-      case '.txt':
-        return Icons.description_rounded;
-      case '.jpg':
-      case '.jpeg':
-      case '.png':
-      case '.gif':
-        return Icons.image_rounded;
-      case '.mp4':
-      case '.mov':
-      case '.avi':
-        return Icons.video_library_rounded;
-      case '.mp3':
-      case '.wav':
-        return Icons.audiotrack_rounded;
-      case '.zip':
-      case '.rar':
-      case '.7z':
-        return Icons.archive_rounded;
-      default:
-        return Icons.insert_drive_file_rounded;
-    }
-  }
-
-  String _formatSize(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) {
-      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    }
-    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 
   String _formatDate(DateTime date) {

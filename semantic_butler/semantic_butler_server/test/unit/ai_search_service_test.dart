@@ -283,7 +283,7 @@ void main() {
       // Simulate the parsing
       expect(() {
         final parsed = Map<String, dynamic>.from(
-          (jsonStr.isEmpty ? {} : _parseJson(jsonStr)) as Map,
+          (jsonStr.isEmpty ? {} : _parseJson(jsonStr)),
         );
         expect(parsed['intent'], equals('specific_file'));
         expect(parsed['strategy'], equals('ai_only'));

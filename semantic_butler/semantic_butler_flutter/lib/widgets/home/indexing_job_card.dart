@@ -23,7 +23,8 @@ class _IndexingJobCardState extends ConsumerState<IndexingJobCard> {
     final textTheme = Theme.of(context).textTheme;
     final job = widget.job;
 
-    final watchedFolders = ref.watch(watchedFoldersProvider);
+    final watchedFoldersAsync = ref.watch(watchedFoldersProvider);
+    final watchedFolders = watchedFoldersAsync.value ?? [];
     final isSmartIndexing = watchedFolders.any(
       (f) => f.path == job.folderPath && f.isEnabled,
     );

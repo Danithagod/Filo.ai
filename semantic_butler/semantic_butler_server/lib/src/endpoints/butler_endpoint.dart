@@ -3,15 +3,13 @@ import 'dart:convert';
 import 'dart:async';
 
 import 'package:serverpod/serverpod.dart';
-import '../../server.dart' show getEnv;
-import '../generated/protocol.dart';
+import 'package:semantic_butler_server/server.dart' show getEnv;
+import 'package:semantic_butler_server/src/generated/protocol.dart';
 import '../services/openrouter_client.dart';
 import '../services/ai_service.dart';
 import '../services/cached_ai_service.dart';
 import '../services/cache_service.dart';
-import '../services/metrics_service.dart';
 import '../services/file_extraction_service.dart';
-import '../services/file_watcher_service.dart';
 import '../services/auth_service.dart';
 import '../services/rate_limit_service.dart';
 import '../services/tag_taxonomy_service.dart';
@@ -19,15 +17,15 @@ import '../services/search_preset_service.dart';
 import '../services/ai_cost_service.dart';
 import '../services/index_health_service.dart';
 import '../services/summarization_service.dart';
-import '../services/lock_service.dart';
 import '../services/ai_search_service.dart';
+import '../services/reset_service.dart';
 import '../utils/validation.dart';
-import '../config/ai_models.dart';
-import '../constants/error_categories.dart';
 import '../services/duplicate_detector.dart';
+import '../services/suggestion_service.dart';
+import '../services/organization_service.dart';
+import '../services/indexing_service.dart';
 import '../services/naming_analyzer.dart';
 import '../services/similarity_analyzer.dart';
-import '../services/suggestion_service.dart';
 
 /// Main endpoint for Semantic Desktop Butler
 /// Handles semantic search, document indexing, and status queries
@@ -39,7 +37,8 @@ class ButlerEndpoint extends Endpoint {
   AIService? _aiService;
   CachedAIService? _cachedAiService;
   final FileExtractionService _extractionService = FileExtractionService();
-  final MetricsService _metrics = MetricsService.instance;
+  final IndexingService _indexingService = IndexingService();
+  final OrganizationService _organizationService = OrganizationService();
 
   /// Track all OpenRouterClient instances for cleanup
   static final List<OpenRouterClient> _allClients = [];
@@ -55,7 +54,7 @@ class ButlerEndpoint extends Endpoint {
   /// Dispose all resources (call on server shutdown)
   static Future<void> disposeAll() async {
     // Stop the watcher cleanup timer
-    stopWatcherCleanup();
+    IndexingService.stopWatcherCleanup();
 
     // Dispose all tracked HTTP clients
     for (final client in _allClients) {
@@ -64,119 +63,15 @@ class ButlerEndpoint extends Endpoint {
     _allClients.clear();
 
     // Also dispose file watchers
-    await disposeAllWatchers();
+    await IndexingService.disposeAllWatchers();
   }
 
-  /// File watcher instances per-session (for smart indexing)
-  static final Map<String, FileWatcherService> _fileWatchers = {};
-
-  /// Track last access time for each watcher to enable cleanup
-  static final Map<String, DateTime> _fileWatcherLastAccess = {};
-
-  /// Maximum number of concurrent file watchers to prevent memory exhaustion
-  static const int _maxFileWatchers = 100;
-
-  /// Paths currently being processed (Issue #4: Race condition prevention)
-  /// Uses _processingPathsLock to ensure atomic check-and-add operations
-  static final Set<String> _processingPaths = {};
-
-  /// Lock for synchronizing access to _processingPaths
-  /// In Dart's single-threaded async model, we use a simple Completer-based lock
-  static Completer<void>? _processingPathsLock;
-
-  /// Atomically check if paths are being processed and mark them if not
-  /// Returns the list of paths that were successfully claimed (not already processing)
-  static Future<List<String>> _claimPathsForProcessing(
-    List<String> paths,
-  ) async {
-    // Wait for any existing lock
-    while (_processingPathsLock != null) {
-      await _processingPathsLock!.future;
-    }
-
-    // Create lock for this operation
-    _processingPathsLock = Completer<void>();
-
-    try {
-      // Atomically filter and claim paths
-      final claimedPaths = paths
-          .where((p) => !_processingPaths.contains(p))
-          .toList();
-      _processingPaths.addAll(claimedPaths);
-      return claimedPaths;
-    } finally {
-      // Release lock
-      final lock = _processingPathsLock;
-      _processingPathsLock = null;
-      lock?.complete();
-    }
-  }
-
-  /// Release claimed paths after processing
-  static void _releaseProcessingPaths(List<String> paths) {
-    _processingPaths.removeAll(paths);
-  }
-
-  /// Flag to log pgvector warning only once (Issue #12)
-  static bool _pgvectorWarningLogged = false;
-
-  /// Maximum age for idle file watchers before cleanup (30 minutes)
-  static const Duration _watcherMaxIdleTime = Duration(minutes: 30);
-
-  /// Timer for periodic cleanup of idle file watchers
-  static Timer? _watcherCleanupTimer;
-
-  /// Initialize periodic cleanup of file watchers
-  /// Call this once during server startup
+  /// Initialize periodic cleanup of idle watchers
   static void initializeWatcherCleanup() {
-    _watcherCleanupTimer?.cancel();
-    // Run cleanup every 10 minutes
-    _watcherCleanupTimer = Timer.periodic(
-      const Duration(minutes: 10),
-      (_) => cleanupIdleWatchers(),
-    );
+    IndexingService.startWatcherCleanup();
   }
 
-  /// Stop the watcher cleanup timer (call on server shutdown)
-  static void stopWatcherCleanup() {
-    _watcherCleanupTimer?.cancel();
-    _watcherCleanupTimer = null;
-  }
-
-  /// Clean up file watchers for sessions that have been idle too long
-  /// Call this periodically or when system resources are low
-  static Future<void> cleanupIdleWatchers() async {
-    final now = DateTime.now();
-    final expiredSessions = <String>[];
-
-    for (final entry in _fileWatcherLastAccess.entries) {
-      if (now.difference(entry.value) > _watcherMaxIdleTime) {
-        expiredSessions.add(entry.key);
-      }
-    }
-
-    for (final sessionId in expiredSessions) {
-      await _cleanupWatcherForSession(sessionId);
-    }
-  }
-
-  /// Clean up watcher for a specific session
-  static Future<void> _cleanupWatcherForSession(String sessionId) async {
-    final watcher = _fileWatchers.remove(sessionId);
-    _fileWatcherLastAccess.remove(sessionId);
-    if (watcher != null) {
-      await watcher.dispose();
-    }
-  }
-
-  /// Clean up all file watchers (call on server shutdown)
-  static Future<void> disposeAllWatchers() async {
-    for (final watcher in _fileWatchers.values) {
-      await watcher.dispose();
-    }
-    _fileWatchers.clear();
-    _fileWatcherLastAccess.clear();
-  }
+  // Indexing moved to IndexingService
 
   /// Get OpenRouter API key from environment (.env file or system env)
   String get _openRouterApiKey => getEnv('OPENROUTER_API_KEY');
@@ -213,11 +108,10 @@ class ButlerEndpoint extends Endpoint {
     return _cachedAiService!;
   }
 
-  /// Get a client identifier from session for rate limiting
-  /// Uses session ID as the primary identifier
   String _getClientIdentifier(Session session) {
-    // Session doesn't expose HTTP request info directly in Serverpod,
-    // so we use the session ID for rate limiting
+    // Note: Ideally we should use IP address here, but accessing it reliably
+    // via Session/MethodCallSession in current Serverpod version is problematic without
+    // direct httpRequest access. Falling back to session ID.
     return session.sessionId.toString();
   }
 
@@ -364,7 +258,7 @@ class ButlerEndpoint extends Endpoint {
         // PERFORMANCE: Using JOIN to avoid N+1 query problem
         // Build dynamic WHERE clause for filters
         final whereConditions = <String>[
-          '1 - (de.embedding <=> \$1::vector) > \$2',
+          '1 - (de.embedding_vector <=> \$1::vector) > \$2',
         ];
         final parameters = <dynamic>[queryEmbeddingJson, threshold];
         // Start parameter index at 3 (since 1 and 2 are used above)
@@ -459,7 +353,7 @@ class ButlerEndpoint extends Endpoint {
           FROM document_embedding de
           JOIN file_index fi ON de."fileIndexId" = fi.id
           WHERE ${whereConditions.join(" AND ")}
-          ORDER BY de.embedding <=> \$1::vector
+          ORDER BY de.embedding_vector <=> \$1::vector
           LIMIT \$$limitParamIndex OFFSET \$$offsetParamIndex
         ''';
 
@@ -495,31 +389,44 @@ class ButlerEndpoint extends Endpoint {
           level: LogLevel.warning,
         );
 
-        // Original implementation as fallback
+        // Batch fetch all embeddings for all documents to avoid N+1 queries
         final allDocs = await FileIndex.db.find(
           session,
           where: (t) => t.status.equals('indexed'),
         );
 
-        for (final doc in allDocs) {
-          final embeddings = await DocumentEmbedding.db.find(
+        if (allDocs.isNotEmpty) {
+          final docIds = allDocs.map((d) => d.id!).toList();
+          final allEmbeddings = await DocumentEmbedding.db.find(
             session,
-            where: (t) => t.fileIndexId.equals(doc.id!),
+            where: (t) => t.fileIndexId.inSet(docIds.toSet()),
           );
 
-          if (embeddings.isEmpty) continue;
-
-          double maxSimilarity = 0.0;
-          for (final emb in embeddings) {
-            final docEmbedding = _parseEmbedding(emb.embeddingJson);
-            final similarity = _cosineSimilarity(queryEmbedding, docEmbedding);
-            if (similarity > maxSimilarity) {
-              maxSimilarity = similarity;
-            }
+          // Group embeddings by fileIndexId
+          final embeddingMap = <int, List<DocumentEmbedding>>{};
+          for (final emb in allEmbeddings) {
+            embeddingMap.putIfAbsent(emb.fileIndexId, () => []).add(emb);
           }
 
-          if (maxSimilarity >= threshold) {
-            results.add(_ScoredResult(doc: doc, score: maxSimilarity));
+          for (final doc in allDocs) {
+            final embeddings = embeddingMap[doc.id] ?? [];
+            if (embeddings.isEmpty) continue;
+
+            double maxSimilarity = 0.0;
+            for (final emb in embeddings) {
+              final docEmbedding = _parseEmbedding(emb.embeddingJson);
+              final similarity = _cosineSimilarity(
+                queryEmbedding,
+                docEmbedding,
+              );
+              if (similarity > maxSimilarity) {
+                maxSimilarity = similarity;
+              }
+            }
+
+            if (maxSimilarity >= threshold) {
+              results.add(_ScoredResult(doc: doc, score: maxSimilarity));
+            }
           }
         }
 
@@ -626,1217 +533,160 @@ class ButlerEndpoint extends Endpoint {
     Session session,
     int presetId,
   ) async {
-    AuthService.requireAuth(session);
     return SearchPresetService.deletePreset(session, presetId);
+  }
+
+  // ==========================================================================
+  // SEARCH HISTORY
+  // ==========================================================================
+
+  /// Get search history
+  Future<List<SearchHistory>> getSearchHistory(
+    Session session, {
+    int? limit,
+    int? offset,
+  }) async {
+    AuthService.requireAuth(session);
+    return await SearchHistory.db.find(
+      session,
+      limit: limit ?? 50,
+      offset: offset ?? 0,
+      orderBy: (t) => t.searchedAt,
+      orderDescending: true,
+    );
+  }
+
+  /// Clear all search history
+  Future<int> clearSearchHistory(Session session) async {
+    AuthService.requireAuth(session);
+    final deleted = await SearchHistory.db.deleteWhere(
+      session,
+      where: (t) => Constant.bool(true),
+    );
+    return deleted.length;
+  }
+
+  /// Delete a specific search history item
+  Future<bool> deleteSearchHistoryItem(Session session, int id) async {
+    AuthService.requireAuth(session);
+    final deleted = await SearchHistory.db.deleteWhere(
+      session,
+      where: (t) => t.id.equals(id),
+    );
+    return deleted.isNotEmpty;
+  }
+
+  /// Record a local file search
+  Future<void> recordLocalSearch(
+    Session session,
+    String query,
+    String directory,
+    int resultCount,
+  ) async {
+    AuthService.requireAuth(session);
+    final history = SearchHistory(
+      query: query,
+      resultCount: resultCount,
+      queryTimeMs: 0,
+      searchedAt: DateTime.now(),
+      searchType: 'local',
+      directoryContext: directory,
+    );
+    await SearchHistory.db.insertRow(session, history);
+  }
+
+  // ==========================================================================
+  // RESET
+  // ==========================================================================
+
+  /// Generate a reset confirmation code
+  Future<String> generateResetConfirmationCode(Session session) async {
+    AuthService.requireAuth(session);
+    return ResetService.instance.generateConfirmationCode();
+  }
+
+  /// Preview a database reset
+  Future<ResetPreview> previewReset(Session session) async {
+    AuthService.requireAuth(session);
+    return await ResetService.instance.getPreview(session);
+  }
+
+  /// Perform a database reset
+  Future<ResetResult> resetDatabase(
+    Session session, {
+    required String scope,
+    required String confirmationCode,
+    bool dryRun = false,
+  }) async {
+    AuthService.requireAuth(session);
+    return await ResetService.instance.resetDatabase(
+      session,
+      scope: scope,
+      confirmationCode: confirmationCode,
+      dryRun: dryRun,
+    );
   }
 
   // ==========================================================================
   // DOCUMENT INDEXING
   // ==========================================================================
 
+  /// Get current indexing status
+  Future<IndexingStatus> getIndexingStatus(Session session) async {
+    return await _indexingService.getIndexingStatus(session);
+  }
+
+  /// Stream indexing progress
+  Stream<IndexingProgress> streamIndexingProgress(
+    Session session,
+    int jobId,
+  ) async* {
+    yield* _indexingService.streamProgress(session);
+  }
+
+  /// Get details of a specific indexing job
+  Future<IndexingJob?> getIndexingJob(Session session, int jobId) async {
+    return await _indexingService.getIndexingJob(session, jobId);
+  }
+
   /// Start indexing documents from specified folder path
   Future<IndexingJob> startIndexing(
     Session session,
     String folderPath,
   ) async {
-    // Security: Validate authentication
     AuthService.requireAuth(session);
-
-    // Security: Rate limiting (10 requests per minute for indexing)
-    final clientId = _getClientIdentifier(session);
-    RateLimitService.instance.requireRateLimit(
-      clientId,
-      'startIndexing',
-      limit: 10,
-    );
-
-    // Security: Input validation
-    InputValidation.validateFilePath(folderPath);
-
-    // Create a new indexing job
-    final job = IndexingJob(
-      folderPath: folderPath,
-      status: 'queued',
-      totalFiles: 0,
-      processedFiles: 0,
-      failedFiles: 0,
-      skippedFiles: 0,
-    );
-
-    final insertedJob = await IndexingJob.db.insertRow(session, job);
-
-    // Start indexing in background with a new session
-    // The original session will close when the request completes,
-    // so we need to create a child session for the background work
-    unawaited(_processIndexingJobSafe(session.serverpod, insertedJob.id!));
-
-    return insertedJob;
+    return _indexingService.startIndexing(session, folderPath);
   }
 
-  /// Safe wrapper for background indexing job that creates its own session
-  Future<void> _processIndexingJobSafe(Serverpod serverpod, int jobId) async {
-    // Create a new internal session for background processing
-    // This ensures the session stays open even after the HTTP request completes
-    final session = await serverpod.createSession();
-
-    try {
-      // Fetch the job from database
-      final job = await IndexingJob.db.findById(session, jobId);
-      if (job == null) {
-        session.log('Indexing job $jobId not found', level: LogLevel.error);
-        return;
-      }
-
-      await _processIndexingJob(session, job);
-    } catch (e, stackTrace) {
-      session.log(
-        'Background indexing job $jobId failed unexpectedly: $e',
-        level: LogLevel.error,
-        stackTrace: stackTrace,
-      );
-    } finally {
-      // Always close the session when done
-      await session.close();
-    }
-  }
-
-  /// Process an indexing job (background task)
-  Future<void> _processIndexingJob(Session session, IndexingJob job) async {
-    try {
-      // Update job status to running
-      job.status = 'running';
-      job.startedAt = DateTime.now();
-      await IndexingJob.db.updateRow(session, job);
-
-      // Fetch ignore patterns from database
-      List<String> ignorePatterns;
-      try {
-        ignorePatterns = await getIgnorePatternStrings(session);
-        session.log(
-          'Loaded ${ignorePatterns.length} ignore patterns',
-          level: LogLevel.debug,
-        );
-      } catch (e) {
-        session.log(
-          'Failed to load ignore patterns, continuing without: $e',
-          level: LogLevel.warning,
-        );
-        ignorePatterns = [];
-      }
-
-      // Scan directory for files (applying ignore patterns)
-      List<String> files;
-      try {
-        files = await _extractionService
-            .scanDirectory(job.folderPath, ignorePatterns: ignorePatterns)
-            .timeout(const Duration(minutes: 5));
-      } catch (e) {
-        session.log('Failed to scan directory: $e', level: LogLevel.error);
-        job.status = 'failed';
-        job.errorMessage = 'Failed to scan directory: $e';
-        job.errorCategory = _categorizeError(e);
-        job.completedAt = DateTime.now();
-        await IndexingJob.db.updateRow(session, job);
-        return;
-      }
-
-      job.totalFiles = files.length;
-      await IndexingJob.db.updateRow(session, job);
-
-      // Process files in batches - optimized for performance
-      // Increased batch size and reduced delay with caching enabled
-      const batchSize = 25; // Increased from 5 for better throughput
-      for (var i = 0; i < files.length; i += batchSize) {
-        try {
-          final batch = files.sublist(
-            i,
-            i + batchSize > files.length ? files.length : i + batchSize,
-          );
-
-          final results = await _processBatch(
-            session,
-            batch,
-          ).timeout(const Duration(minutes: 10));
-
-          job.processedFiles += results.indexedCount;
-          job.failedFiles += results.failedCount;
-          job.skippedFiles += results.skippedCount;
-
-          // Update progress
-          await IndexingJob.db.updateRow(session, job);
-
-          // Minimal delay between batches (caching reduces API load)
-          await Future.delayed(const Duration(milliseconds: 100));
-        } catch (e) {
-          session.log('Batch processing failed: $e', level: LogLevel.warning);
-          job.failedFiles += batchSize;
-          await IndexingJob.db.updateRow(session, job);
-          // Continue with next batch instead of failing entire job
-        }
-      }
-
-      // Mark job as completed
-      job.status = 'completed';
-      job.completedAt = DateTime.now();
-      await IndexingJob.db.updateRow(session, job);
-    } catch (e, stackTrace) {
-      session.log(
-        'Indexing job failed: $e',
-        level: LogLevel.error,
-        stackTrace: stackTrace,
-      );
-
-      // Try to update job status, but don't fail if this also fails
-      try {
-        job.status = 'failed';
-        job.errorMessage = e.toString().length > 500
-            ? '${e.toString().substring(0, 500)}...'
-            : e.toString();
-        job.errorCategory = _categorizeError(e);
-        job.completedAt = DateTime.now();
-        await IndexingJob.db.updateRow(session, job);
-      } catch (updateError) {
-        session.log(
-          'Failed to update job status: $updateError',
-          level: LogLevel.error,
-        );
-      }
-    }
-  }
-
-  /// Process a batch of files
-  Future<_BatchResult> _processBatch(
-    Session session,
-    List<String> filePaths,
-  ) async {
-    int indexed = 0;
-    int failed = 0;
-    int skipped = 0;
-
-    // 1. Extract content and filter already indexed files
-    final itemsToProcess = <_BatchItem>[];
-
-    for (final path in filePaths) {
-      // Try to acquire lock for this file
-      final locked = await LockService.tryAcquireLock(session, path);
-
-      if (!locked) {
-        // Another thread is processing this file, skip it
-        session.log(
-          'File already being processed, skipping: $path',
-          level: LogLevel.info,
-        );
-        skipped++;
-        continue;
-      }
-
-      try {
-        final existing = await FileIndex.db.findFirstRow(
-          session,
-          where: (t) => t.path.equals(path),
-        );
-
-        // Retry extraction up to 3 times
-        final extraction = await _retry(
-          () => _extractionService.extractText(path),
-          maxAttempts: 3,
-        );
-
-        // Skip if content unchanged
-        if (existing != null &&
-            existing.contentHash == extraction.contentHash) {
-          skipped++;
-          session.log(
-            'Content unchanged, skipping: $path',
-            level: LogLevel.debug,
-          );
-          continue;
-        }
-
-        itemsToProcess.add(
-          _BatchItem(
-            path: path,
-            extraction: extraction,
-            existingIndex: existing,
-          ),
-        );
-      } catch (e) {
-        failed++;
-        final errorCategory = _categorizeError(e);
-        session.log(
-          'Failed to extract $path [$errorCategory]: $e',
-          level: LogLevel.warning,
-        );
-        await _recordIndexingError(
-          session,
-          path,
-          'Extraction failed: $e',
-          errorCategory: errorCategory,
-        );
-      } finally {
-        // Always release lock
-        await LockService.releaseLock(session, path);
-      }
-    }
-
-    if (itemsToProcess.isEmpty) {
-      return _BatchResult(indexed, failed, skipped);
-    }
-
-    // 2. Generate summaries for large documents in parallel
-    // 2. Generate summaries for large documents in parallel
-    final summaryResults = await Future.wait(
-      itemsToProcess.map((item) async {
-        try {
-          if (item.extraction.wordCount > 500) {
-            final docSummary = await SummarizationService.generateSummary(
-              session,
-              item.extraction.content,
-              openRouterClient,
-              fileName: item.extraction.fileName,
-            );
-            return (
-              summaryForDb: jsonEncode(docSummary.toJson()),
-              textForEmbedding: SummarizationService.getEmbeddingSummary(
-                docSummary,
-              ),
-            );
-          } else {
-            return (
-              summaryForDb: null as String?, // No summary for short docs
-              textForEmbedding: item.extraction.content,
-            );
-          }
-        } catch (e) {
-          session.log(
-            'Summary generation failed for ${item.path}, using preview: $e',
-            level: LogLevel.warning,
-          );
-          return (
-            summaryForDb: null as String?,
-            textForEmbedding: item.extraction.preview,
-          );
-        }
-      }),
-    );
-
-    // 3. Generate embeddings from summaries/content
-    final embeddingTexts = summaryResults
-        .map((e) => e.textForEmbedding)
-        .toList();
-    List<List<double>> embeddings;
-    try {
-      embeddings = await _retry(
-        () => aiService.generateEmbeddings(embeddingTexts),
-        maxAttempts: 3,
-      );
-    } catch (e) {
-      session.log(
-        'Failed to generate embeddings for batch: $e',
-        level: LogLevel.error,
-      );
-      return _BatchResult(indexed, failed + itemsToProcess.length, skipped);
-    }
-
-    // 4. Process each file with its embedding in parallel (generating tags)
-    final processingFutures = List.generate(itemsToProcess.length, (i) async {
-      final item = itemsToProcess[i];
-      final embedding = embeddings[i];
-      final summary = summaryResults[i].summaryForDb;
-
-      try {
-        // Generate tags
-        final tags = await _retry(
-          () => aiService.generateTags(
-            item.extraction.content,
-            fileName: item.extraction.fileName,
-          ),
-          maxAttempts: 2,
-        );
-
-        // Record tags in taxonomy for analytics
-        try {
-          await TagTaxonomyService.recordDocumentTags(session, tags);
-        } catch (e) {
-          // Don't fail indexing if taxonomy update fails
-          session.log(
-            'Failed to record tag taxonomy: $e',
-            level: LogLevel.warning,
-          );
-        }
-
-        // TRANSACTION: Wrap all database operations atomically
-        await session.db.transaction((transaction) async {
-          // Create/Update FileIndex record
-          final fileIndex = FileIndex(
-            id: item.existingIndex?.id,
-            path: item.path,
-            fileName: item.extraction.fileName,
-            contentHash: item.extraction.contentHash,
-            fileSizeBytes: item.extraction.fileSizeBytes,
-            mimeType: item.extraction.mimeType,
-            contentPreview: item.extraction.preview,
-            summary: summary,
-            tagsJson: tags.toJson(),
-            status: 'indexed',
-            embeddingModel: AIModels.embeddingDefault,
-            indexedAt: DateTime.now(),
-            isTextContent: true,
-            documentCategory: item.extraction.documentCategory,
-            wordCount: item.extraction.wordCount,
-            fileCreatedAt: item.extraction.fileCreatedAt,
-            fileModifiedAt: item.extraction.fileModifiedAt,
-          );
-
-          FileIndex savedIndex;
-          if (item.existingIndex != null) {
-            savedIndex = await FileIndex.db.updateRow(
-              session,
-              fileIndex,
-              transaction: transaction,
-            );
-
-            // Delete old embeddings
-            await DocumentEmbedding.db.deleteWhere(
-              session,
-              where: (t) => t.fileIndexId.equals(item.existingIndex!.id!),
-              transaction: transaction,
-            );
-          } else {
-            // Try insert, fall back to update if duplicate key
-            try {
-              savedIndex = await FileIndex.db.insertRow(
-                session,
-                fileIndex,
-                transaction: transaction,
-              );
-            } catch (e) {
-              // Likely duplicate key - find existing and update instead
-              final existing = await FileIndex.db.findFirstRow(
-                session,
-                where: (t) => t.path.equals(item.path),
-                transaction: transaction,
-              );
-              if (existing != null) {
-                fileIndex.id = existing.id;
-                savedIndex = await FileIndex.db.updateRow(
-                  session,
-                  fileIndex,
-                  transaction: transaction,
-                );
-                // Delete old embeddings
-                await DocumentEmbedding.db.deleteWhere(
-                  session,
-                  where: (t) => t.fileIndexId.equals(existing.id!),
-                  transaction: transaction,
-                );
-              } else {
-                rethrow; // Not a duplicate key issue
-              }
-            }
-          }
-
-          // Issue #13: Store embeddings - use chunking for long documents
-          if (item.extraction.wordCount > 1000) {
-            // Long document - split into chunks and generate embeddings for each
-            final chunks = _chunkText(item.extraction.content);
-            session.log(
-              'Long document (${item.extraction.wordCount} words), creating ${chunks.length} chunks: ${item.path}',
-              level: LogLevel.debug,
-            );
-
-            for (var i = 0; i < chunks.length; i++) {
-              try {
-                // Generate embedding for this chunk
-                final chunkEmbedding = await aiService.generateEmbedding(
-                  chunks[i],
-                );
-                final chunkPreview = chunks[i].length > 500
-                    ? '${chunks[i].substring(0, 500)}...'
-                    : chunks[i];
-
-                final chunkRecord = await DocumentEmbedding.db.insertRow(
-                  session,
-                  DocumentEmbedding(
-                    fileIndexId: savedIndex.id!,
-                    chunkIndex: i,
-                    chunkText: chunkPreview,
-                    embeddingJson: jsonEncode(chunkEmbedding),
-                    dimensions: aiService.getEmbeddingDimensions(),
-                  ),
-                  transaction: transaction,
-                );
-
-                // Update vector column
-                try {
-                  await session.db.unsafeQuery(
-                    'UPDATE document_embedding SET embedding = \$1::vector WHERE id = \$2',
-                    parameters: QueryParameters.positional([
-                      jsonEncode(chunkEmbedding),
-                      chunkRecord.id,
-                    ]),
-                  );
-                } catch (e) {
-                  if (!_pgvectorWarningLogged) {
-                    session.log(
-                      'pgvector extension not available, using Dart fallback: $e',
-                      level: LogLevel.warning,
-                    );
-                    _pgvectorWarningLogged = true;
-                  }
-                }
-              } catch (e) {
-                session.log(
-                  'Failed to create chunk $i for ${item.path}: $e',
-                  level: LogLevel.warning,
-                );
-              }
-            }
-          } else {
-            // Short document - single embedding (original behavior)
-            final embeddingRecord = await DocumentEmbedding.db.insertRow(
-              session,
-              DocumentEmbedding(
-                fileIndexId: savedIndex.id!,
-                chunkIndex: 0,
-                chunkText: item.extraction.preview,
-                embeddingJson: jsonEncode(embedding),
-                dimensions: aiService.getEmbeddingDimensions(),
-              ),
-              transaction: transaction,
-            );
-
-            // Update vector column directly (optional - Dart fallback works without it)
-            try {
-              await session.db.unsafeQuery(
-                'UPDATE document_embedding SET embedding = \$1::vector WHERE id = \$2',
-                parameters: QueryParameters.positional([
-                  jsonEncode(embedding),
-                  embeddingRecord.id,
-                ]),
-              );
-            } catch (e) {
-              // Issue #12: Log pgvector failure once per session
-              if (!_pgvectorWarningLogged) {
-                session.log(
-                  'pgvector extension not available, using Dart fallback for vector search: $e',
-                  level: LogLevel.warning,
-                );
-                _pgvectorWarningLogged = true;
-              }
-            }
-          }
-        }); // End transaction
-
-        return true; // Success
-      } catch (e) {
-        final errorCategory = _categorizeError(e);
-        session.log(
-          'Failed to index ${item.path} [$errorCategory]: $e',
-          level: LogLevel.warning,
-        );
-        await _recordIndexingError(
-          session,
-          item.path,
-          'Indexing failed: $e',
-          errorCategory: errorCategory,
-        );
-        return false; // Failure
-      }
-    });
-
-    final results = await Future.wait(processingFutures);
-    for (final success in results) {
-      if (success) {
-        indexed++;
-      } else {
-        failed++;
-      }
-    }
-
-    return _BatchResult(indexed, failed, skipped);
-  }
-
-  /// Record indexing error to database with categorization
-  Future<void> _recordIndexingError(
-    Session session,
-    String path,
-    String errorMessage, {
-    String? errorCategory,
-  }) async {
-    try {
-      final existing = await FileIndex.db.findFirstRow(
-        session,
-        where: (t) => t.path.equals(path),
-      );
-
-      if (existing != null) {
-        existing.status = 'failed';
-        existing.errorMessage = errorMessage;
-        // Note: FileIndex doesn't have errorCategory, only IndexingJob does
-        await FileIndex.db.updateRow(session, existing);
-      } else {
-        await FileIndex.db.insertRow(
-          session,
-          FileIndex(
-            path: path,
-            fileName: path.split(Platform.pathSeparator).last,
-            contentHash: '',
-            fileSizeBytes: 0,
-            status: 'failed',
-            errorMessage: errorMessage,
-            indexedAt: DateTime.now(),
-            embeddingModel: AIModels.embeddingDefault,
-            tagsJson: null,
-            isTextContent: false,
-          ),
-        );
-      }
-    } catch (e) {
-      session.log(
-        'Failed to record indexing error for $path: $e',
-        level: LogLevel.error,
-      );
-    }
-  }
-
-  /// Generic retry helper
-  Future<T> _retry<T>(
-    Future<T> Function() action, {
-    int maxAttempts = 3,
-    Duration delay = const Duration(seconds: 1),
-  }) async {
-    int attempts = 0;
-    while (true) {
-      try {
-        attempts++;
-        return await action();
-      } catch (e) {
-        if (attempts >= maxAttempts) rethrow;
-        await Future.delayed(delay * attempts); // Exponential-ish backoff
-      }
-    }
-  }
-
-  /// Categorize error based on error message/exception
-  String _categorizeError(dynamic error) {
-    final errorStr = error.toString().toLowerCase();
-
-    // Check for specific error patterns
-    if (errorStr.contains('timeout') || errorStr.contains('timed out')) {
-      return ErrorCategory.apiTimeout;
-    }
-    if (errorStr.contains('permission') || errorStr.contains('access denied')) {
-      return ErrorCategory.permissionDenied;
-    }
-    if (errorStr.contains('corrupt') ||
-        errorStr.contains('invalid format') ||
-        errorStr.contains('malformed')) {
-      return ErrorCategory.corruptFile;
-    }
-    if (errorStr.contains('network') ||
-        errorStr.contains('connection') ||
-        errorStr.contains('socket')) {
-      return ErrorCategory.networkError;
-    }
-    if (errorStr.contains('unsupported') ||
-        errorStr.contains('not supported')) {
-      return ErrorCategory.unsupportedFormat;
-    }
-    if (errorStr.contains('disk') ||
-        errorStr.contains('space') ||
-        errorStr.contains('quota')) {
-      return ErrorCategory.insufficientDiskSpace;
-    }
-
-    return ErrorCategory.unknown;
-  }
-
-  // ==========================================================================
-  // STATUS & STATISTICS
-  // ==========================================================================
-
-  /// Get current indexing status
-  Future<IndexingStatus> getIndexingStatus(Session session) async {
-    final activeJobsList = await IndexingJob.db.find(
-      session,
-      where: (t) => t.status.equals('running'),
-    );
-    final activeJobs = activeJobsList.length;
-
-    final indexedDocs = await FileIndex.db.count(
-      session,
-      where: (t) => t.status.equals('indexed'),
-    );
-    final pendingDocs = await FileIndex.db.count(
-      session,
-      where: (t) => t.status.equals('pending'),
-    );
-    final failedDocs = await FileIndex.db.count(
-      session,
-      where: (t) => t.status.equals('failed'),
-    );
-
-    // Calculate dynamic total: include files in jobs that aren't yet in FileIndex
-    var totalDocs = await FileIndex.db.count(session);
-    for (final job in activeJobsList) {
-      // If job is discovering files, its totalFiles might be higher than what's in DB
-      final pendingInJob = job.totalFiles - job.processedFiles;
-      if (pendingInJob > 0) {
-        totalDocs += pendingInJob;
-      }
-    }
-
-    // Get last activity
-    final lastIndexed = await FileIndex.db.findFirstRow(
-      session,
-      orderBy: (t) => t.indexedAt,
-      orderDescending: true,
-    );
-
-    // Get recent jobs history
-    final recentJobs = await IndexingJob.db.find(
-      session,
-      orderBy: (t) => t.startedAt,
-      orderDescending: true,
-      limit: 10,
-    );
-
-    // Calculate estimated time remaining for active jobs
-    int? estimatedTimeRemainingSeconds;
-    if (activeJobs > 0 && recentJobs.isNotEmpty) {
-      final activeJob = recentJobs.firstWhere(
-        (j) => j.status == 'running',
-        orElse: () => recentJobs.first,
-      );
-
-      if (activeJob.startedAt != null && activeJob.totalFiles > 0) {
-        final processed =
-            activeJob.processedFiles +
-            activeJob.failedFiles +
-            activeJob.skippedFiles;
-        final elapsed = DateTime.now()
-            .difference(activeJob.startedAt!)
-            .inSeconds;
-
-        if (processed > 0 && elapsed > 0) {
-          final filesPerSecond = processed / elapsed;
-          final remaining = activeJob.totalFiles - processed;
-          estimatedTimeRemainingSeconds = (remaining / filesPerSecond).ceil();
-        }
-      }
-    }
-
-    // Update metrics
-    _metrics.setIndexedDocuments(indexedDocs);
-    _metrics.setActiveJobs(activeJobs);
-
-    return IndexingStatus(
-      totalDocuments: totalDocs,
-      indexedDocuments: indexedDocs,
-      pendingDocuments: pendingDocs,
-      failedDocuments: failedDocs,
-      activeJobs: activeJobs,
-      databaseSizeMb: await _estimateDatabaseSize(session),
-      lastActivity: lastIndexed?.indexedAt,
-      recentJobs: recentJobs,
-      estimatedTimeRemainingSeconds: estimatedTimeRemainingSeconds,
-      cacheHitRate: CacheService.instance.stats.hitRate,
-    );
-  }
-
-  /// Get database statistics
-  Future<DatabaseStats> getDatabaseStats(Session session) async {
-    final fileCount = await FileIndex.db.count(session);
-    final embeddingCount = await DocumentEmbedding.db.count(session);
-
-    return DatabaseStats(
-      totalSizeMb: await _estimateDatabaseSize(session),
-      fileCount: fileCount,
-      embeddingCount: embeddingCount,
-      avgEmbeddingTimeMs: await _getAvgEmbeddingTime(session),
-      lastUpdated: DateTime.now(),
-    );
-  }
-
-  /// Get error statistics aggregated by category
-  ///
-  /// [timeRange] - Filter by time: "24h", "7d", "30d", or "all" (default: "all")
-  /// [category] - Filter by specific error category (optional)
-  /// [jobId] - Filter by specific indexing job (optional)
-  Future<ErrorStats> getErrorStats(
-    Session session, {
-    String? timeRange,
-    String? category,
-    int? jobId,
-  }) async {
-    // Security: Validate authentication
-    AuthService.requireAuth(session);
-
-    // Build date filter based on timeRange
-    DateTime? cutoffDate;
-    final now = DateTime.now();
-    switch (timeRange) {
-      case '24h':
-        cutoffDate = now.subtract(const Duration(hours: 24));
-        break;
-      case '7d':
-        cutoffDate = now.subtract(const Duration(days: 7));
-        break;
-      case '30d':
-        cutoffDate = now.subtract(const Duration(days: 30));
-        break;
-      default:
-        cutoffDate = null; // No time filter
-    }
-
-    // Query failed job details with basic filters
-    var failedDetails = await IndexingJobDetail.db.find(
-      session,
-      where: (t) {
-        var condition = t.status.equals('failed');
-
-        if (jobId != null) {
-          condition = condition & t.jobId.equals(jobId);
-        }
-
-        if (category != null) {
-          condition = condition & t.errorCategory.equals(category);
-        }
-
-        return condition;
-      },
-    );
-
-    // Apply date filter in-memory (Serverpod 3.1.0 doesn't have date comparison operators)
-    if (cutoffDate != null) {
-      failedDetails = failedDetails.where((d) {
-        final completedAt = d.completedAt;
-        return completedAt != null && completedAt.isAfter(cutoffDate!);
-      }).toList();
-    }
-
-    // Aggregate by category
-    final categoryCounts = <String, int>{};
-    for (final detail in failedDetails) {
-      final cat = detail.errorCategory ?? ErrorCategory.unknown;
-      categoryCounts[cat] = (categoryCounts[cat] ?? 0) + 1;
-    }
-
-    // Calculate total and percentages
-    final totalErrors = failedDetails.length;
-    final byCategory = categoryCounts.entries.map((entry) {
-      return ErrorCategoryCount(
-        category: entry.key,
-        count: entry.value,
-        percentage: totalErrors > 0 ? (entry.value / totalErrors) * 100 : 0.0,
-      );
-    }).toList();
-
-    // Sort by count descending
-    byCategory.sort((a, b) => b.count.compareTo(a.count));
-
-    return ErrorStats(
-      totalErrors: totalErrors,
-      byCategory: byCategory,
-      timeRange: timeRange,
-      jobId: jobId,
-      generatedAt: DateTime.now(),
-    );
-  }
-
-  /// Get recent search history with pagination support
-  Future<List<SearchHistory>> getSearchHistory(
-    Session session, {
-    int limit = 20,
-    int offset = 0,
-    String? searchType, // Filter by 'semantic', 'local', or 'hybrid'
-  }) async {
-    if (searchType != null) {
-      return await SearchHistory.db.find(
-        session,
-        orderBy: (t) => t.searchedAt,
-        orderDescending: true,
-        limit: limit,
-        offset: offset,
-        where: (t) => t.searchType.equals(searchType),
-      );
-    }
-    return await SearchHistory.db.find(
-      session,
-      orderBy: (t) => t.searchedAt,
-      orderDescending: true,
-      limit: limit,
-      offset: offset,
-    );
-  }
-
-  /// Delete a specific search history item by ID
-  Future<bool> deleteSearchHistoryItem(Session session, int searchId) async {
-    try {
-      final item = await SearchHistory.db.findById(session, searchId);
-      if (item == null) {
-        return false;
-      }
-      await SearchHistory.db.deleteRow(session, item);
-      return true;
-    } catch (e) {
-      session.log(
-        'Failed to delete search history item: $e',
-        level: LogLevel.error,
-      );
-      return false;
-    }
-  }
-
-  /// Clear all search history
-  Future<int> clearSearchHistory(Session session) async {
-    try {
-      final deleted = await SearchHistory.db.deleteWhere(
-        session,
-        where: (t) => t.id > 0,
-      );
-      return deleted.length;
-    } catch (e) {
-      session.log('Failed to clear search history: $e', level: LogLevel.error);
-      return 0;
-    }
-  }
-
-  /// Record a local file search to history
-  ///
-  /// [query] - Search query string
-  /// [directoryPath] - Directory where search was performed
-  /// [resultCount] - Number of results found
-  Future<void> recordLocalSearch(
-    Session session,
-    String query,
-    String directoryPath,
-    int resultCount,
-  ) async {
-    try {
-      await SearchHistory.db.insertRow(
-        session,
-        SearchHistory(
-          query: query,
-          resultCount: resultCount,
-          queryTimeMs: 0, // Local search timing not tracked
-          searchedAt: DateTime.now(),
-          searchType: 'local',
-          directoryContext: directoryPath,
-        ),
-      );
-    } catch (e) {
-      session.log('Failed to record local search: $e', level: LogLevel.warning);
-      // Don't throw - search history failure shouldn't break the UI
-    }
-  }
-
-  /// Get AI usage statistics (cost tracking)
-  Future<Map<String, dynamic>> getAIUsageStats(Session session) async {
-    final stats = aiService.usageStats;
-    return {
-      'total_input_tokens': stats.totalInputTokens,
-      'total_output_tokens': stats.totalOutputTokens,
-      'total_tokens': stats.totalTokens,
-      'estimated_cost_usd': stats.totalCost,
-    };
-  }
-
-  /// Clear all indexed data
-  Future<void> clearIndex(Session session) async {
-    await DocumentEmbedding.db.deleteWhere(session, where: (t) => t.id > 0);
-    await FileIndex.db.deleteWhere(session, where: (t) => t.id > 0);
-    await IndexingJob.db.deleteWhere(session, where: (t) => t.id > 0);
-  }
-
-  // ==========================================================================
-  // REAL-TIME STREAMING
-  // ==========================================================================
-
-  /// Stream real-time indexing progress for a specific job
-  ///
-  /// Yields [IndexingProgress] updates every 500ms while the job is running.
-  /// Automatically completes when the job finishes or fails.
-  Stream<IndexingProgress> streamIndexingProgress(
+  /// Cancel a running indexing job
+  Future<bool> cancelIndexingJob(
     Session session,
     int jobId,
-  ) async* {
-    // Security: Validate authentication
+  ) async {
     AuthService.requireAuth(session);
-
-    const updateInterval = Duration(milliseconds: 500);
-    var isRunning = true;
-
-    while (isRunning) {
-      // Fetch current job state
-      final job = await IndexingJob.db.findById(session, jobId);
-
-      if (job == null) {
-        // Job not found, emit error and stop
-        yield IndexingProgress(
-          jobId: jobId,
-          status: 'not_found',
-          totalFiles: 0,
-          processedFiles: 0,
-          failedFiles: 0,
-          skippedFiles: 0,
-          progressPercent: 0.0,
-          timestamp: DateTime.now(),
-        );
-        return;
-      }
-
-      // Calculate progress percentage
-      final totalProcessed =
-          job.processedFiles + job.failedFiles + job.skippedFiles;
-      final progressPercent = job.totalFiles > 0
-          ? (totalProcessed / job.totalFiles * 100).clamp(0.0, 100.0)
-          : 0.0;
-
-      // Calculate estimated time remaining
-      int? estimatedSecondsRemaining;
-      if (job.startedAt != null && job.totalFiles > 0 && totalProcessed > 0) {
-        final elapsed = DateTime.now().difference(job.startedAt!).inSeconds;
-        if (elapsed > 0) {
-          final filesPerSecond = totalProcessed / elapsed;
-          if (filesPerSecond > 0) {
-            final remaining = job.totalFiles - totalProcessed;
-            estimatedSecondsRemaining = (remaining / filesPerSecond).ceil();
-          }
-        }
-      }
-
-      // Yield progress update
-      yield IndexingProgress(
-        jobId: jobId,
-        status: job.status,
-        totalFiles: job.totalFiles,
-        processedFiles: job.processedFiles,
-        failedFiles: job.failedFiles,
-        skippedFiles: job.skippedFiles,
-        progressPercent: progressPercent,
-        estimatedSecondsRemaining: estimatedSecondsRemaining,
-        currentFile: null, // Would need job-level tracking to populate
-        timestamp: DateTime.now(),
-      );
-
-      // Check if job is still running
-      if (job.status != 'running') {
-        isRunning = false;
-        continue;
-      }
-
-      // Wait before next update
-      await Future.delayed(updateInterval);
-    }
+    return _indexingService.cancelIndexingJob(session, jobId);
   }
 
   // ==========================================================================
   // SMART INDEXING (File Watching)
   // ==========================================================================
 
-  /// Get or create a file watcher service for this session
-  FileWatcherService _getFileWatcher(Session session) {
-    final sessionId = session.sessionId.toString();
-    if (!_fileWatchers.containsKey(sessionId)) {
-      // Check if we've hit the max watchers limit
-      if (_fileWatchers.length >= _maxFileWatchers) {
-        // Clean up idle watchers first
-        cleanupIdleWatchers();
-
-        // If still at limit, remove the oldest watcher
-        if (_fileWatchers.length >= _maxFileWatchers) {
-          String? oldestSessionId;
-          DateTime? oldestAccess;
-          for (final entry in _fileWatcherLastAccess.entries) {
-            if (oldestAccess == null || entry.value.isBefore(oldestAccess)) {
-              oldestAccess = entry.value;
-              oldestSessionId = entry.key;
-            }
-          }
-          if (oldestSessionId != null) {
-            session.log(
-              'Max file watchers reached, removing oldest: $oldestSessionId',
-              level: LogLevel.warning,
-            );
-            _cleanupWatcherForSession(oldestSessionId);
-          }
-        }
-      }
-
-      _fileWatchers[sessionId] = FileWatcherService(
-        session,
-        onFilesChanged: (paths) async {
-          // Issue #4: Atomically claim paths for processing (race condition prevention)
-          // This prevents multiple watchers from processing the same paths
-          final pathsToProcess = await _claimPathsForProcessing(paths);
-          if (pathsToProcess.isEmpty) {
-            session.log(
-              'Smart indexing: All ${paths.length} files already being processed, skipping',
-              level: LogLevel.debug,
-            );
-            return;
-          }
-
-          // Issue #18: Rate limit auto-index operations
-          final clientId = sessionId;
-          final allowed = RateLimitService.instance.checkAndConsume(
-            clientId,
-            'auto-index',
-            limit: 30, // 30 files per minute for auto-index
-          );
-          if (!allowed) {
-            session.log(
-              'Auto-index rate limited, deferring ${pathsToProcess.length} files',
-              level: LogLevel.warning,
-            );
-            // Release claimed paths since we're not processing them
-            _releaseProcessingPaths(pathsToProcess);
-            return;
-          }
-
-          // Use background session for processing to prevent blocking the main session
-          // and to ensure locks are managed independently
-          final bgSession = await session.serverpod.createSession();
-          try {
-            session.log(
-              'Smart indexing: Re-indexing ${pathsToProcess.length} changed files',
-              level: LogLevel.info,
-            );
-            await _handleFilesChanged(bgSession, pathsToProcess);
-          } catch (e, stackTrace) {
-            session.log(
-              'Error in background indexing: $e',
-              level: LogLevel.error,
-              stackTrace: stackTrace,
-            );
-          } finally {
-            _releaseProcessingPaths(pathsToProcess);
-            await bgSession.close();
-          }
-        },
-        onFileRemoved: (path) async {
-          // Use background session with locking for removal
-          final bgSession = await session.serverpod.createSession();
-          try {
-            await LockService.withLock(bgSession, path, () async {
-              // Issue #1: Properly remove file from index when deleted
-              await _removeFileFromIndex(bgSession, path);
-            });
-          } catch (e) {
-            session.log(
-              'Error removing file $path: $e',
-              level: LogLevel.error,
-            );
-          } finally {
-            await bgSession.close();
-          }
-        },
-      );
-
-      // Load and set ignore patterns for the watcher
-      _loadIgnorePatternsForWatcher(session, sessionId);
-    }
-    // Update last access time to prevent cleanup while session is active
-    _fileWatcherLastAccess[sessionId] = DateTime.now();
-    return _fileWatchers[sessionId]!;
-  }
-
-  /// Load ignore patterns and set them on the file watcher
-  Future<void> _loadIgnorePatternsForWatcher(
-    Session session,
-    String sessionId,
-  ) async {
-    try {
-      final patterns = await getIgnorePatternStrings(session);
-      final watcher = _fileWatchers[sessionId];
-      if (watcher != null && patterns.isNotEmpty) {
-        watcher.setIgnorePatterns(patterns);
-        session.log(
-          'Loaded ${patterns.length} ignore patterns for file watcher',
-          level: LogLevel.debug,
-        );
-      }
-    } catch (e) {
-      session.log(
-        'Failed to load ignore patterns for file watcher: $e',
-        level: LogLevel.warning,
-      );
-    }
-  }
-
-  /// Internal method to remove a file from the index (Issue #1: File removal implementation)
-  ///
-  /// Deletes the FileIndex record and associated DocumentEmbedding records
-  /// for a file that has been deleted from the filesystem.
-  /// This is called by the file watcher when a file is deleted.
-  Future<void> _removeFileFromIndex(Session session, String filePath) async {
-    try {
-      final existing = await FileIndex.db.findFirstRow(
-        session,
-        where: (t) => t.path.equals(filePath),
-      );
-
-      if (existing == null) {
-        session.log(
-          'File not in index, nothing to remove: $filePath',
-          level: LogLevel.debug,
-        );
-        return;
-      }
-
-      // TRANSACTION: Delete embeddings and file index atomically
-      await session.db.transaction((transaction) async {
-        // Delete embeddings first (foreign key dependency)
-        final deletedEmbeddings = await DocumentEmbedding.db.deleteWhere(
-          session,
-          where: (t) => t.fileIndexId.equals(existing.id!),
-          transaction: transaction,
-        );
-
-        // Delete file index record
-        await FileIndex.db.deleteRow(
-          session,
-          existing,
-          transaction: transaction,
-        );
-
-        session.log(
-          'Removed from index: $filePath (${deletedEmbeddings.length} embeddings)',
-          level: LogLevel.info,
-        );
-      });
-    } catch (e) {
-      session.log(
-        'Failed to remove from index: $filePath - $e',
-        level: LogLevel.error,
-      );
-      rethrow;
-    }
-  }
-
-  /// Enable smart indexing for a folder (starts file watching)
+  /// Enable smart indexing for a folder
   Future<WatchedFolder> enableSmartIndexing(
     Session session,
     String folderPath,
   ) async {
-    final watcher = _getFileWatcher(session);
-    return await watcher.startWatching(folderPath);
+    AuthService.requireAuth(session);
+    return _indexingService.enableSmartIndexing(session, folderPath);
   }
 
-  /// Disable smart indexing for a folder (stops file watching)
+  /// Disable smart indexing for a folder
   Future<void> disableSmartIndexing(
     Session session,
     String folderPath,
   ) async {
-    final watcher = _getFileWatcher(session);
-    await watcher.stopWatching(folderPath);
-  }
-
-  /// Get all watched folders
-  Future<List<WatchedFolder>> getWatchedFolders(Session session) async {
-    return await WatchedFolder.db.find(session);
+    AuthService.requireAuth(session);
+    return _indexingService.disableSmartIndexing(session, folderPath);
   }
 
   /// Toggle smart indexing for a folder
@@ -1844,19 +694,14 @@ class ButlerEndpoint extends Endpoint {
     Session session,
     String folderPath,
   ) async {
-    final existing = await WatchedFolder.db.findFirstRow(
-      session,
-      where: (t) => t.path.equals(folderPath),
-    );
+    AuthService.requireAuth(session);
+    return _indexingService.toggleSmartIndexing(session, folderPath);
+  }
 
-    if (existing != null && existing.isEnabled) {
-      await disableSmartIndexing(session, folderPath);
-      existing.isEnabled = false;
-      await WatchedFolder.db.updateRow(session, existing);
-      return existing;
-    } else {
-      return await enableSmartIndexing(session, folderPath);
-    }
+  /// Get all watched folders
+  Future<List<WatchedFolder>> getWatchedFolders(Session session) async {
+    AuthService.requireAuth(session);
+    return WatchedFolder.db.find(session);
   }
 
   // ==========================================================================
@@ -2110,95 +955,8 @@ class ButlerEndpoint extends Endpoint {
     return guess;
   }
 
-  /// Split text into overlapping chunks for better embedding coverage (Issue #13)
-  ///
-  /// Long documents are split into chunks of [chunkSize] words with [overlap]
-  /// words of overlap between consecutive chunks for context continuity.
-  List<String> _chunkText(
-    String text, {
-    int chunkSize = 1000,
-    int overlap = 100,
-  }) {
-    final words = text.split(RegExp(r'\s+'));
-    if (words.length <= chunkSize) return [text];
-
-    final chunks = <String>[];
-    int start = 0;
-    while (start < words.length) {
-      final end = (start + chunkSize).clamp(0, words.length);
-      chunks.add(words.sublist(start, end).join(' '));
-      start += chunkSize - overlap;
-      if (start >= words.length) break;
-    }
-    return chunks;
-  }
-
   /// Estimate database size based on content
   /// This is an approximation based on indexed content
-  Future<double> _estimateDatabaseSize(Session session) async {
-    // Get total content size from file indices
-    final files = await FileIndex.db.find(session);
-
-    int totalBytes = 0;
-    for (final file in files) {
-      totalBytes += file.fileSizeBytes;
-      // Estimate embedding storage (768 dimensions * 4 bytes per float)
-      totalBytes += 768 * 4;
-      // Estimate metadata overhead
-      totalBytes += 500;
-    }
-
-    // Convert to MB
-    return totalBytes / (1024 * 1024);
-  }
-
-  /// Get average embedding generation time from search history
-  Future<double> _getAvgEmbeddingTime(Session session) async {
-    final recentSearches = await SearchHistory.db.find(
-      session,
-      limit: 100,
-      orderBy: (t) => t.searchedAt,
-      orderDescending: true,
-    );
-
-    if (recentSearches.isEmpty) {
-      return 0.0;
-    }
-
-    final totalMs = recentSearches.fold<int>(
-      0,
-      (sum, search) => sum + search.queryTimeMs,
-    );
-
-    return totalMs / recentSearches.length;
-  }
-
-  /// Handle file changes from file watcher (with locking)
-  Future<void> _handleFilesChanged(
-    Session session,
-    List<String> filePaths,
-  ) async {
-    session.log(
-      'Processing ${filePaths.length} changed files',
-      level: LogLevel.info,
-    );
-
-    // Process files in batches of 10
-    const batchSize = 10;
-    for (int i = 0; i < filePaths.length; i += batchSize) {
-      final end = (i + batchSize < filePaths.length)
-          ? i + batchSize
-          : filePaths.length;
-      final batch = filePaths.sublist(i, end);
-      await _processBatch(session, batch);
-    }
-
-    session.log(
-      'Completed processing ${filePaths.length} files',
-      level: LogLevel.info,
-    );
-  }
-
   /// Get top tags by frequency
   Future<List<TagTaxonomy>> getTopTags(
     Session session, {
@@ -2891,9 +1649,8 @@ class ButlerEndpoint extends Endpoint {
   }
 
   /// Generate index health report
-  Future<Map<String, dynamic>> getIndexHealthReport(Session session) async {
-    final report = await IndexHealthService.generateReport(session);
-    return report.toJson();
+  Future<IndexHealthReport> getIndexHealthReport(Session session) async {
+    return await IndexHealthService.generateReport(session);
   }
 
   /// Clean up orphaned files from index
@@ -2947,6 +1704,7 @@ class ButlerEndpoint extends Endpoint {
     String query, {
     String? strategy,
     int? maxResults,
+    SearchFilters? filters,
   }) async* {
     // Security: Validate authentication
     AuthService.requireAuth(session);
@@ -2993,6 +1751,7 @@ class ButlerEndpoint extends Endpoint {
         query,
         strategy: searchStrategy,
         maxResults: effectiveMaxResults,
+        filters: filters,
       );
     } catch (e, stackTrace) {
       session.log(
@@ -3149,28 +1908,127 @@ class ButlerEndpoint extends Endpoint {
       potentialSavingsBytes: potentialSavings,
     );
   }
-}
 
-/// Helper class for batch processing
-class _BatchItem {
-  final String path;
-  final ExtractionResult extraction;
-  final FileIndex? existingIndex;
+  // ==========================================================================
+  // FILE ORGANIZATION ACTIONS
+  // ==========================================================================
 
-  _BatchItem({
-    required this.path,
-    required this.extraction,
-    this.existingIndex,
-  });
-}
+  /// Apply an organization action (resolve duplicates, fix naming, organize similar)
+  ///
+  /// [request] - The organization action request with action type and parameters
+  Future<OrganizationActionResult> applyOrganizationAction(
+    Session session,
+    OrganizationActionRequest request,
+  ) async {
+    // Security: Validate authentication
+    AuthService.requireAuth(session);
 
-/// Result of batch processing
-class _BatchResult {
-  final int indexedCount;
-  final int failedCount;
-  final int skippedCount;
+    session.log(
+      'Applying organization action: ${request.actionType}',
+      level: LogLevel.info,
+    );
 
-  _BatchResult(this.indexedCount, this.failedCount, this.skippedCount);
+    return await _organizationService.applyAction(session, request);
+  }
+
+  /// Apply multiple organization actions as a batch
+  ///
+  /// [request] - The batch organization request with multiple actions
+  Future<BatchOrganizationResult> applyBatchOrganization(
+    Session session,
+    BatchOrganizationRequest request,
+  ) async {
+    // Security: Validate authentication
+    AuthService.requireAuth(session);
+
+    session.log(
+      'Applying batch organization: ${request.actions.length} actions',
+      level: LogLevel.info,
+    );
+
+    return await _organizationService.applyBatch(session, request);
+  }
+
+  /// Resolve duplicate files by keeping one and deleting the rest
+  ///
+  /// Convenience method for duplicate resolution
+  ///
+  /// [contentHash] - Hash identifying the duplicate group
+  /// [keepFilePath] - Path to the file to keep
+  /// [deleteFilePaths] - Paths to duplicate files to delete
+  /// [dryRun] - If true, preview without executing
+  Future<OrganizationActionResult> resolveDuplicates(
+    Session session, {
+    required String contentHash,
+    required String keepFilePath,
+    required List<String> deleteFilePaths,
+    bool dryRun = false,
+  }) async {
+    // Security: Validate authentication
+    AuthService.requireAuth(session);
+
+    final request = OrganizationActionRequest(
+      actionType: 'resolve_duplicates',
+      contentHash: contentHash,
+      keepFilePath: keepFilePath,
+      deleteFilePaths: deleteFilePaths,
+      dryRun: dryRun,
+    );
+
+    return await _organizationService.applyAction(session, request);
+  }
+
+  /// Fix naming issues for multiple files
+  ///
+  /// Convenience method for naming fixes
+  ///
+  /// [renameOldPaths] - List of old file paths
+  /// [renameNewNames] - List of new names (parallel to renameOldPaths)
+  /// [dryRun] - If true, preview without executing
+  Future<OrganizationActionResult> fixNamingIssues(
+    Session session, {
+    required List<String> renameOldPaths,
+    required List<String> renameNewNames,
+    bool dryRun = false,
+  }) async {
+    // Security: Validate authentication
+    AuthService.requireAuth(session);
+
+    final request = OrganizationActionRequest(
+      actionType: 'fix_naming',
+      renameOldPaths: renameOldPaths,
+      renameNewNames: renameNewNames,
+      dryRun: dryRun,
+    );
+
+    return await _organizationService.applyAction(session, request);
+  }
+
+  /// Organize similar files into a target folder
+  ///
+  /// Convenience method for organizing similar content
+  ///
+  /// [filePaths] - Paths to files to organize
+  /// [targetFolder] - Destination folder path
+  /// [dryRun] - If true, preview without executing
+  Future<OrganizationActionResult> organizeSimilarFiles(
+    Session session, {
+    required List<String> filePaths,
+    required String targetFolder,
+    bool dryRun = false,
+  }) async {
+    // Security: Validate authentication
+    AuthService.requireAuth(session);
+
+    final request = OrganizationActionRequest(
+      actionType: 'organize_similar',
+      organizeFilePaths: filePaths,
+      targetFolder: targetFolder,
+      dryRun: dryRun,
+    );
+
+    return await _organizationService.applyAction(session, request);
+  }
 }
 
 /// Helper class for sorting search results by score

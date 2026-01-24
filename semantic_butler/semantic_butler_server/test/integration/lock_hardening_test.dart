@@ -11,7 +11,7 @@ void main() {
             (sessionBuilder as serverpod_test.InternalTestSessionBuilder)
                 .internalBuild(endpoint: 'butler', method: 'startIndexing');
         final session2 =
-            (sessionBuilder as serverpod_test.InternalTestSessionBuilder)
+            (sessionBuilder)
                 .internalBuild(endpoint: 'butler', method: 'startIndexing');
 
         final resourceId = 'hardening_test_resource_1';
@@ -38,7 +38,7 @@ void main() {
             (sessionBuilder as serverpod_test.InternalTestSessionBuilder)
                 .internalBuild(endpoint: 'butler', method: 'startIndexing');
         final session2 =
-            (sessionBuilder as serverpod_test.InternalTestSessionBuilder)
+            (sessionBuilder)
                 .internalBuild(endpoint: 'butler', method: 'startIndexing');
 
         final resourceId = 'hardening_test_resource_timeout';
@@ -77,7 +77,7 @@ void main() {
             (sessionBuilder as serverpod_test.InternalTestSessionBuilder)
                 .internalBuild(endpoint: 'butler', method: 'startIndexing');
         final session2 =
-            (sessionBuilder as serverpod_test.InternalTestSessionBuilder)
+            (sessionBuilder)
                 .internalBuild(endpoint: 'butler', method: 'startIndexing');
 
         final resourceId = 'hardening_test_resource_exception';

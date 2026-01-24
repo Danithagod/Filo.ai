@@ -7,21 +7,22 @@ butler:
   - savePreset:
   - getSavedPresets:
   - deletePreset:
-  - startIndexing:
-  - getIndexingStatus:
-  - getDatabaseStats:
-  - getErrorStats:
   - getSearchHistory:
-  - deleteSearchHistoryItem:
   - clearSearchHistory:
+  - deleteSearchHistoryItem:
   - recordLocalSearch:
-  - getAIUsageStats:
-  - clearIndex:
+  - generateResetConfirmationCode:
+  - previewReset:
+  - resetDatabase:
+  - getIndexingStatus:
   - streamIndexingProgress:
+  - getIndexingJob:
+  - startIndexing:
+  - cancelIndexingJob:
   - enableSmartIndexing:
   - disableSmartIndexing:
-  - getWatchedFolders:
   - toggleSmartIndexing:
+  - getWatchedFolders:
   - addIgnorePattern:
   - removeIgnorePattern:
   - listIgnorePatterns:
@@ -50,6 +51,11 @@ butler:
   - aiSearch:
   - summarizeFile:
   - getOrganizationSuggestions:
+  - applyOrganizationAction:
+  - applyBatchOrganization:
+  - resolveDuplicates:
+  - fixNamingIssues:
+  - organizeSimilarFiles:
 fileSystem:
   - listDirectory:
   - getDrives:

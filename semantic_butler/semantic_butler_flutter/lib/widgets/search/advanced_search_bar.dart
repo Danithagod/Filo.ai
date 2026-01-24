@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:semantic_butler_client/semantic_butler_client.dart';
-import '../../main.dart'; // For client access
+import '../../main.dart'; // For clientProvider
 
-class AdvancedSearchBar extends StatefulWidget {
+class AdvancedSearchBar extends ConsumerStatefulWidget {
   final TextEditingController controller;
   final Function(String) onSearch;
   final Function(String)? onAISearch;
+  final List<Widget>? trailing;
   final String hintText;
 
   const AdvancedSearchBar({
@@ -14,14 +16,15 @@ class AdvancedSearchBar extends StatefulWidget {
     required this.controller,
     required this.onSearch,
     this.onAISearch,
+    this.trailing,
     this.hintText = 'Search recent files, tags, or content...',
   });
 
   @override
-  State<AdvancedSearchBar> createState() => _AdvancedSearchBarState();
+  ConsumerState<AdvancedSearchBar> createState() => _AdvancedSearchBarState();
 }
 
-class _AdvancedSearchBarState extends State<AdvancedSearchBar> {
+class _AdvancedSearchBarState extends ConsumerState<AdvancedSearchBar> {
   final SearchController _searchController = SearchController();
   Timer? _debounceTimer;
   List<SearchSuggestion> _suggestions = [];
@@ -65,7 +68,8 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar> {
     setState(() => _isLoadingSuggestions = true);
 
     try {
-      final suggestions = await client.butler.getSearchSuggestions(
+      final apiClient = ref.read(clientProvider);
+      final suggestions = await apiClient.butler.getSearchSuggestions(
         query,
         limit: 10,
       );
@@ -91,6 +95,7 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
     return SearchAnchor(
       searchController: _searchController,
@@ -99,20 +104,52 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar> {
       builder: (BuildContext context, SearchController controller) {
         return SearchBar(
           controller: controller,
+          elevation: const WidgetStatePropertyAll<double>(0),
+          backgroundColor: WidgetStatePropertyAll<Color>(
+            colorScheme.surfaceContainerHigh.withValues(alpha: 0.8),
+          ),
+          overlayColor: WidgetStatePropertyAll<Color>(
+            colorScheme.onSurface.withValues(alpha: 0.05),
+          ),
           padding: const WidgetStatePropertyAll<EdgeInsets>(
-            EdgeInsets.symmetric(horizontal: 16.0),
+            EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+          ),
+          textStyle: WidgetStatePropertyAll<TextStyle>(
+            textTheme.bodyLarge!.copyWith(fontWeight: FontWeight.w500),
+          ),
+          hintStyle: WidgetStatePropertyAll<TextStyle>(
+            textTheme.bodyLarge!.copyWith(
+              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+            ),
+          ),
+          shape: WidgetStatePropertyAll<OutlinedBorder>(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(32),
+              side: BorderSide(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.2),
+              ),
+            ),
           ),
           onTap: () {
             controller.openView();
           },
           onChanged: _onQueryChanged,
-          leading: const Icon(Icons.search),
+          leading: Icon(
+            Icons.search,
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+          ),
           trailing: [
+            if (widget.trailing != null) ...widget.trailing!,
             if (widget.onAISearch != null)
-              Tooltip(
-                message: 'AI Search',
+              Padding(
+                padding: const EdgeInsets.only(left: 8.0),
                 child: IconButton(
-                  icon: Icon(Icons.auto_awesome, color: colorScheme.primary),
+                  icon: Icon(
+                    Icons.auto_awesome,
+                    color: colorScheme.primary.withValues(alpha: 0.8),
+                    size: 22,
+                  ),
+                  tooltip: 'AI Search',
                   onPressed: () {
                     widget.onAISearch?.call(controller.text);
                   },

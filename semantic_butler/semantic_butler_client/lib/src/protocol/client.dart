@@ -22,34 +22,43 @@ import 'package:semantic_butler_client/src/protocol/search_suggestion.dart'
     as _i8;
 import 'package:semantic_butler_client/src/protocol/saved_search_preset.dart'
     as _i9;
-import 'package:semantic_butler_client/src/protocol/indexing_job.dart' as _i10;
-import 'package:semantic_butler_client/src/protocol/indexing_status.dart'
-    as _i11;
-import 'package:semantic_butler_client/src/protocol/database_stats.dart'
-    as _i12;
-import 'package:semantic_butler_client/src/protocol/error_stats.dart' as _i13;
 import 'package:semantic_butler_client/src/protocol/search_history.dart'
-    as _i14;
+    as _i10;
+import 'package:semantic_butler_client/src/protocol/reset_preview.dart' as _i11;
+import 'package:semantic_butler_client/src/protocol/reset_result.dart' as _i12;
+import 'package:semantic_butler_client/src/protocol/indexing_status.dart'
+    as _i13;
 import 'package:semantic_butler_client/src/protocol/indexing_progress.dart'
-    as _i15;
+    as _i14;
+import 'package:semantic_butler_client/src/protocol/indexing_job.dart' as _i15;
 import 'package:semantic_butler_client/src/protocol/watched_folder.dart'
     as _i16;
 import 'package:semantic_butler_client/src/protocol/ignore_pattern.dart'
     as _i17;
 import 'package:semantic_butler_client/src/protocol/tag_taxonomy.dart' as _i18;
-import 'package:semantic_butler_client/src/protocol/ai_search_progress.dart'
+import 'package:semantic_butler_client/src/protocol/index_health_report.dart'
     as _i19;
-import 'package:semantic_butler_client/src/protocol/organization_suggestions.dart'
+import 'package:semantic_butler_client/src/protocol/ai_search_progress.dart'
     as _i20;
-import 'package:semantic_butler_client/src/protocol/file_system_entry.dart'
+import 'package:semantic_butler_client/src/protocol/organization_suggestions.dart'
     as _i21;
-import 'package:semantic_butler_client/src/protocol/drive_info.dart' as _i22;
-import 'package:semantic_butler_client/src/protocol/file_operation_result.dart'
+import 'package:semantic_butler_client/src/protocol/organization_action_result.dart'
+    as _i22;
+import 'package:semantic_butler_client/src/protocol/organization_action_request.dart'
     as _i23;
-import 'package:semantic_butler_client/src/protocol/health_check.dart' as _i24;
-import 'package:semantic_butler_client/src/protocol/greetings/greeting.dart'
+import 'package:semantic_butler_client/src/protocol/batch_organization_result.dart'
+    as _i24;
+import 'package:semantic_butler_client/src/protocol/batch_organization_request.dart'
     as _i25;
-import 'protocol.dart' as _i26;
+import 'package:semantic_butler_client/src/protocol/file_system_entry.dart'
+    as _i26;
+import 'package:semantic_butler_client/src/protocol/drive_info.dart' as _i27;
+import 'package:semantic_butler_client/src/protocol/file_operation_result.dart'
+    as _i28;
+import 'package:semantic_butler_client/src/protocol/health_check.dart' as _i29;
+import 'package:semantic_butler_client/src/protocol/greetings/greeting.dart'
+    as _i30;
+import 'protocol.dart' as _i31;
 
 /// Agent endpoint for natural language interactions
 ///
@@ -176,71 +185,18 @@ class EndpointButler extends _i1.EndpointRef {
         {'presetId': presetId},
       );
 
-  /// Start indexing documents from specified folder path
-  _i2.Future<_i10.IndexingJob> startIndexing(String folderPath) =>
-      caller.callServerEndpoint<_i10.IndexingJob>(
-        'butler',
-        'startIndexing',
-        {'folderPath': folderPath},
-      );
-
-  /// Get current indexing status
-  _i2.Future<_i11.IndexingStatus> getIndexingStatus() =>
-      caller.callServerEndpoint<_i11.IndexingStatus>(
-        'butler',
-        'getIndexingStatus',
-        {},
-      );
-
-  /// Get database statistics
-  _i2.Future<_i12.DatabaseStats> getDatabaseStats() =>
-      caller.callServerEndpoint<_i12.DatabaseStats>(
-        'butler',
-        'getDatabaseStats',
-        {},
-      );
-
-  /// Get error statistics aggregated by category
-  ///
-  /// [timeRange] - Filter by time: "24h", "7d", "30d", or "all" (default: "all")
-  /// [category] - Filter by specific error category (optional)
-  /// [jobId] - Filter by specific indexing job (optional)
-  _i2.Future<_i13.ErrorStats> getErrorStats({
-    String? timeRange,
-    String? category,
-    int? jobId,
-  }) => caller.callServerEndpoint<_i13.ErrorStats>(
-    'butler',
-    'getErrorStats',
-    {
-      'timeRange': timeRange,
-      'category': category,
-      'jobId': jobId,
-    },
-  );
-
-  /// Get recent search history with pagination support
-  _i2.Future<List<_i14.SearchHistory>> getSearchHistory({
-    required int limit,
-    required int offset,
-    String? searchType,
-  }) => caller.callServerEndpoint<List<_i14.SearchHistory>>(
+  /// Get search history
+  _i2.Future<List<_i10.SearchHistory>> getSearchHistory({
+    int? limit,
+    int? offset,
+  }) => caller.callServerEndpoint<List<_i10.SearchHistory>>(
     'butler',
     'getSearchHistory',
     {
       'limit': limit,
       'offset': offset,
-      'searchType': searchType,
     },
   );
-
-  /// Delete a specific search history item by ID
-  _i2.Future<bool> deleteSearchHistoryItem(int searchId) =>
-      caller.callServerEndpoint<bool>(
-        'butler',
-        'deleteSearchHistoryItem',
-        {'searchId': searchId},
-      );
 
   /// Clear all search history
   _i2.Future<int> clearSearchHistory() => caller.callServerEndpoint<int>(
@@ -249,48 +205,73 @@ class EndpointButler extends _i1.EndpointRef {
     {},
   );
 
-  /// Record a local file search to history
-  ///
-  /// [query] - Search query string
-  /// [directoryPath] - Directory where search was performed
-  /// [resultCount] - Number of results found
+  /// Delete a specific search history item
+  _i2.Future<bool> deleteSearchHistoryItem(int id) =>
+      caller.callServerEndpoint<bool>(
+        'butler',
+        'deleteSearchHistoryItem',
+        {'id': id},
+      );
+
+  /// Record a local file search
   _i2.Future<void> recordLocalSearch(
     String query,
-    String directoryPath,
+    String directory,
     int resultCount,
   ) => caller.callServerEndpoint<void>(
     'butler',
     'recordLocalSearch',
     {
       'query': query,
-      'directoryPath': directoryPath,
+      'directory': directory,
       'resultCount': resultCount,
     },
   );
 
-  /// Get AI usage statistics (cost tracking)
-  _i2.Future<Map<String, dynamic>> getAIUsageStats() =>
-      caller.callServerEndpoint<Map<String, dynamic>>(
+  /// Generate a reset confirmation code
+  _i2.Future<String> generateResetConfirmationCode() =>
+      caller.callServerEndpoint<String>(
         'butler',
-        'getAIUsageStats',
+        'generateResetConfirmationCode',
         {},
       );
 
-  /// Clear all indexed data
-  _i2.Future<void> clearIndex() => caller.callServerEndpoint<void>(
+  /// Preview a database reset
+  _i2.Future<_i11.ResetPreview> previewReset() =>
+      caller.callServerEndpoint<_i11.ResetPreview>(
+        'butler',
+        'previewReset',
+        {},
+      );
+
+  /// Perform a database reset
+  _i2.Future<_i12.ResetResult> resetDatabase({
+    required String scope,
+    required String confirmationCode,
+    required bool dryRun,
+  }) => caller.callServerEndpoint<_i12.ResetResult>(
     'butler',
-    'clearIndex',
-    {},
+    'resetDatabase',
+    {
+      'scope': scope,
+      'confirmationCode': confirmationCode,
+      'dryRun': dryRun,
+    },
   );
 
-  /// Stream real-time indexing progress for a specific job
-  ///
-  /// Yields [IndexingProgress] updates every 500ms while the job is running.
-  /// Automatically completes when the job finishes or fails.
-  _i2.Stream<_i15.IndexingProgress> streamIndexingProgress(int jobId) =>
+  /// Get current indexing status
+  _i2.Future<_i13.IndexingStatus> getIndexingStatus() =>
+      caller.callServerEndpoint<_i13.IndexingStatus>(
+        'butler',
+        'getIndexingStatus',
+        {},
+      );
+
+  /// Stream indexing progress
+  _i2.Stream<_i14.IndexingProgress> streamIndexingProgress(int jobId) =>
       caller.callStreamingServerEndpoint<
-        _i2.Stream<_i15.IndexingProgress>,
-        _i15.IndexingProgress
+        _i2.Stream<_i14.IndexingProgress>,
+        _i14.IndexingProgress
       >(
         'butler',
         'streamIndexingProgress',
@@ -298,7 +279,31 @@ class EndpointButler extends _i1.EndpointRef {
         {},
       );
 
-  /// Enable smart indexing for a folder (starts file watching)
+  /// Get details of a specific indexing job
+  _i2.Future<_i15.IndexingJob?> getIndexingJob(int jobId) =>
+      caller.callServerEndpoint<_i15.IndexingJob?>(
+        'butler',
+        'getIndexingJob',
+        {'jobId': jobId},
+      );
+
+  /// Start indexing documents from specified folder path
+  _i2.Future<_i15.IndexingJob> startIndexing(String folderPath) =>
+      caller.callServerEndpoint<_i15.IndexingJob>(
+        'butler',
+        'startIndexing',
+        {'folderPath': folderPath},
+      );
+
+  /// Cancel a running indexing job
+  _i2.Future<bool> cancelIndexingJob(int jobId) =>
+      caller.callServerEndpoint<bool>(
+        'butler',
+        'cancelIndexingJob',
+        {'jobId': jobId},
+      );
+
+  /// Enable smart indexing for a folder
   _i2.Future<_i16.WatchedFolder> enableSmartIndexing(String folderPath) =>
       caller.callServerEndpoint<_i16.WatchedFolder>(
         'butler',
@@ -306,11 +311,19 @@ class EndpointButler extends _i1.EndpointRef {
         {'folderPath': folderPath},
       );
 
-  /// Disable smart indexing for a folder (stops file watching)
+  /// Disable smart indexing for a folder
   _i2.Future<void> disableSmartIndexing(String folderPath) =>
       caller.callServerEndpoint<void>(
         'butler',
         'disableSmartIndexing',
+        {'folderPath': folderPath},
+      );
+
+  /// Toggle smart indexing for a folder
+  _i2.Future<_i16.WatchedFolder?> toggleSmartIndexing(String folderPath) =>
+      caller.callServerEndpoint<_i16.WatchedFolder?>(
+        'butler',
+        'toggleSmartIndexing',
         {'folderPath': folderPath},
       );
 
@@ -320,14 +333,6 @@ class EndpointButler extends _i1.EndpointRef {
         'butler',
         'getWatchedFolders',
         {},
-      );
-
-  /// Toggle smart indexing for a folder
-  _i2.Future<_i16.WatchedFolder?> toggleSmartIndexing(String folderPath) =>
-      caller.callServerEndpoint<_i16.WatchedFolder?>(
-        'butler',
-        'toggleSmartIndexing',
-        {'folderPath': folderPath},
       );
 
   /// Add an ignore pattern
@@ -394,6 +399,8 @@ class EndpointButler extends _i1.EndpointRef {
         {'paths': paths},
       );
 
+  /// Estimate database size based on content
+  /// This is an approximation based on indexed content
   /// Get top tags by frequency
   _i2.Future<List<_i18.TagTaxonomy>> getTopTags({
     String? category,
@@ -598,8 +605,8 @@ class EndpointButler extends _i1.EndpointRef {
   );
 
   /// Generate index health report
-  _i2.Future<Map<String, dynamic>> getIndexHealthReport() =>
-      caller.callServerEndpoint<Map<String, dynamic>>(
+  _i2.Future<_i19.IndexHealthReport> getIndexHealthReport() =>
+      caller.callServerEndpoint<_i19.IndexHealthReport>(
         'butler',
         'getIndexHealthReport',
         {},
@@ -645,14 +652,15 @@ class EndpointButler extends _i1.EndpointRef {
   /// [maxResults] - Maximum number of results to return
   ///
   /// Returns a stream of [AISearchProgress] events for real-time feedback
-  _i2.Stream<_i19.AISearchProgress> aiSearch(
+  _i2.Stream<_i20.AISearchProgress> aiSearch(
     String query, {
     String? strategy,
     int? maxResults,
+    _i7.SearchFilters? filters,
   }) =>
       caller.callStreamingServerEndpoint<
-        _i2.Stream<_i19.AISearchProgress>,
-        _i19.AISearchProgress
+        _i2.Stream<_i20.AISearchProgress>,
+        _i20.AISearchProgress
       >(
         'butler',
         'aiSearch',
@@ -660,6 +668,7 @@ class EndpointButler extends _i1.EndpointRef {
           'query': query,
           'strategy': strategy,
           'maxResults': maxResults,
+          'filters': filters,
         },
         {},
       );
@@ -683,12 +692,100 @@ class EndpointButler extends _i1.EndpointRef {
   /// and semantically similar documents
   ///
   /// [rootPath] - Optional root path to limit analysis to a specific folder
-  _i2.Future<_i20.OrganizationSuggestions> getOrganizationSuggestions({
+  _i2.Future<_i21.OrganizationSuggestions> getOrganizationSuggestions({
     String? rootPath,
-  }) => caller.callServerEndpoint<_i20.OrganizationSuggestions>(
+  }) => caller.callServerEndpoint<_i21.OrganizationSuggestions>(
     'butler',
     'getOrganizationSuggestions',
     {'rootPath': rootPath},
+  );
+
+  /// Apply an organization action (resolve duplicates, fix naming, organize similar)
+  ///
+  /// [request] - The organization action request with action type and parameters
+  _i2.Future<_i22.OrganizationActionResult> applyOrganizationAction(
+    _i23.OrganizationActionRequest request,
+  ) => caller.callServerEndpoint<_i22.OrganizationActionResult>(
+    'butler',
+    'applyOrganizationAction',
+    {'request': request},
+  );
+
+  /// Apply multiple organization actions as a batch
+  ///
+  /// [request] - The batch organization request with multiple actions
+  _i2.Future<_i24.BatchOrganizationResult> applyBatchOrganization(
+    _i25.BatchOrganizationRequest request,
+  ) => caller.callServerEndpoint<_i24.BatchOrganizationResult>(
+    'butler',
+    'applyBatchOrganization',
+    {'request': request},
+  );
+
+  /// Resolve duplicate files by keeping one and deleting the rest
+  ///
+  /// Convenience method for duplicate resolution
+  ///
+  /// [contentHash] - Hash identifying the duplicate group
+  /// [keepFilePath] - Path to the file to keep
+  /// [deleteFilePaths] - Paths to duplicate files to delete
+  /// [dryRun] - If true, preview without executing
+  _i2.Future<_i22.OrganizationActionResult> resolveDuplicates({
+    required String contentHash,
+    required String keepFilePath,
+    required List<String> deleteFilePaths,
+    required bool dryRun,
+  }) => caller.callServerEndpoint<_i22.OrganizationActionResult>(
+    'butler',
+    'resolveDuplicates',
+    {
+      'contentHash': contentHash,
+      'keepFilePath': keepFilePath,
+      'deleteFilePaths': deleteFilePaths,
+      'dryRun': dryRun,
+    },
+  );
+
+  /// Fix naming issues for multiple files
+  ///
+  /// Convenience method for naming fixes
+  ///
+  /// [renameOldPaths] - List of old file paths
+  /// [renameNewNames] - List of new names (parallel to renameOldPaths)
+  /// [dryRun] - If true, preview without executing
+  _i2.Future<_i22.OrganizationActionResult> fixNamingIssues({
+    required List<String> renameOldPaths,
+    required List<String> renameNewNames,
+    required bool dryRun,
+  }) => caller.callServerEndpoint<_i22.OrganizationActionResult>(
+    'butler',
+    'fixNamingIssues',
+    {
+      'renameOldPaths': renameOldPaths,
+      'renameNewNames': renameNewNames,
+      'dryRun': dryRun,
+    },
+  );
+
+  /// Organize similar files into a target folder
+  ///
+  /// Convenience method for organizing similar content
+  ///
+  /// [filePaths] - Paths to files to organize
+  /// [targetFolder] - Destination folder path
+  /// [dryRun] - If true, preview without executing
+  _i2.Future<_i22.OrganizationActionResult> organizeSimilarFiles({
+    required List<String> filePaths,
+    required String targetFolder,
+    required bool dryRun,
+  }) => caller.callServerEndpoint<_i22.OrganizationActionResult>(
+    'butler',
+    'organizeSimilarFiles',
+    {
+      'filePaths': filePaths,
+      'targetFolder': targetFolder,
+      'dryRun': dryRun,
+    },
   );
 }
 
@@ -701,27 +798,27 @@ class EndpointFileSystem extends _i1.EndpointRef {
   String get name => 'fileSystem';
 
   /// List contents of a directory
-  _i2.Future<List<_i21.FileSystemEntry>> listDirectory(String path) =>
-      caller.callServerEndpoint<List<_i21.FileSystemEntry>>(
+  _i2.Future<List<_i26.FileSystemEntry>> listDirectory(String path) =>
+      caller.callServerEndpoint<List<_i26.FileSystemEntry>>(
         'fileSystem',
         'listDirectory',
         {'path': path},
       );
 
   /// Get available drives on the system
-  _i2.Future<List<_i22.DriveInfo>> getDrives() =>
-      caller.callServerEndpoint<List<_i22.DriveInfo>>(
+  _i2.Future<List<_i27.DriveInfo>> getDrives() =>
+      caller.callServerEndpoint<List<_i27.DriveInfo>>(
         'fileSystem',
         'getDrives',
         {},
       );
 
   /// Rename a file or folder
-  _i2.Future<_i23.FileOperationResult> rename(
+  _i2.Future<_i28.FileOperationResult> rename(
     String path,
     String newName,
     bool isDirectory,
-  ) => caller.callServerEndpoint<_i23.FileOperationResult>(
+  ) => caller.callServerEndpoint<_i28.FileOperationResult>(
     'fileSystem',
     'rename',
     {
@@ -732,10 +829,10 @@ class EndpointFileSystem extends _i1.EndpointRef {
   );
 
   /// Move a file or folder
-  _i2.Future<_i23.FileOperationResult> move(
+  _i2.Future<_i28.FileOperationResult> move(
     String sourcePath,
     String destFolder,
-  ) => caller.callServerEndpoint<_i23.FileOperationResult>(
+  ) => caller.callServerEndpoint<_i28.FileOperationResult>(
     'fileSystem',
     'move',
     {
@@ -745,16 +842,16 @@ class EndpointFileSystem extends _i1.EndpointRef {
   );
 
   /// Delete a file or folder
-  _i2.Future<_i23.FileOperationResult> delete(String path) =>
-      caller.callServerEndpoint<_i23.FileOperationResult>(
+  _i2.Future<_i28.FileOperationResult> delete(String path) =>
+      caller.callServerEndpoint<_i28.FileOperationResult>(
         'fileSystem',
         'delete',
         {'path': path},
       );
 
   /// Create a new folder
-  _i2.Future<_i23.FileOperationResult> createFolder(String path) =>
-      caller.callServerEndpoint<_i23.FileOperationResult>(
+  _i2.Future<_i28.FileOperationResult> createFolder(String path) =>
+      caller.callServerEndpoint<_i28.FileOperationResult>(
         'fileSystem',
         'createFolder',
         {'path': path},
@@ -772,8 +869,8 @@ class EndpointHealth extends _i1.EndpointRef {
 
   /// Check system health
   /// Returns overall status and component-level health metrics
-  _i2.Future<_i24.HealthCheck> check() =>
-      caller.callServerEndpoint<_i24.HealthCheck>(
+  _i2.Future<_i29.HealthCheck> check() =>
+      caller.callServerEndpoint<_i29.HealthCheck>(
         'health',
         'check',
         {},
@@ -790,8 +887,8 @@ class EndpointGreeting extends _i1.EndpointRef {
   String get name => 'greeting';
 
   /// Returns a personalized greeting message: "Hello {name}".
-  _i2.Future<_i25.Greeting> hello(String name) =>
-      caller.callServerEndpoint<_i25.Greeting>(
+  _i2.Future<_i30.Greeting> hello(String name) =>
+      caller.callServerEndpoint<_i30.Greeting>(
         'greeting',
         'hello',
         {'name': name},
@@ -818,7 +915,7 @@ class Client extends _i1.ServerpodClientShared {
     bool? disconnectStreamsOnLostInternetConnection,
   }) : super(
          host,
-         _i26.Protocol(),
+         _i31.Protocol(),
          securityContext: securityContext,
          streamingConnectionTimeout: streamingConnectionTimeout,
          connectionTimeout: connectionTimeout,

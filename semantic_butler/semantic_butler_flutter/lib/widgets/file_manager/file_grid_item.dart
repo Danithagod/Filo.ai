@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:semantic_butler_client/semantic_butler_client.dart';
-import 'package:path/path.dart' as p;
+import '../../utils/file_display_helper.dart';
 
 /// Grid view item for a file or folder
 class FileGridItem extends StatefulWidget {
   final FileSystemEntry entry;
   final VoidCallback onTap;
   final VoidCallback onContextMenu;
+  final bool isHighlighted;
 
   const FileGridItem({
     super.key,
     required this.entry,
     required this.onTap,
     required this.onContextMenu,
+    this.isHighlighted = false,
   });
 
   @override
@@ -43,10 +45,12 @@ class _FileGridItemState extends State<FileGridItem> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
               side: BorderSide(
-                color: _isHovered
-                    ? colorScheme.primary.withValues(alpha: 0.3)
-                    : colorScheme.outlineVariant.withValues(alpha: 0.3),
-                width: _isHovered ? 1.5 : 1,
+                color: widget.isHighlighted
+                    ? colorScheme.primary
+                    : (_isHovered
+                          ? colorScheme.primary.withValues(alpha: 0.3)
+                          : colorScheme.outlineVariant.withValues(alpha: 0.3)),
+                width: widget.isHighlighted ? 2.5 : (_isHovered ? 1.5 : 1),
               ),
             ),
             clipBehavior: Clip.antiAlias,
@@ -72,7 +76,9 @@ class _FileGridItemState extends State<FileGridItem> {
                             child: Icon(
                               widget.entry.isDirectory
                                   ? Icons.folder_rounded
-                                  : _getIconForFile(widget.entry.name),
+                                  : FileDisplayHelper.getIconForFile(
+                                      widget.entry.name,
+                                    ),
                               size: 56,
                               color: widget.entry.isDirectory
                                   ? colorScheme.primary
@@ -102,7 +108,9 @@ class _FileGridItemState extends State<FileGridItem> {
                             Text(
                               widget.entry.isDirectory
                                   ? 'Folder'
-                                  : _formatSize(widget.entry.size),
+                                  : FileDisplayHelper.formatSize(
+                                      widget.entry.size,
+                                    ),
                               style: textTheme.labelSmall?.copyWith(
                                 color: colorScheme.onSurfaceVariant.withValues(
                                   alpha: 0.7,
@@ -164,44 +172,5 @@ class _FileGridItemState extends State<FileGridItem> {
         ),
       ),
     );
-  }
-
-  IconData _getIconForFile(String filename) {
-    final ext = p.extension(filename).toLowerCase();
-    switch (ext) {
-      case '.pdf':
-        return Icons.picture_as_pdf_rounded;
-      case '.doc':
-      case '.docx':
-      case '.txt':
-        return Icons.description_rounded;
-      case '.jpg':
-      case '.jpeg':
-      case '.png':
-      case '.gif':
-        return Icons.image_rounded;
-      case '.mp4':
-      case '.mov':
-      case '.avi':
-        return Icons.video_library_rounded;
-      case '.mp3':
-      case '.wav':
-        return Icons.audiotrack_rounded;
-      case '.zip':
-      case '.rar':
-      case '.7z':
-        return Icons.archive_rounded;
-      default:
-        return Icons.insert_drive_file_rounded;
-    }
-  }
-
-  String _formatSize(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) {
-      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    }
-    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 }

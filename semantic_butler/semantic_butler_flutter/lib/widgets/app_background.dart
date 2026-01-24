@@ -18,7 +18,8 @@ class AppBackground extends StatelessWidget {
 
         // 2. Subtle Vertical Gradient (Bottom to Top)
         Positioned.fill(
-          child: DecoratedBox(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.bottomCenter,
@@ -73,5 +74,6 @@ class _PatternPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _PatternPainter oldDelegate) =>
+      oldDelegate.color != color;
 }

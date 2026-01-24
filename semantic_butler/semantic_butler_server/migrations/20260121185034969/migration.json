@@ -1,0 +1,50 @@
+{
+  "__className__": "serverpod.DatabaseMigration",
+  "actions": [
+    {
+      "__className__": "serverpod.DatabaseMigrationAction",
+      "type": "alterTable",
+      "alterTable": {
+        "__className__": "serverpod.TableMigration",
+        "name": "document_embedding",
+        "schema": "public",
+        "addColumns": [],
+        "deleteColumns": [
+          "embedding"
+        ],
+        "modifyColumns": [],
+        "addIndexes": [],
+        "deleteIndexes": [
+          "idx_document_embedding_hnsw"
+        ],
+        "addForeignKeys": [],
+        "deleteForeignKeys": [],
+        "warnings": [
+          {
+            "__className__": "serverpod.DatabaseMigrationWarning",
+            "type": "columnDropped",
+            "message": "Column \"embedding\" of table \"document_embedding\" will be dropped.",
+            "table": "document_embedding",
+            "columns": [
+              "embedding"
+            ],
+            "destrucive": true
+          }
+        ]
+      }
+    }
+  ],
+  "warnings": [
+    {
+      "__className__": "serverpod.DatabaseMigrationWarning",
+      "type": "columnDropped",
+      "message": "Column \"embedding\" of table \"document_embedding\" will be dropped.",
+      "table": "document_embedding",
+      "columns": [
+        "embedding"
+      ],
+      "destrucive": true
+    }
+  ],
+  "migrationApiVersion": 1
+}

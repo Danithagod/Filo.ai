@@ -1,205 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:semantic_butler_client/semantic_butler_client.dart';
-import '../main.dart';
-import '../utils/app_logger.dart';
+import '../providers/search_history_provider.dart';
 import 'loading_skeletons.dart';
 
 /// Recent searches list widget with Material 3 styling
 /// Includes delete individual items, clear all, and load more functionality
-class RecentSearches extends StatefulWidget {
+class RecentSearches extends ConsumerWidget {
   final Function(String) onSearchTap;
 
   const RecentSearches({
     super.key,
     required this.onSearchTap,
   });
-
-  @override
-  State<RecentSearches> createState() => _RecentSearchesState();
-}
-
-class _RecentSearchesState extends State<RecentSearches> {
-  List<SearchHistory> _searches = [];
-  bool _isLoading = true;
-  bool _isLoadingMore = false;
-  bool _hasMore = true;
-  String? _loadError;
-  int _currentLimit = 10;
-  static const int _pageSize = 10;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSearchHistory();
-  }
-
-  Future<void> _loadSearchHistory({bool loadMore = false}) async {
-    if (loadMore) {
-      if (_isLoadingMore || !_hasMore) return;
-      setState(() => _isLoadingMore = true);
-    } else {
-      setState(() {
-        _isLoading = true;
-        _loadError = null;
-        _currentLimit = _pageSize;
-      });
-    }
-
-    AppLogger.debug(
-      'Loading search history (limit: $_currentLimit, loadMore: $loadMore)',
-      tag: 'RecentSearches',
-    );
-
-    try {
-      final history = await client.butler.getSearchHistory(
-        limit: _pageSize, // Always fetch page size
-        offset: loadMore
-            ? _currentLimit - _pageSize
-            : 0, // Offset based on current position
-      );
-      AppLogger.debug(
-        'Loaded ${history.length} search history items',
-        tag: 'RecentSearches',
-      );
-
-      if (!mounted) return;
-
-      setState(() {
-        _searches = history.where((h) => h.query.isNotEmpty).toList();
-        _hasMore = history.length >= _currentLimit;
-        _isLoading = false;
-        _isLoadingMore = false;
-        _loadError = null;
-      });
-    } catch (e, stackTrace) {
-      AppLogger.error(
-        'Failed to load search history',
-        tag: 'RecentSearches',
-        error: e,
-        stackTrace: stackTrace,
-      );
-      if (!mounted) return;
-      setState(() {
-        if (!loadMore) {
-          _searches = [];
-        }
-        _isLoading = false;
-        _isLoadingMore = false;
-        _loadError = e.toString();
-      });
-    }
-  }
-
-  Future<void> _loadMore() async {
-    if (_isLoadingMore || !_hasMore) return;
-    _currentLimit += _pageSize;
-    await _loadSearchHistory(loadMore: true);
-  }
-
-  Future<void> _deleteItem(SearchHistory item) async {
-    final index = _searches.indexWhere((s) => s.id == item.id);
-    if (index == -1) return;
-
-    setState(() {
-      _searches.removeAt(index);
-    });
-
-    // Call backend to delete the item
-    try {
-      await client.butler.deleteSearchHistoryItem(item.id!);
-      AppLogger.info(
-        'Deleted search item: ${item.query}',
-        tag: 'RecentSearches',
-      );
-    } catch (e) {
-      AppLogger.warning(
-        'Failed to delete search item: $e',
-        tag: 'RecentSearches',
-      );
-      // Re-add to local state if backend delete failed
-      setState(() {
-        _searches.insert(index, item);
-      });
-    }
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Removed "${item.query}"'),
-          duration: const Duration(seconds: 1),
-        ),
-      );
-    }
-  }
-
-  Future<void> _clearAllHistory() async {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: Icon(Icons.delete_forever, color: colorScheme.error, size: 48),
-        title: const Text('Clear All History?'),
-        content: const Text(
-          'This will permanently delete all your search history. This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: colorScheme.error,
-            ),
-            child: const Text('Clear All'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !mounted) return;
-
-    // Keep backup for restoration
-    final backup = List<SearchHistory>.from(_searches);
-
-    setState(() {
-      _searches = [];
-    });
-
-    try {
-      final deletedCount = await client.butler.clearSearchHistory();
-      AppLogger.info(
-        'Cleared $deletedCount search history items',
-        tag: 'RecentSearches',
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Cleared ${backup.length} search history items'),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      AppLogger.error(
-        'Failed to clear search history: $e',
-        tag: 'RecentSearches',
-      );
-      if (mounted) {
-        setState(() {
-          _searches = backup;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Clear failed: $e'),
-            backgroundColor: colorScheme.error,
-          ),
-        );
-      }
-    }
-  }
 
   String _formatTime(DateTime time) {
     final now = DateTime.now();
@@ -213,16 +26,17 @@ class _RecentSearchesState extends State<RecentSearches> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final historyState = ref.watch(searchHistoryProvider);
 
-    if (_isLoading) {
+    if (historyState.isLoading) {
       return const RecentSearchesSkeleton(itemCount: 3);
     }
 
     // Show error state with retry button
-    if (_loadError != null && _searches.isEmpty) {
+    if (historyState.error != null && historyState.searches.isEmpty) {
       return Card(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -243,7 +57,7 @@ class _RecentSearchesState extends State<RecentSearches> {
               ),
               const SizedBox(height: 8),
               Text(
-                _loadError!,
+                historyState.error!,
                 style: textTheme.bodySmall?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
@@ -253,7 +67,7 @@ class _RecentSearchesState extends State<RecentSearches> {
               ),
               const SizedBox(height: 16),
               FilledButton.tonal(
-                onPressed: _loadSearchHistory,
+                onPressed: () => ref.read(searchHistoryProvider.notifier).refresh(),
                 child: const Text('Retry'),
               ),
             ],
@@ -262,7 +76,7 @@ class _RecentSearchesState extends State<RecentSearches> {
       );
     }
 
-    if (_searches.isEmpty) {
+    if (historyState.searches.isEmpty) {
       return Card(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -314,7 +128,7 @@ class _RecentSearchesState extends State<RecentSearches> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      '${_searches.length}',
+                      '${historyState.searches.length}',
                       style: textTheme.labelSmall?.copyWith(
                         color: colorScheme.onSecondaryContainer,
                         fontWeight: FontWeight.bold,
@@ -328,13 +142,13 @@ class _RecentSearchesState extends State<RecentSearches> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.refresh, size: 18),
-                    onPressed: _loadSearchHistory,
+                    onPressed: () => ref.read(searchHistoryProvider.notifier).refresh(),
                     visualDensity: VisualDensity.compact,
                     tooltip: 'Refresh history',
                   ),
-                  if (_searches.isNotEmpty)
+                  if (historyState.searches.isNotEmpty)
                     TextButton(
-                      onPressed: _clearAllHistory,
+                      onPressed: () => _showClearAllDialog(context, ref),
                       style: TextButton.styleFrom(
                         foregroundColor: colorScheme.error,
                         visualDensity: VisualDensity.compact,
@@ -348,28 +162,29 @@ class _RecentSearchesState extends State<RecentSearches> {
         ),
 
         // Search history list
-        ..._searches.map(
+        ...historyState.searches.map(
           (search) => _SearchHistoryTile(
             item: search,
             time: _formatTime(search.searchedAt),
-            onTap: () => widget.onSearchTap(search.query),
-            onDelete: () => _deleteItem(search),
+            onTap: () => onSearchTap(search.query),
+            onDelete: () => _deleteItem(context, ref, search),
           ),
         ),
 
         // Load more button
-        if (_hasMore)
+        if (historyState.hasMore)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Center(
-              child: _isLoadingMore
+              child: historyState.isLoadingMore
                   ? const SizedBox(
                       width: 24,
                       height: 24,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : TextButton.icon(
-                      onPressed: _loadMore,
+                      onPressed: () =>
+                          ref.read(searchHistoryProvider.notifier).loadHistory(loadMore: true),
                       icon: const Icon(Icons.expand_more, size: 18),
                       label: const Text('Show More'),
                     ),
@@ -377,6 +192,80 @@ class _RecentSearchesState extends State<RecentSearches> {
           ),
       ],
     );
+  }
+
+  Future<void> _showClearAllDialog(BuildContext context, WidgetRef ref) async {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: Icon(Icons.delete_forever, color: colorScheme.error, size: 48),
+        title: const Text('Clear All History?'),
+        content: const Text(
+          'This will permanently delete all your search history. This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: colorScheme.error,
+            ),
+            child: const Text('Clear All'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      try {
+        await ref.read(searchHistoryProvider.notifier).clearAll();
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Search history cleared'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Clear failed: $e'),
+              backgroundColor: colorScheme.error,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _deleteItem(BuildContext context, WidgetRef ref, SearchHistory item) async {
+    try {
+      await ref.read(searchHistoryProvider.notifier).deleteItem(item);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Removed "${item.query}"'),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
   }
 }
 

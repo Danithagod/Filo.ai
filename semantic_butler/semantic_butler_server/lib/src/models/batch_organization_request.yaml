@@ -1,0 +1,9 @@
+### Request for multiple organization actions at once
+class: BatchOrganizationRequest
+fields:
+  ### List of actions to perform
+  actions: List<OrganizationActionRequest>
+  ### If true, stop on first error and rollback
+  rollbackOnError: bool?
+  ### If true, preview all changes without executing
+  dryRun: bool?

@@ -24,3 +24,5 @@ fields:
   mimeType: String?
   ### Tags from index (if available)
   tags: List<String>?
+  ### Date indexed or found (if available)
+  indexedAt: DateTime?

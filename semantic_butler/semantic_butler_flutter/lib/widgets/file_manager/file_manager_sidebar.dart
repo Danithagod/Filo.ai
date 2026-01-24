@@ -208,12 +208,15 @@ class FileManagerSidebar extends StatelessWidget {
         );
 
         return Semantics(
-          label: 'Drive ${drive.name}, ${isSelected ? 'selected' : 'not selected'}',
+          label:
+              'Drive ${drive.name}, ${isSelected ? 'selected' : 'not selected'}',
           button: true,
           selected: isSelected,
           onTapHint: 'Navigate to ${drive.name}',
           child: Material(
-            color: isSelected ? colorScheme.primaryContainer : Colors.transparent,
+            color: isSelected
+                ? colorScheme.primaryContainer
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
@@ -269,7 +272,8 @@ class FileManagerSidebar extends StatelessWidget {
   String _getFriendlyErrorMessage(String error) {
     final lowerError = error.toLowerCase();
 
-    if (lowerError.contains('permission') || lowerError.contains('access denied')) {
+    if (lowerError.contains('permission') ||
+        lowerError.contains('access denied')) {
       return 'Permission denied. Check file access permissions.';
     }
     if (lowerError.contains('network') || lowerError.contains('connection')) {

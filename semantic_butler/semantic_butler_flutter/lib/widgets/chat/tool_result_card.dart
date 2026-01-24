@@ -45,9 +45,7 @@ class ToolResultCard extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: ExpansionTile(
-          shape: const RoundedRectangleBorder(side: BorderSide.none),
-          collapsedShape: const RoundedRectangleBorder(side: BorderSide.none),
-          visualDensity: VisualDensity.compact,
+          clipBehavior: Clip.none,
           leading: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
@@ -100,11 +98,14 @@ class ToolResultCard extends StatelessWidget {
                         color: Colors.white70,
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        'Technical Output (${result.tool})',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: Colors.white70,
-                          fontWeight: FontWeight.bold,
+                      Flexible(
+                        child: Text(
+                          'Technical Output (${result.tool})',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: Colors.white70,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const Spacer(),
@@ -140,7 +141,10 @@ class ToolResultCard extends StatelessWidget {
     return '$hour:$minute';
   }
 
-  static String _getFriendlyToolDescription(String toolName, {bool success = true}) {
+  static String _getFriendlyToolDescription(
+    String toolName, {
+    bool success = true,
+  }) {
     if (!success) {
       switch (toolName) {
         case 'search_files':

@@ -35,19 +35,28 @@ class NavigationState {
   /// Context for chat navigation (if navigating to chat with file context)
   final ChatNavigationContext? chatContext;
 
+  /// Path to a file or directory to highlight/navigate to in file manager
+  final String? fileTargetPath;
+
   NavigationState({
     this.selectedIndex = 0,
     this.chatContext,
+    this.fileTargetPath,
   });
 
   NavigationState copyWith({
     int? selectedIndex,
     ChatNavigationContext? chatContext,
+    String? fileTargetPath,
     bool clearChatContext = false,
+    bool clearFileTarget = false,
   }) {
     return NavigationState(
       selectedIndex: selectedIndex ?? this.selectedIndex,
       chatContext: clearChatContext ? null : (chatContext ?? this.chatContext),
+      fileTargetPath: clearFileTarget
+          ? null
+          : (fileTargetPath ?? this.fileTargetPath),
     );
   }
 }
@@ -61,7 +70,11 @@ class NavigationNotifier extends Notifier<NavigationState> {
 
   /// Navigate to a specific tab
   void navigateTo(int index) {
-    state = state.copyWith(selectedIndex: index, clearChatContext: true);
+    state = state.copyWith(
+      selectedIndex: index,
+      clearChatContext: true,
+      clearFileTarget: true,
+    );
   }
 
   /// Navigate to chat with file context
@@ -72,9 +85,22 @@ class NavigationNotifier extends Notifier<NavigationState> {
     );
   }
 
+  /// Navigate to files tab and target a specific path
+  void navigateToFilesWithTarget(String path) {
+    state = NavigationState(
+      selectedIndex: NavigationIndex.files,
+      fileTargetPath: path,
+    );
+  }
+
   /// Clear chat context after it's been consumed
   void clearChatContext() {
     state = state.copyWith(clearChatContext: true);
+  }
+
+  /// Clear file target after it's been consumed
+  void clearFileTarget() {
+    state = state.copyWith(clearFileTarget: true);
   }
 }
 

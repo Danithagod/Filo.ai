@@ -17,7 +17,23 @@
       "Bash(npm test:*)",
       "Bash(npm run lint)",
       "Bash(dart compile exe:*)",
-      "Bash(flutter build:*)"
+      "Bash(flutter build:*)",
+      "Bash(tree:*)",
+      "Bash(flutter pub:*)",
+      "Bash(grep:*)",
+      "Bash(sort:*)",
+      "Bash(ls:*)",
+      "Bash(dart:*)",
+      "Bash(flutter clean:*)",
+      "Bash(exit:*)",
+      "Bash(findstr:*)",
+      "Bash(powershell:*)",
+      "Bash(flutter run:*)",
+      "Bash(curl:*)",
+      "Bash(start:*)",
+      "WebSearch",
+      "Bash(flutter doctor:*)",
+      "Bash(claude mcp list:*)"
     ]
   },
   "outputStyle": "default"

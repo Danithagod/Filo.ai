@@ -3,49 +3,56 @@ import 'package:semantic_butler_client/semantic_butler_client.dart';
 import '../main.dart';
 import '../utils/app_logger.dart';
 
-/// Provider for the list of watched folders
+/// Provider for the list of watched folders using AsyncNotifier
 final watchedFoldersProvider =
-    NotifierProvider<WatchedFoldersNotifier, List<WatchedFolder>>(
+    AsyncNotifierProvider<WatchedFoldersNotifier, List<WatchedFolder>>(
       WatchedFoldersNotifier.new,
     );
 
-class WatchedFoldersNotifier extends Notifier<List<WatchedFolder>> {
-  bool _isLoading = false;
-  String? _error;
-
-  bool get isLoading => _isLoading;
-  String? get error => _error;
-
+class WatchedFoldersNotifier extends AsyncNotifier<List<WatchedFolder>> {
   @override
-  List<WatchedFolder> build() {
-    // Initial load
-    Future(() => load());
-    return [];
-  }
-
-  Future<void> load() async {
-    if (_isLoading) return;
-    _isLoading = true;
-    _error = null; // Clear previous error
-
+  Future<List<WatchedFolder>> build() async {
+    final apiClient = ref.read(clientProvider);
     try {
-      final folders = await client.butler.getWatchedFolders();
-      state = folders;
+      return await apiClient.butler.getWatchedFolders();
     } catch (e) {
-      _error = e.toString();
       AppLogger.error('Failed to load watched folders: $e', tag: 'Provider');
-    } finally {
-      _isLoading = false;
+      rethrow;
     }
   }
 
+  /// Refresh the watched folders list
+  Future<void> refresh() async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      final apiClient = ref.read(clientProvider);
+      return await apiClient.butler.getWatchedFolders();
+    });
+  }
+
+  /// Toggle smart indexing for a folder path
   Future<void> toggle(String path) async {
+    final apiClient = ref.read(clientProvider);
     try {
-      await client.butler.toggleSmartIndexing(path);
-      await load(); // Reload after toggle
+      await apiClient.butler.toggleSmartIndexing(path);
+      // Invalidate to trigger a refresh
+      ref.invalidateSelf();
     } catch (e) {
       AppLogger.error('Failed to toggle watched folder: $e', tag: 'Provider');
       rethrow;
     }
   }
 }
+
+/// Check if a specific folder is being smart-watched
+/// Use this in widgets to avoid rebuilding when other folders change
+///
+/// Example usage in CompactIndexCard:
+/// ```dart
+/// final isSmartIndexing = ref.watch(isFolderSmartlyWatchedProvider(job.folderPath));
+/// ```
+final isFolderSmartlyWatchedProvider = Provider.family<bool, String>((ref, path) {
+  final watchedFoldersAsync = ref.watch(watchedFoldersProvider);
+  final watchedFolders = watchedFoldersAsync.value ?? [];
+  return watchedFolders.any((f) => f.path == path && f.isEnabled);
+});

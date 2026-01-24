@@ -1,0 +1,21 @@
+### Request model for organization actions
+class: OrganizationActionRequest
+fields:
+  ### Type of action: resolve_duplicates, fix_naming, organize_similar
+  actionType: String
+  ### Content hash for duplicate resolution (keeps newest, deletes others)
+  contentHash: String?
+  ### File to keep when resolving duplicates (path)
+  keepFilePath: String?
+  ### Files to delete when resolving duplicates (paths)
+  deleteFilePaths: List<String>?
+  ### For naming fixes: list of old paths
+  renameOldPaths: List<String>?
+  ### For naming fixes: list of new names (parallel to renameOldPaths)
+  renameNewNames: List<String>?
+  ### For similar content: paths of files to organize together
+  organizeFilePaths: List<String>?
+  ### Target folder for organizing similar files
+  targetFolder: String?
+  ### If true, preview changes without executing
+  dryRun: bool?

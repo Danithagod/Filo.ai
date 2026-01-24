@@ -1,0 +1,14 @@
+### Represents the result of a database reset operation.
+### This is a non-persisted DTO (no table) used for API responses.
+class: ResetResult
+fields:
+  ### Whether the reset completed successfully
+  success: bool
+  ### Map of table name to rows deleted
+  affectedRows: Map<String, int>
+  ### Duration of the reset operation in milliseconds
+  durationMs: int
+  ### Scope of reset: 'dataOnly' or 'full'
+  scope: String
+  ### Error message if the reset failed
+  errorMessage: String?

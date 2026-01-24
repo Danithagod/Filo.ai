@@ -170,6 +170,7 @@ Strategy types:
     String query, {
     SearchStrategy strategy = SearchStrategy.hybrid,
     int maxResults = 20,
+    SearchFilters? filters,
   }) async* {
     // Step 1: Parse query intent
     yield AISearchProgress(
@@ -203,7 +204,13 @@ Strategy types:
       );
 
       try {
-        final semanticResults = await _searchIndex(session, query, maxResults);
+        final semanticResults = await _searchIndex(
+          session,
+          query,
+          maxResults,
+          threshold: 0.3,
+          filters: filters,
+        );
         allResults.addAll(semanticResults);
 
         if (semanticResults.isNotEmpty) {
@@ -231,6 +238,17 @@ Strategy types:
         maxResults,
         startProgress: allResults.isEmpty ? 0.2 : 0.5,
       );
+
+      // Proactive Step: If still few results, use AI to suggest targeted search locations/patterns
+      if (allResults.length < 5) {
+        yield* _executeProactiveDiscovery(
+          session,
+          query,
+          intent,
+          allResults,
+          maxResults,
+        );
+      }
     }
 
     // Step 3: Aggregate and rank results
@@ -295,10 +313,15 @@ Strategy types:
       );
 
       try {
-        // Try each search term
-        for (final term in intent.searchTerms) {
+        // Try search terms and file patterns
+        final patternsToTry = <String>{
+          ...intent.searchTerms,
+          ...intent.filePatterns,
+        };
+
+        for (final pattern in patternsToTry) {
           final results = await _terminal.deepSearch(
-            term,
+            pattern,
             directory: drive.path,
             foldersOnly: intent.isFolderSearch,
           );
@@ -311,14 +334,16 @@ Strategy types:
 
             for (final path in files) {
               if (!existingResults.any((r) => r.path == path)) {
+                final fileName = path.split(RegExp(r'[/\\]')).last;
                 existingResults.add(
                   AISearchResult(
                     path: path,
-                    fileName: path.split(RegExp(r'[/\\]')).last,
+                    fileName: fileName,
                     isDirectory: intent.isFolderSearch,
                     source: 'terminal',
                     foundVia: 'deep_search',
-                    matchReason: 'Matched pattern "$term"',
+                    matchReason:
+                        'Matched pattern "$pattern" on drive ${drive.path}',
                   ),
                 );
               }
@@ -328,7 +353,7 @@ Strategy types:
               yield AISearchProgress(
                 type: 'found',
                 message:
-                    'Found ${files.length} matches in ${drive.description.isNotEmpty ? drive.description : drive.path}',
+                    'Found ${files.length} matches for "$pattern" in ${drive.description.isNotEmpty ? drive.description : drive.path}',
                 source: 'terminal',
                 drive: drive.path,
                 results: existingResults,
@@ -358,27 +383,277 @@ Strategy types:
     }
   }
 
+  /// Use AI to suggest targeted terminal commands for difficult-to-find files
+  Stream<AISearchProgress> _executeProactiveDiscovery(
+    Session session,
+    String query,
+    SearchIntent intent,
+    List<AISearchResult> currentResults,
+    int maxResults,
+  ) async* {
+    yield AISearchProgress(
+      type: 'thinking',
+      message:
+          'Initial search yielded few results. Thinking of other places to look...',
+      progress: 0.85,
+    );
+
+    final messages = <ChatMessage>[
+      ChatMessage.system('''
+You are a file discovery expert. The initial search for "$query" didn't find much.
+Suggest exactly 3 targeted PowerShell search patterns or locations that might contain what the user wants.
+Focus on common Windows paths if not specified, or patterns related to the topic.
+
+Respond with JSON only:
+{
+  "suggestions": [
+    {"pattern": "*pattern*", "reason": "why", "path": "specific path or null"},
+    ...
+  ]
+}
+'''),
+      ChatMessage.user(query),
+    ];
+
+    try {
+      final response = await _client.chatCompletion(
+        model: AIModels.chatGeminiFlash,
+        messages: messages,
+        temperature: 0.4,
+      );
+
+      final parsed = _parseJson(response.content.trim());
+      final suggestions = parsed['suggestions'] as List? ?? [];
+
+      for (final suggestion in suggestions) {
+        final pattern = suggestion['pattern'] as String?;
+        final path = suggestion['path'] as String?;
+        if (pattern == null) continue;
+
+        yield AISearchProgress(
+          type: 'searching',
+          message: 'Trying deeper match: $pattern...',
+          source: 'terminal',
+          progress: 0.9,
+        );
+
+        final results = await _terminal.deepSearch(
+          pattern,
+          directory: path, // Will use default if null
+        );
+
+        if (results.success) {
+          final files = results.stdout
+              .split('\n')
+              .where((l) => l.trim().isNotEmpty)
+              .toList();
+
+          for (final fPath in files) {
+            if (!currentResults.any((r) => r.path == fPath)) {
+              currentResults.add(
+                AISearchResult(
+                  path: fPath,
+                  fileName: fPath.split(RegExp(r'[/\\]')).last,
+                  isDirectory: false,
+                  source: 'terminal',
+                  foundVia: 'proactive_discovery',
+                  matchReason:
+                      'Found via AI suggestion: ${suggestion['reason']}',
+                ),
+              );
+            }
+          }
+        }
+      }
+    } catch (e) {
+      session.log('Proactive discovery failed: $e', level: LogLevel.debug);
+    }
+  }
+
   // ==========================================================================
   // INDEX SEARCH
   // ==========================================================================
 
-  /// Search the semantic index
+  /// Search the semantic index using vector similarity
   Future<List<AISearchResult>> _searchIndex(
     Session session,
     String query,
-    int limit,
-  ) async {
-    // Import and use the ButlerEndpoint for semantic search
-    // This is a simplified version - in practice, you'd inject this dependency
+    int limit, {
+    double threshold = 0.3,
+    SearchFilters? filters,
+  }) async {
     final results = <AISearchResult>[];
 
-    // Query the file_index table with vector similarity
-    // For now, we'll do a simple text search as a placeholder
+    try {
+      // 1. Generate embedding for the query
+      final embeddingResponse = await _client.createEmbeddings(
+        model: AIModels.embeddingGemini,
+        input: [query],
+      );
+      final queryEmbedding = embeddingResponse.firstEmbedding;
+      final queryEmbeddingJson = jsonEncode(queryEmbedding);
+
+      // 2. Perform vector search using pgvector
+      // Build dynamic WHERE clause for filters
+      final whereConditions = <String>[
+        '1 - (dvs.embedding_vector <=> \$1::vector) > \$2',
+      ];
+      final parameters = <dynamic>[queryEmbeddingJson, threshold];
+      int paramIndex = 3;
+
+      if (filters != null) {
+        // Date Range
+        if (filters.dateFrom != null) {
+          whereConditions.add('fi."indexedAt" >= \$$paramIndex');
+          parameters.add(filters.dateFrom);
+          paramIndex++;
+        }
+        if (filters.dateTo != null) {
+          whereConditions.add('fi."indexedAt" <= \$$paramIndex');
+          parameters.add(filters.dateTo);
+          paramIndex++;
+        }
+
+        // File Size
+        if (filters.minSize != null) {
+          whereConditions.add('fi."fileSizeBytes" >= \$$paramIndex');
+          parameters.add(filters.minSize);
+          paramIndex++;
+        }
+        if (filters.maxSize != null) {
+          whereConditions.add('fi."fileSizeBytes" <= \$$paramIndex');
+          parameters.add(filters.maxSize);
+          paramIndex++;
+        }
+
+        // File Types
+        if (filters.fileTypes != null && filters.fileTypes!.isNotEmpty) {
+          final typeConditions = <String>[];
+          for (final type in filters.fileTypes!) {
+            if (type == 'pdf') {
+              typeConditions.add('fi."mimeType" ILIKE \$$paramIndex');
+              parameters.add('%pdf%');
+              paramIndex++;
+            } else if (type == 'image') {
+              typeConditions.add('fi."mimeType" ILIKE \$$paramIndex');
+              parameters.add('image/%');
+              paramIndex++;
+            } else if (type == 'doc') {
+              typeConditions.add(
+                '(fi."mimeType" ILIKE \$$paramIndex OR fi."fileName" ILIKE \$$paramIndex)',
+              );
+              parameters.add('%word%');
+              paramIndex++;
+            } else {
+              typeConditions.add('fi."fileName" ILIKE \$$paramIndex');
+              parameters.add('%.$type%');
+              paramIndex++;
+            }
+          }
+          if (typeConditions.isNotEmpty) {
+            whereConditions.add('(${typeConditions.join(" OR ")})');
+          }
+        }
+
+        // Tags
+        if (filters.tags != null && filters.tags!.isNotEmpty) {
+          for (final tag in filters.tags!) {
+            whereConditions.add('fi."tagsJson" ILIKE \$$paramIndex');
+            parameters.add('%"$tag"%');
+            paramIndex++;
+          }
+        }
+      }
+
+      final limitParamIndex = paramIndex;
+      parameters.add(limit);
+
+      final searchQuery =
+          '''
+        SELECT
+          de."fileIndexId",
+          1 - (dvs.embedding_vector <=> \$1::vector) as similarity,
+          fi.id, fi.path, fi."fileName", fi."contentPreview",
+          fi."tagsJson", fi."indexedAt", fi."fileSizeBytes", fi."mimeType"
+        FROM document_embedding de
+        JOIN document_vector_store dvs ON de.id = dvs.id
+        JOIN file_index fi ON de."fileIndexId" = fi.id
+        WHERE ${whereConditions.join(" AND ")}
+        ORDER BY dvs.embedding_vector <=> \$1::vector
+        LIMIT \$$limitParamIndex
+      ''';
+
+      final rows = await session.db.unsafeQuery(
+        searchQuery,
+        parameters: QueryParameters.positional(parameters),
+      );
+
+      for (final row in rows) {
+        final similarity = row[1] as double;
+        results.add(
+          AISearchResult(
+            path: row[3] as String,
+            fileName: row[4] as String,
+            isDirectory: false,
+            source: 'index',
+            relevanceScore: similarity,
+            contentPreview: row[5] as String?,
+            foundVia: 'semantic',
+            matchReason:
+                'Highly relevant semantic match (${(similarity * 100).toStringAsFixed(0)}%)',
+            fileSizeBytes: (row[8] as int?) ?? 0,
+            mimeType: row[9] as String?,
+            tags: _parseTags(row[6] as String?),
+            indexedAt: row[7] as DateTime?,
+          ),
+        );
+      }
+    } catch (e) {
+      session.log(
+        'pgvector search failed in AISearchService: $e',
+        level: LogLevel.warning,
+      );
+      // Fallback to text search if pgvector/embeddings fail
+      return _fallbackSearch(session, query, limit, filters);
+    }
+
+    return results;
+  }
+
+  /// Fallback search using basic keyword matching
+  Future<List<AISearchResult>> _fallbackSearch(
+    Session session,
+    String query,
+    int limit,
+    SearchFilters? filters,
+  ) async {
+    final results = <AISearchResult>[];
+
     final indexed = await FileIndex.db.find(
       session,
-      where: (t) =>
-          t.fileName.ilike('%${query.replaceAll(' ', '%')}%') |
-          t.contentPreview.ilike('%${query.replaceAll(' ', '%')}%'),
+      where: (t) {
+        var condition =
+            t.fileName.ilike('%${query.replaceAll(' ', '%')}%') |
+            t.contentPreview.ilike('%${query.replaceAll(' ', '%')}%');
+
+        if (filters != null) {
+          if (filters.dateFrom != null) {
+            condition &= (t.indexedAt >= filters.dateFrom!);
+          }
+          if (filters.dateTo != null) {
+            condition &= (t.indexedAt <= filters.dateTo!);
+          }
+          if (filters.minSize != null) {
+            condition &= (t.fileSizeBytes >= filters.minSize!);
+          }
+          if (filters.maxSize != null) {
+            condition &= (t.fileSizeBytes <= filters.maxSize!);
+          }
+          // Tags and types are harder with the basic 'where' builder on strings without more logic
+          // but we'll stick to basic implementation for fallback
+        }
+        return condition;
+      },
       limit: limit,
     );
 
@@ -389,23 +664,31 @@ Strategy types:
           fileName: doc.fileName,
           isDirectory: false,
           source: 'index',
-          relevanceScore: 0.8, // Placeholder score
+          relevanceScore: 0.5,
           contentPreview: doc.contentPreview,
-          foundVia: 'semantic',
-          matchReason: 'Matched in index',
+          foundVia: 'keyword_fallback',
+          matchReason: 'Matched keyword search',
           fileSizeBytes: doc.fileSizeBytes,
           mimeType: doc.mimeType,
-          tags: doc.tagsJson != null
-              ? (doc.tagsJson as String)
-                    .split(',')
-                    .where((t) => t.isNotEmpty)
-                    .toList()
-              : null,
+          tags: _parseTags(doc.tagsJson),
+          indexedAt: doc.indexedAt,
         ),
       );
     }
-
     return results;
+  }
+
+  List<String> _parseTags(String? tagsJson) {
+    if (tagsJson == null || tagsJson.isEmpty) return [];
+    try {
+      // It might be a comma-separated string or a JSON array
+      if (tagsJson.startsWith('[')) {
+        return List<String>.from(jsonDecode(tagsJson) as List);
+      }
+      return tagsJson.split(',').where((t) => t.isNotEmpty).toList();
+    } catch (_) {
+      return tagsJson.split(',').where((t) => t.isNotEmpty).toList();
+    }
   }
 
   // ==========================================================================
@@ -449,22 +732,45 @@ Strategy types:
   double _scoreResult(AISearchResult result, Iterable<String> queryTerms) {
     var score = 0.0;
 
-    // Base score from relevance if available
-    score += result.relevanceScore ?? 0.5;
+    // 1. Base score from relevance (if available from semantic search)
+    // Semantic relevance is usually 0.0-1.0
+    score += (result.relevanceScore ?? 0.3) * 1.5;
 
-    // Bonus for being in both sources
-    if (result.source == 'both') {
-      score += 0.3;
+    // 2. Source Weighting
+    if (result.source == 'index') {
+      score += 0.2; // Prefer indexed (likely more relevant/processed)
+    } else if (result.source == 'terminal') {
+      score += 0.1;
     }
 
-    // Bonus for exact name matches
+    // 3. Keyword Exactness (Lexical)
     final fileName = result.fileName.toLowerCase();
     for (final term in queryTerms) {
-      if (fileName.contains(term)) {
-        score += 0.2;
+      final termLower = term.toLowerCase();
+      if (fileName == termLower) {
+        score += 1.0; // Exact match
+      } else if (fileName.startsWith(termLower)) {
+        score += 0.5; // Prefix match
+      } else if (fileName.contains(termLower)) {
+        score += 0.3; // Contains
       }
-      if (fileName == term) {
-        score += 0.5;
+    }
+
+    // 4. File Type Relevance (Bonus if it matches a pattern the AI extracted)
+    // Note: We don't have the full intent here, but we can check common patterns
+    if (result.mimeType != null) {
+      // Small bonus for common document types if query looks like document search
+      if (result.mimeType!.contains('pdf') ||
+          result.mimeType!.contains('word')) {
+        score += 0.05;
+      }
+    }
+
+    // 5. Freshness Bonus (if indexedAt available)
+    if (result.indexedAt != null) {
+      final daysOld = DateTime.now().difference(result.indexedAt!).inDays;
+      if (daysOld < 7) {
+        score += 0.1; // Bonus for files indexed in the last week
       }
     }
 

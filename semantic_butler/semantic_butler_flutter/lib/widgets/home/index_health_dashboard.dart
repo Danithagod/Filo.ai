@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../main.dart';
 import '../../utils/app_logger.dart';
+import 'package:semantic_butler_client/semantic_butler_client.dart';
 
 /// Dashboard for monitoring and maintaining index health
-class IndexHealthDashboard extends StatefulWidget {
+class IndexHealthDashboard extends ConsumerStatefulWidget {
   const IndexHealthDashboard({super.key});
 
   @override
-  State<IndexHealthDashboard> createState() => _IndexHealthDashboardState();
+  ConsumerState<IndexHealthDashboard> createState() =>
+      _IndexHealthDashboardState();
 }
 
-class _IndexHealthDashboardState extends State<IndexHealthDashboard> {
+class _IndexHealthDashboardState extends ConsumerState<IndexHealthDashboard> {
   bool _isLoading = true;
-  Map<String, dynamic>? _healthReport;
+  IndexHealthReport? _healthReport;
   bool _isFixing = false;
 
   @override
@@ -22,25 +25,33 @@ class _IndexHealthDashboardState extends State<IndexHealthDashboard> {
   }
 
   Future<void> _loadHealthReport() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
 
     try {
-      final report = await client.butler.getIndexHealthReport();
-      setState(() {
-        _healthReport = report;
-        _isLoading = false;
-      });
+      final apiClient = ref.read(clientProvider);
+      final report = await apiClient.butler.getIndexHealthReport();
+      if (mounted) {
+        setState(() {
+          _healthReport = report;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       AppLogger.error('Failed to load health report: $e', tag: 'IndexHealth');
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   Future<void> _cleanupOrphaned() async {
+    if (!mounted) return;
     setState(() => _isFixing = true);
 
     try {
-      final count = await client.butler.cleanupOrphanedFiles();
+      final apiClient = ref.read(clientProvider);
+      final count = await apiClient.butler.cleanupOrphanedFiles();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -56,15 +67,19 @@ class _IndexHealthDashboardState extends State<IndexHealthDashboard> {
         tag: 'IndexHealth',
       );
     } finally {
-      setState(() => _isFixing = false);
+      if (mounted) {
+        setState(() => _isFixing = false);
+      }
     }
   }
 
   Future<void> _refreshStale() async {
+    if (!mounted) return;
     setState(() => _isFixing = true);
 
     try {
-      final count = await client.butler.refreshStaleEntries();
+      final apiClient = ref.read(clientProvider);
+      final count = await apiClient.butler.refreshStaleEntries();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -80,15 +95,19 @@ class _IndexHealthDashboardState extends State<IndexHealthDashboard> {
         tag: 'IndexHealth',
       );
     } finally {
-      setState(() => _isFixing = false);
+      if (mounted) {
+        setState(() => _isFixing = false);
+      }
     }
   }
 
   Future<void> _removeDuplicates() async {
+    if (!mounted) return;
     setState(() => _isFixing = true);
 
     try {
-      final count = await client.butler.removeDuplicates();
+      final apiClient = ref.read(clientProvider);
+      final count = await apiClient.butler.removeDuplicates();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -101,15 +120,19 @@ class _IndexHealthDashboardState extends State<IndexHealthDashboard> {
     } catch (e) {
       AppLogger.error('Failed to remove duplicates: $e', tag: 'IndexHealth');
     } finally {
-      setState(() => _isFixing = false);
+      if (mounted) {
+        setState(() => _isFixing = false);
+      }
     }
   }
 
   Future<void> _fixMissingEmbeddings() async {
+    if (!mounted) return;
     setState(() => _isFixing = true);
 
     try {
-      final count = await client.butler.fixMissingEmbeddings();
+      final apiClient = ref.read(clientProvider);
+      final count = await apiClient.butler.fixMissingEmbeddings();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -125,7 +148,9 @@ class _IndexHealthDashboardState extends State<IndexHealthDashboard> {
         tag: 'IndexHealth',
       );
     } finally {
-      setState(() => _isFixing = false);
+      if (mounted) {
+        setState(() => _isFixing = false);
+      }
     }
   }
 
@@ -219,7 +244,7 @@ class _IndexHealthDashboardState extends State<IndexHealthDashboard> {
   }
 
   Widget _buildHealthScore() {
-    final healthScore = _healthReport?['healthScore'] as double? ?? 0.0;
+    final healthScore = _healthReport?.healthScore ?? 0.0;
     final colorScheme = Theme.of(context).colorScheme;
 
     Color scoreColor;
@@ -290,13 +315,8 @@ class _IndexHealthDashboardState extends State<IndexHealthDashboard> {
   }
 
   Widget _buildStatistics() {
-    final stats = _healthReport?['statistics'] as Map<String, dynamic>?;
-    if (stats == null) return const SizedBox.shrink();
-
-    final totalIndexed = stats['totalIndexed'] as int? ?? 0;
-    final totalPending = stats['totalPending'] as int? ?? 0;
-    final totalFailed = stats['totalFailed'] as int? ?? 0;
-    final totalEmbeddings = stats['totalEmbeddings'] as int? ?? 0;
+    final report = _healthReport;
+    if (report == null) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -313,7 +333,7 @@ class _IndexHealthDashboardState extends State<IndexHealthDashboard> {
             Expanded(
               child: _buildStatCard(
                 'Indexed',
-                totalIndexed,
+                report.totalIndexed,
                 Icons.check_circle,
               ),
             ),
@@ -321,17 +341,19 @@ class _IndexHealthDashboardState extends State<IndexHealthDashboard> {
             Expanded(
               child: _buildStatCard(
                 'Pending',
-                totalPending,
+                report.totalPending,
                 Icons.hourglass_empty,
               ),
             ),
             const SizedBox(width: 16),
-            Expanded(child: _buildStatCard('Failed', totalFailed, Icons.error)),
+            Expanded(
+              child: _buildStatCard('Failed', report.totalFailed, Icons.error)
+            ),
             const SizedBox(width: 16),
             Expanded(
               child: _buildStatCard(
                 'Embeddings',
-                totalEmbeddings,
+                report.totalEmbeddings,
                 Icons.memory,
               ),
             ),
@@ -370,11 +392,8 @@ class _IndexHealthDashboardState extends State<IndexHealthDashboard> {
   }
 
   Widget _buildIssuesSection() {
-    final orphanedFiles = _healthReport?['orphanedFiles'] as List? ?? [];
-    final staleEntries = _healthReport?['staleEntries'] as List? ?? [];
-    final duplicateGroups = _healthReport?['duplicateGroups'] as List? ?? [];
-    final missingEmbeddings =
-        _healthReport?['missingEmbeddings'] as List? ?? [];
+    final report = _healthReport;
+    if (report == null) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -388,31 +407,28 @@ class _IndexHealthDashboardState extends State<IndexHealthDashboard> {
         const SizedBox(height: 16),
         _buildIssueCard(
           'Orphaned Files',
-          orphanedFiles.length,
+          report.orphanedFiles.length,
           Icons.broken_image,
           'Files in index that no longer exist on disk',
         ),
         const SizedBox(height: 8),
         _buildIssueCard(
           'Stale Entries',
-          staleEntries.length,
+          report.staleEntryCount,
           Icons.schedule,
           'Files not updated in over 6 months',
         ),
         const SizedBox(height: 8),
         _buildIssueCard(
           'Duplicate Files',
-          duplicateGroups.fold(
-            0,
-            (sum, g) => sum + ((g['duplicateCount'] as int? ?? 0) - 1),
-          ),
+          report.duplicateFileCount,
           Icons.content_copy,
           'Files with identical content',
         ),
         const SizedBox(height: 8),
         _buildIssueCard(
           'Missing Embeddings',
-          missingEmbeddings.length,
+          report.missingEmbeddingsCount,
           Icons.memory,
           'Indexed files without embeddings',
         ),
@@ -481,11 +497,8 @@ class _IndexHealthDashboardState extends State<IndexHealthDashboard> {
   }
 
   Widget _buildActionsSection() {
-    final orphanedFiles = _healthReport?['orphanedFiles'] as List? ?? [];
-    final staleEntries = _healthReport?['staleEntries'] as List? ?? [];
-    final duplicateGroups = _healthReport?['duplicateGroups'] as List? ?? [];
-    final missingEmbeddings =
-        _healthReport?['missingEmbeddings'] as List? ?? [];
+    final report = _healthReport;
+    if (report == null) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -501,25 +514,25 @@ class _IndexHealthDashboardState extends State<IndexHealthDashboard> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            if (orphanedFiles.isNotEmpty)
+            if (report.orphanedFiles.isNotEmpty)
               OutlinedButton.icon(
                 onPressed: _cleanupOrphaned,
                 icon: const Icon(Icons.cleaning_services, size: 18),
                 label: const Text('Cleanup Orphaned'),
               ),
-            if (staleEntries.isNotEmpty)
+            if (report.staleEntryCount > 0)
               OutlinedButton.icon(
                 onPressed: _refreshStale,
                 icon: const Icon(Icons.refresh, size: 18),
                 label: const Text('Refresh Stale'),
               ),
-            if (duplicateGroups.isNotEmpty)
+            if (report.duplicateFileCount > 0)
               OutlinedButton.icon(
                 onPressed: _removeDuplicates,
                 icon: const Icon(Icons.delete_sweep, size: 18),
                 label: const Text('Remove Duplicates'),
               ),
-            if (missingEmbeddings.isNotEmpty)
+            if (report.missingEmbeddingsCount > 0)
               OutlinedButton.icon(
                 onPressed: _fixMissingEmbeddings,
                 icon: const Icon(Icons.build, size: 18),

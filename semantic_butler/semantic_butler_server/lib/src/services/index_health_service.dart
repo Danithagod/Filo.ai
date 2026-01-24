@@ -15,7 +15,7 @@ class IndexHealthService {
     final now = DateTime.now();
 
     // Run all checks in parallel
-    final results = await Future.wait([
+    final results = await Future.wait<dynamic>([
       _findOrphanedFiles(session),
       _findStaleEntries(session, staleThresholdDays: 180),
       _findDuplicateContent(session),
@@ -45,11 +45,16 @@ class IndexHealthService {
       generatedAt: now,
       healthScore: healthScore,
       orphanedFiles: orphanedFiles,
-      staleEntries: staleEntries,
-      duplicateGroups: duplicates,
-      statistics: stats,
-      missingEmbeddings: missingEmbeddings,
-      corruptedData: corrupted,
+      staleEntryCount: staleEntries.length,
+      duplicateGroupCount: duplicates.length,
+      duplicateFileCount: duplicates.fold(0, (sum, g) => sum + g.files.length),
+      totalIndexed: stats.totalIndexed,
+      totalPending: stats.totalPending,
+      totalFailed: stats.totalFailed,
+      totalEmbeddings: stats.totalEmbeddings,
+      averageFileSizeBytes: stats.averageFileSizeBytes,
+      missingEmbeddingsCount: missingEmbeddings.length,
+      corruptedDataCount: corrupted.length,
     );
   }
 
@@ -159,29 +164,14 @@ class IndexHealthService {
 
     final avgSize = totalIndexed > 0 ? totalSize ~/ totalIndexed : 0;
 
-    // Get oldest and newest indexed files
-    final oldestFile = await FileIndex.db.findFirstRow(
-      session,
-      where: (t) => t.status.equals('indexed') & t.indexedAt.notEquals(null),
-      orderBy: (t) => t.indexedAt,
-      orderDescending: false,
-    );
-
-    final newestFile = await FileIndex.db.findFirstRow(
-      session,
-      where: (t) => t.status.equals('indexed') & t.indexedAt.notEquals(null),
-      orderBy: (t) => t.indexedAt,
-      orderDescending: true,
-    );
-
     return IndexStatistics(
       totalIndexed: totalIndexed,
       totalPending: totalPending,
       totalFailed: totalFailed,
       totalEmbeddings: totalEmbeddings,
       averageFileSizeBytes: avgSize,
-      oldestIndexedAt: oldestFile?.indexedAt,
-      newestIndexedAt: newestFile?.indexedAt,
+      oldestIndexedAt: null,
+      newestIndexedAt: null,
     );
   }
 
@@ -368,40 +358,6 @@ class IndexHealthService {
   }
 }
 
-/// Health report model
-class IndexHealthReport {
-  final DateTime generatedAt;
-  final double healthScore;
-  final List<String> orphanedFiles;
-  final List<FileIndex> staleEntries;
-  final List<InternalDuplicateGroup> duplicateGroups;
-  final IndexStatistics statistics;
-  final List<FileIndex> missingEmbeddings;
-  final List<FileIndex> corruptedData;
-
-  IndexHealthReport({
-    required this.generatedAt,
-    required this.healthScore,
-    required this.orphanedFiles,
-    required this.staleEntries,
-    required this.duplicateGroups,
-    required this.statistics,
-    required this.missingEmbeddings,
-    required this.corruptedData,
-  });
-
-  Map<String, dynamic> toJson() => {
-    'generatedAt': generatedAt.toIso8601String(),
-    'healthScore': healthScore,
-    'orphanedFiles': orphanedFiles,
-    'staleEntries': staleEntries.map((e) => e.toJson()).toList(),
-    'duplicateGroups': duplicateGroups.map((e) => e.toJson()).toList(),
-    'statistics': statistics.toJson(),
-    'missingEmbeddings': missingEmbeddings.map((e) => e.toJson()).toList(),
-    'corruptedData': corruptedData.map((e) => e.toJson()).toList(),
-  };
-}
-
 /// Internal duplicate file group (not the protocol model)
 class InternalDuplicateGroup {
   final String contentHash;
@@ -413,15 +369,9 @@ class InternalDuplicateGroup {
     required this.files,
     required this.duplicateCount,
   });
-
-  Map<String, dynamic> toJson() => {
-    'contentHash': contentHash,
-    'files': files.map((f) => f.toJson()).toList(),
-    'duplicateCount': duplicateCount,
-  };
 }
 
-/// Index statistics
+/// Internal statistics holder
 class IndexStatistics {
   final int totalIndexed;
   final int totalPending;
@@ -440,14 +390,4 @@ class IndexStatistics {
     this.oldestIndexedAt,
     this.newestIndexedAt,
   });
-
-  Map<String, dynamic> toJson() => {
-    'totalIndexed': totalIndexed,
-    'totalPending': totalPending,
-    'totalFailed': totalFailed,
-    'totalEmbeddings': totalEmbeddings,
-    'averageFileSizeBytes': averageFileSizeBytes,
-    'oldestIndexedAt': oldestIndexedAt?.toIso8601String(),
-    'newestIndexedAt': newestIndexedAt?.toIso8601String(),
-  };
 }

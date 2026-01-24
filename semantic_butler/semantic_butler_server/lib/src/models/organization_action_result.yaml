@@ -1,0 +1,21 @@
+### Result of an organization action
+class: OrganizationActionResult
+fields:
+  ### Whether the action succeeded
+  success: bool
+  ### Type of action that was performed
+  actionType: String
+  ### Number of files processed
+  filesProcessed: int
+  ### Number of files that succeeded
+  successCount: int
+  ### Number of files that failed
+  failureCount: int
+  ### Space saved in bytes (for duplicate removal)
+  spaceSavedBytes: int
+  ### Individual file operation results
+  results: List<FileOperationResult>
+  ### Error message if the overall action failed
+  error: String?
+  ### Whether this was a dry-run preview
+  isDryRun: bool?

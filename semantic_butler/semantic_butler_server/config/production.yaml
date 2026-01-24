@@ -7,33 +7,33 @@
 # Configuration for the main API server.
 apiServer:
   port: 8080
-  publicHost: api.examplepod.com
-  publicPort: 443
-  publicScheme: https
+  publicHost: localhost
+  publicPort: 8080
+  publicScheme: http
 
 # Configuration for the Insights server.
 insightsServer:
   port: 8081
-  publicHost: insights.examplepod.com
-  publicPort: 443
-  publicScheme: https
+  publicHost: localhost
+  publicPort: 8081
+  publicScheme: http
 
 # Configuration for the web server.
 webServer:
   port: 8082
-  publicHost: app.examplepod.com
-  publicPort: 443
-  publicScheme: https
+  publicHost: localhost
+  publicPort: 8082
+  publicScheme: http
 
 # This is the database setup for your servers. The default for the Google Cloud
 # Engine Terraform configuration is to connect on a private IP address.
 # If you are connecting on a public IP (e.g. on AWS or Google Cloud Run), you
 # connect on the public IP of the database e.g. database.examplepod.com.
 database:
-  host: database.private-production.examplepod.com
+  host: ep-purple-block-ahv7qmg4-pooler.c-3.us-east-1.aws.neon.tech
   port: 5432
-  name: serverpod
-  user: postgres
+  name: neondb
+  user: neondb_owner
   requireSsl: true
   #isUnixSocket: true # defaults to false
   #maxConnectionCount: 10 # Defaults to 10, a negative or null value removes the limit
@@ -52,9 +52,9 @@ redis:
 maxRequestSize: 524288 # The maximum size of requests allowed in bytes
 
 sessionLogs:
-  consoleEnabled: false
-# persistentEnabled: true
-# consoleLogFormat: json # Defaults to "json", options are "text" or "json"
+  consoleEnabled: true
+  persistentEnabled: true
+  consoleLogFormat: text # Defaults to "json", options are "text" or "json"
 
 # futureCallExecutionEnabled: true # Defaults to true
 

@@ -129,7 +129,8 @@ class _SearchResultPreviewState extends ConsumerState<SearchResultPreview> {
     );
 
     try {
-      final summaryJson = await client.butler.summarizeFile(widget.path);
+      final apiClient = ref.read(clientProvider);
+      final summaryJson = await apiClient.butler.summarizeFile(widget.path);
       if (!mounted) return;
       Navigator.pop(context); // Close loading
 

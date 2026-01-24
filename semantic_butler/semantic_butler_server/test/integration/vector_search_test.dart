@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:test/test.dart';
 import 'test_tools/serverpod_test_tools.dart';
 import 'package:serverpod/serverpod.dart';
-import 'package:semantic_butler_server/src/generated/protocol.dart';
 
 void main() {
   withServerpod('Vector Search Integration Tests', (sessionBuilder, endpoints) {

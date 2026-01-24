@@ -56,9 +56,9 @@ class _CategoryChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withAlpha((0.1 * 255).round()),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withAlpha((0.3 * 255).round())),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -76,7 +76,7 @@ class _CategoryChip extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
             decoration: BoxDecoration(
-              color: color.withAlpha((0.15 * 255).round()),
+              color: color.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(

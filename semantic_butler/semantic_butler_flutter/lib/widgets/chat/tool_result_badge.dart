@@ -46,7 +46,12 @@ class _ToolResultBadgeState extends State<ToolResultBadge> {
       statusText = widget.statusMessage ?? 'Processing...';
     } else if (hasError) {
       final failCount = widget.results.where((r) => !r.success).length;
-      statusText = '$failCount action${failCount > 1 ? 's' : ''} failed';
+      final successCount = widget.results.length - failCount;
+      if (successCount > 0) {
+        statusText = '$successCount completed, $failCount failed';
+      } else {
+        statusText = '$failCount action${failCount > 1 ? 's' : ''} failed';
+      }
     } else {
       final count = widget.results.length;
       statusText = '$count action${count > 1 ? 's' : ''} completed';
@@ -77,18 +82,31 @@ class _ToolResultBadgeState extends State<ToolResultBadge> {
               children: [
                 // Icon
                 if (widget.isStreaming)
-                  SizedBox(
-                    width: 12,
-                    height: 12,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: statusColor,
-                    ),
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1.5,
+                          color: statusColor.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      Icon(
+                        _getIconForStatus(widget.statusMessage),
+                        size: 10,
+                        color: statusColor,
+                      ),
+                    ],
                   )
                 else
                   Icon(
                     hasError
-                        ? Icons.error_outline_rounded
+                        ? (widget.results.length >
+                                  widget.results.where((r) => !r.success).length
+                              ? Icons.warning_amber_rounded
+                              : Icons.error_outline_rounded)
                         : Icons.check_circle_outline_rounded,
                     size: 16,
                     color: statusColor,
@@ -97,11 +115,14 @@ class _ToolResultBadgeState extends State<ToolResultBadge> {
                 const SizedBox(width: 8),
 
                 // Text
-                Text(
-                  statusText,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: statusColor,
-                    fontWeight: FontWeight.bold,
+                Flexible(
+                  child: Text(
+                    statusText,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: statusColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
 
@@ -147,5 +168,21 @@ class _ToolResultBadgeState extends State<ToolResultBadge> {
         ),
       ],
     );
+  }
+
+  IconData _getIconForStatus(String? message) {
+    if (message == null) return Icons.autorenew_rounded;
+    final m = message.toLowerCase();
+    if (m.contains('search')) return Icons.search_rounded;
+    if (m.contains('mov')) return Icons.drive_file_move_rounded;
+    if (m.contains('renam')) return Icons.edit_note_rounded;
+    if (m.contains('delet') || m.contains('trash')) {
+      return Icons.delete_outline_rounded;
+    }
+    if (m.contains('list')) return Icons.list_alt_rounded;
+    if (m.contains('read')) return Icons.menu_book_rounded;
+    if (m.contains('index')) return Icons.fingerprint_rounded;
+    if (m.contains('creat')) return Icons.create_new_folder_rounded;
+    return Icons.autorenew_rounded;
   }
 }

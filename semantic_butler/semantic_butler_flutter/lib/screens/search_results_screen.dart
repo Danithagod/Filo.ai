@@ -125,7 +125,8 @@ class _SearchResultsScreenState extends ConsumerState<SearchResultsScreen> {
   /// Perform AI-powered search with streaming progress
   Future<void> _performAISearch(int currentToken) async {
     try {
-      final stream = client.butler.aiSearch(
+      final apiClient = ref.read(clientProvider);
+      final stream = apiClient.butler.aiSearch(
         widget.query,
         strategy: 'hybrid',
         maxResults: _pageSize,
@@ -194,14 +195,15 @@ class _SearchResultsScreenState extends ConsumerState<SearchResultsScreen> {
   /// Perform traditional semantic or hybrid search
   Future<void> _performTraditionalSearch(int currentToken) async {
     try {
+      final apiClient = ref.read(clientProvider);
       final results = _searchMode == SearchMode.hybrid
-          ? await client.butler.hybridSearch(
+          ? await apiClient.butler.hybridSearch(
               widget.query,
               limit: _pageSize,
               threshold: 0.3,
               offset: 0,
             )
-          : await client.butler.semanticSearch(
+          : await apiClient.butler.semanticSearch(
               widget.query,
               limit: _pageSize,
               threshold: 0.3,
@@ -260,14 +262,15 @@ class _SearchResultsScreenState extends ConsumerState<SearchResultsScreen> {
     });
 
     try {
+      final apiClient = ref.read(clientProvider);
       final results = _searchMode == SearchMode.hybrid
-          ? await client.butler.hybridSearch(
+          ? await apiClient.butler.hybridSearch(
               widget.query,
               limit: _pageSize,
               threshold: 0.3,
               offset: _currentOffset,
             )
-          : await client.butler.semanticSearch(
+          : await apiClient.butler.semanticSearch(
               widget.query,
               limit: _pageSize,
               threshold: 0.3,
@@ -368,7 +371,7 @@ class _SearchResultsScreenState extends ConsumerState<SearchResultsScreen> {
               decoration: BoxDecoration(
                 color: Theme.of(
                   context,
-                ).colorScheme.surfaceContainerHighest.withAlpha(128),
+                ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Column(
@@ -460,7 +463,7 @@ class _SearchResultsScreenState extends ConsumerState<SearchResultsScreen> {
               size: 64,
               color: Theme.of(
                 context,
-              ).colorScheme.onSurfaceVariant.withAlpha(128),
+              ).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
             Text(

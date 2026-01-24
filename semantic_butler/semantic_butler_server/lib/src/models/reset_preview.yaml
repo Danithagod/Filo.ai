@@ -1,0 +1,10 @@
+### Represents a preview of what will be deleted during a reset operation.
+### This is a non-persisted DTO (no table) used for API responses.
+class: ResetPreview
+fields:
+  ### Map of table name to row count
+  tables: Map<String, int>
+  ### Total rows across all tables that will be deleted
+  totalRows: int
+  ### Estimated reset duration in seconds
+  estimatedTimeSeconds: int

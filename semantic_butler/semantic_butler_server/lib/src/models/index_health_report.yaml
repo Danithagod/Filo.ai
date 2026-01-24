@@ -1,0 +1,29 @@
+### IndexHealthReport - comprehensive health report for the file index
+class: IndexHealthReport
+fields:
+  ### When the report was generated
+  generatedAt: DateTime
+  ### Overall health score (0-100)
+  healthScore: double
+  ### List of file paths that are indexed but no longer exist on disk
+  orphanedFiles: List<String>
+  ### Number of stale entries (files not updated in over 6 months)
+  staleEntryCount: int
+  ### Number of duplicate file groups found
+  duplicateGroupCount: int
+  ### Total number of duplicate files
+  duplicateFileCount: int
+  ### Number of indexed files
+  totalIndexed: int
+  ### Number of files pending indexing
+  totalPending: int
+  ### Number of failed indexing attempts
+  totalFailed: int
+  ### Number of embeddings stored
+  totalEmbeddings: int
+  ### Average file size in bytes
+  averageFileSizeBytes: int
+  ### Number of files missing embeddings
+  missingEmbeddingsCount: int
+  ### Number of potentially corrupted data entries
+  corruptedDataCount: int

@@ -23,9 +23,6 @@ import '../widgets/home/ai_cost_dashboard.dart';
 import '../widgets/home/index_health_dashboard.dart';
 import '../providers/indexing_status_provider.dart';
 import '../providers/navigation_provider.dart';
-import '../services/shortcut_manager.dart' as sm;
-import '../services/shortcut_manager.dart'
-    show FocusSearchIntent, NavigateTabIntent;
 
 /// Home screen with Material 3 navigation rail
 class HomeScreen extends ConsumerStatefulWidget {
@@ -41,112 +38,89 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
     final colorScheme = Theme.of(context).colorScheme;
     final navState = ref.watch(navigationProvider);
 
-    return Shortcuts(
-      shortcuts: sm.ShortcutManager.shortcuts,
-      child: Actions(
-        actions: <Type, Action<Intent>>{
-          FocusSearchIntent: CallbackAction<FocusSearchIntent>(
-            onInvoke: (_) => _showQuickSearch(context),
-          ),
-          NavigateTabIntent: CallbackAction<NavigateTabIntent>(
-            onInvoke: (intent) {
-              // Clear focus before navigating to prevent focus being stuck in hidden input fields
-              FocusManager.instance.primaryFocus?.unfocus();
-              ref.read(navigationProvider.notifier).navigateTo(intent.index);
-              return null;
+    return Scaffold(
+      body: Row(
+        children: [
+          // Material 3 Navigation Rail
+          NavigationRail(
+            selectedIndex: navState.selectedIndex,
+            onDestinationSelected: (index) {
+              ref.read(navigationProvider.notifier).navigateTo(index);
             },
-          ),
-        },
-        child: Focus(
-          autofocus: true,
-          child: Scaffold(
-            body: SafeArea(
-              child: Row(
-                children: [
-                  // Material 3 Navigation Rail
-                  NavigationRail(
-                    selectedIndex: navState.selectedIndex,
-                    onDestinationSelected: (index) {
-                      ref.read(navigationProvider.notifier).navigateTo(index);
-                    },
-                    leading: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      child: FloatingActionButton(
-                        elevation: 0,
-                        onPressed: () => _showQuickSearch(context),
-                        child: const Icon(Icons.search),
-                      ),
-                    ),
-                    destinations: const [
-                      NavigationRailDestination(
-                        icon: Tooltip(
-                          message: 'Home (Ctrl+1 / Cmd+1)',
-                          child: Icon(Icons.home_outlined),
-                        ),
-                        selectedIcon: Icon(Icons.home),
-                        label: Text('Home'),
-                      ),
-                      NavigationRailDestination(
-                        icon: Tooltip(
-                          message: 'Index (Ctrl+2 / Cmd+2)',
-                          child: Icon(Icons.folder_outlined),
-                        ),
-                        selectedIcon: Icon(Icons.folder),
-                        label: Text('Index'),
-                      ),
-                      NavigationRailDestination(
-                        icon: Tooltip(
-                          message: 'Chat (Ctrl+3 / Cmd+3)',
-                          child: Icon(Icons.chat_bubble_outline),
-                        ),
-                        selectedIcon: Icon(Icons.chat_bubble),
-                        label: Text('Chat'),
-                      ),
-                      NavigationRailDestination(
-                        icon: Tooltip(
-                          message: 'Files (Ctrl+4 / Cmd+4)',
-                          child: Icon(Icons.folder_shared_outlined),
-                        ),
-                        selectedIcon: Icon(Icons.folder_shared),
-                        label: Text('Files'),
-                      ),
-                      NavigationRailDestination(
-                        icon: Tooltip(
-                          message: 'Organization (Ctrl+5 / Cmd+5)',
-                          child: Icon(Icons.auto_fix_high_outlined),
-                        ),
-                        selectedIcon: Icon(Icons.auto_fix_high),
-                        label: Text('Organization'),
-                      ),
-                      NavigationRailDestination(
-                        icon: Tooltip(
-                          message: 'Settings (Ctrl+6 / Cmd+6)',
-                          child: Icon(Icons.settings_outlined),
-                        ),
-                        selectedIcon: Icon(Icons.settings),
-                        label: Text('Settings'),
-                      ),
-                    ],
-                  ),
-
-                  // Divider
-                  VerticalDivider(
-                    thickness: 1,
-                    width: 1,
-                    color: colorScheme.outlineVariant,
-                  ),
-
-                  // Content area
-                  Expanded(
-                    child: AppBackground(
-                      child: _buildContent(),
-                    ),
-                  ),
-                ],
+            leading: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: FloatingActionButton(
+                elevation: 0,
+                onPressed: () => _showQuickSearch(context),
+                child: const Icon(Icons.search),
               ),
             ),
+            destinations: const [
+              NavigationRailDestination(
+                icon: Tooltip(
+                  message: 'Home (Ctrl+1 / Cmd+1)',
+                  child: Icon(Icons.home_outlined),
+                ),
+                selectedIcon: Icon(Icons.home),
+                label: Text('Home'),
+              ),
+              NavigationRailDestination(
+                icon: Tooltip(
+                  message: 'Index (Ctrl+2 / Cmd+2)',
+                  child: Icon(Icons.folder_outlined),
+                ),
+                selectedIcon: Icon(Icons.folder),
+                label: Text('Index'),
+              ),
+              NavigationRailDestination(
+                icon: Tooltip(
+                  message: 'Chat (Ctrl+3 / Cmd+3)',
+                  child: Icon(Icons.chat_bubble_outline),
+                ),
+                selectedIcon: Icon(Icons.chat_bubble),
+                label: Text('Chat'),
+              ),
+              NavigationRailDestination(
+                icon: Tooltip(
+                  message: 'Files (Ctrl+4 / Cmd+4)',
+                  child: Icon(Icons.folder_shared_outlined),
+                ),
+                selectedIcon: Icon(Icons.folder_shared),
+                label: Text('Files'),
+              ),
+              NavigationRailDestination(
+                icon: Tooltip(
+                  message: 'Organization (Ctrl+5 / Cmd+5)',
+                  child: Icon(Icons.auto_fix_high_outlined),
+                ),
+                selectedIcon: Icon(Icons.auto_fix_high),
+                label: Text('Organization'),
+              ),
+              NavigationRailDestination(
+                icon: Tooltip(
+                  message: 'Settings (Ctrl+6 / Cmd+6)',
+                  child: Icon(Icons.settings_outlined),
+                ),
+                selectedIcon: Icon(Icons.settings),
+                label: Text('Settings'),
+              ),
+            ],
           ),
-        ),
+
+          // Divider
+          VerticalDivider(
+            thickness: 1,
+            width: 1,
+            color: colorScheme.outlineVariant,
+          ),
+
+          // Content area
+          Expanded(
+            child: AppBackground(
+              child: _buildContent(),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -191,7 +165,7 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
   void _showQuickSearch(BuildContext context) {
     showSearch(
       context: context,
-      delegate: _SemanticSearchDelegate(),
+      delegate: _SemanticSearchDelegate(ref),
     );
   }
 }
@@ -311,12 +285,13 @@ class _SearchDashboardState extends ConsumerState<SearchDashboard>
 
   @override
   Widget build(BuildContext context) {
-    final status = ref.watch(indexingStatusProvider);
+    final status = ref.watch(indexingStatusProvider).value;
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 60),
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 48),
       child: Center(
         child: Container(
           constraints: const BoxConstraints(maxWidth: 900),
@@ -332,18 +307,24 @@ class _SearchDashboardState extends ConsumerState<SearchDashboard>
                     Text(
                       'Welcome back,',
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 14,
                         fontWeight: FontWeight.w500,
-                        letterSpacing: 1.2,
+                        letterSpacing: 1.1,
+                        color: Colors.white70,
                       ),
                     ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Semantic Butler',
-                      style: TextStyle(
-                        fontSize: 48,
-                        fontWeight: FontWeight.bold,
-                        height: 1.1,
+                    SizedBox(height: 12),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Semantic Butler',
+                        style: TextStyle(
+                          fontSize: 56,
+                          fontWeight: FontWeight.w900,
+                          height: 1.0,
+                          letterSpacing: -1,
+                        ),
                       ),
                     ),
                   ],
@@ -367,25 +348,13 @@ class _SearchDashboardState extends ConsumerState<SearchDashboard>
               FadeInAnimation(
                 delay: const Duration(milliseconds: 300),
                 child: Container(
-                  decoration: BoxDecoration(
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 30,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    children: [
-                      AdvancedSearchBar(
-                        controller: _searchController,
-                        onSearch: _performSearch,
-                        onAISearch: _performAISearch,
-                        hintText: 'Search files, content, or ask questions...',
-                      ),
-                      const SizedBox(height: 8),
+                  constraints: const BoxConstraints(maxWidth: 800),
+                  child: AdvancedSearchBar(
+                    controller: _searchController,
+                    onSearch: _performSearch,
+                    onAISearch: _performAISearch,
+                    hintText: 'Search your files using natural language',
+                    trailing: [
                       AdvancedFilters(
                         initialFilters: _searchFilters,
                         onFiltersChanged: (filters) {
@@ -427,9 +396,15 @@ class _SearchDashboardState extends ConsumerState<SearchDashboard>
                       ],
                     ),
                     const SizedBox(height: 24),
-                    Row(
+                    Wrap(
+                      spacing: 24,
+                      runSpacing: 24,
                       children: [
-                        Expanded(
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            minWidth: 300,
+                            maxWidth: 800,
+                          ),
                           child: StatsCard(
                             title: 'Documents',
                             numericValue: (status?.totalDocuments ?? 0)
@@ -438,8 +413,11 @@ class _SearchDashboardState extends ConsumerState<SearchDashboard>
                             color: colorScheme.primary,
                           ),
                         ),
-                        const SizedBox(width: 20),
-                        Expanded(
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            minWidth: 300,
+                            maxWidth: 800,
+                          ),
                           child: StatsCard(
                             title: 'Indexed',
                             numericValue:
@@ -454,12 +432,15 @@ class _SearchDashboardState extends ConsumerState<SearchDashboard>
                                 ? (status.indexedDocuments /
                                       status.totalDocuments)
                                 : 0,
-                            icon: Icons.offline_bolt_rounded,
+                            icon: Icons.check_circle_rounded,
                             color: colorScheme.tertiary,
                           ),
                         ),
-                        const SizedBox(width: 20),
-                        Expanded(
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            minWidth: 300,
+                            maxWidth: 800,
+                          ),
                           child: StatsCard(
                             title: 'Activity',
                             numericValue: (status?.activeJobs ?? 0).toDouble(),
@@ -633,7 +614,8 @@ class _IndexingScreenState extends ConsumerState<IndexingScreen> {
 
         // Call the server to start indexing
         AppLogger.info('Calling startIndexing API...', tag: 'Indexing');
-        await client.butler.startIndexing(selectedDirectory);
+        final apiClient = ref.read(clientProvider);
+        await apiClient.butler.startIndexing(selectedDirectory);
         AppLogger.info('startIndexing API call completed', tag: 'Indexing');
 
         // Refresh global provider immediately
@@ -658,284 +640,308 @@ class _IndexingScreenState extends ConsumerState<IndexingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final status = ref.watch(indexingStatusProvider);
+    final status = ref.watch(indexingStatusProvider).value;
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final recentJobs = status?.recentJobs ?? [];
     final isIndexing = (status?.activeJobs ?? 0) > 0;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Index Files',
-            style: textTheme.headlineLarge?.copyWith(
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Add folders to index for semantic search',
-            style: textTheme.bodyLarge?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 32),
-
-          // Summary Stats Row (Compact)
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _StatCard(
-                  label: 'TOTAL DOCUMENTS',
-                  numericValue: (status?.totalDocuments ?? 0).toDouble(),
-                  icon: Icons.description_outlined,
-                  color: colorScheme.primary,
-                ),
-                const SizedBox(width: 12),
-                _StatCard(
-                  label: 'INDEXED',
-                  numericValue: (status?.indexedDocuments ?? 0).toDouble(),
-                  icon: Icons.check_circle_outline,
-                  color: colorScheme.tertiary,
-                ),
-                const SizedBox(width: 12),
-                _StatCard(
-                  label: 'PENDING',
-                  numericValue: (status?.pendingDocuments ?? 0).toDouble(),
-                  icon: Icons.pending_outlined,
-                  color: colorScheme.secondary,
-                ),
-                if ((status?.failedDocuments ?? 0) > 0) ...[
-                  const SizedBox(width: 12),
-                  _StatCard(
-                    label: 'FAILED',
-                    numericValue: (status?.failedDocuments ?? 0).toDouble(),
-                    icon: Icons.error_outline,
-                    color: colorScheme.error,
-                  ),
-                ],
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 32),
-
-          // Add Folder Action
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: isIndexing ? null : _pickFolder,
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              icon: (status?.activeJobs ?? 0) > 0
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.create_new_folder_outlined),
-              label: Text(
-                (status?.activeJobs ?? 0) > 0
-                    ? 'Indexing in Progress...'
-                    : 'Index New Folder',
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 32),
-
-          // Recent Jobs Section Header
-          Row(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(24, 48, 24, 48),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Indexed Folders',
-                style: textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+                'Index Files',
+                style: textTheme.headlineLarge?.copyWith(
+                  fontWeight: FontWeight.w400,
                 ),
               ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer.withAlpha(100),
-                  borderRadius: BorderRadius.circular(12),
+              const SizedBox(height: 8),
+              Text(
+                'Add folders to index for semantic search',
+                style: textTheme.bodyLarge?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
                 ),
-                child: Text(
-                  '${recentJobs.length}',
-                  style: textTheme.labelSmall?.copyWith(
-                    color: colorScheme.onPrimaryContainer,
-                    fontWeight: FontWeight.bold,
+              ),
+              const SizedBox(height: 48),
+
+              Wrap(
+                spacing: 16,
+                runSpacing: 16,
+                children: [
+                  _StatCard(
+                    label: 'TOTAL DOCUMENTS',
+                    numericValue: (status?.totalDocuments ?? 0).toDouble(),
+                    icon: Icons.description_outlined,
+                    color: colorScheme.primary,
+                  ),
+                  _StatCard(
+                    label: 'INDEXED',
+                    numericValue: (status?.indexedDocuments ?? 0).toDouble(),
+                    icon: Icons.check_circle_outline,
+                    color: colorScheme.tertiary,
+                  ),
+                  _StatCard(
+                    label: 'PENDING',
+                    numericValue: (status?.pendingDocuments ?? 0).toDouble(),
+                    icon: Icons.pending_outlined,
+                    color: colorScheme.secondary,
+                  ),
+                  if ((status?.failedDocuments ?? 0) > 0)
+                    _StatCard(
+                      label: 'FAILED',
+                      numericValue: (status?.failedDocuments ?? 0).toDouble(),
+                      icon: Icons.error_outline,
+                      color: colorScheme.error,
+                    ),
+                ],
+              ),
+
+              const SizedBox(height: 32),
+
+              // Add Folder Action
+              Align(
+                alignment: Alignment.centerLeft,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minWidth: 200),
+                  child: FilledButton.icon(
+                    onPressed: isIndexing ? null : _pickFolder,
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 16,
+                        horizontal: 24,
+                      ),
+                    ),
+                    icon: (status?.activeJobs ?? 0) > 0
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.create_new_folder_outlined),
+                    label: Text(
+                      (status?.activeJobs ?? 0) > 0
+                          ? 'Indexing in Progress...'
+                          : 'Index New Folder',
+                    ),
                   ),
                 ),
               ),
-              const Spacer(),
-              // View Toggle
-              Container(
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest.withAlpha(50),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+
+              const SizedBox(height: 32),
+
+              // Recent Jobs Section Header
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      'Indexed Folders',
+                      style: textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer.withValues(
+                        alpha: 0.4,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${recentJobs.length}',
+                      style: textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onPrimaryContainer,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  // View Toggle
+                  Container(
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest.withValues(
+                        alpha: 0.2,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.grid_view_rounded, size: 18),
+                          onPressed: () => setState(() => _isGridView = true),
+                          color: _isGridView
+                              ? colorScheme.primary
+                              : colorScheme.onSurfaceVariant,
+                          style: IconButton.styleFrom(
+                            backgroundColor: _isGridView
+                                ? colorScheme.primaryContainer.withValues(
+                                    alpha: 0.6,
+                                  )
+                                : null,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.view_list_rounded, size: 18),
+                          onPressed: () => setState(() => _isGridView = false),
+                          color: !_isGridView
+                              ? colorScheme.primary
+                              : colorScheme.onSurfaceVariant,
+                          style: IconButton.styleFrom(
+                            backgroundColor: !_isGridView
+                                ? colorScheme.primaryContainer.withValues(
+                                    alpha: 0.6,
+                                  )
+                                : null,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (recentJobs.isNotEmpty)
+                    TextButton.icon(
+                      onPressed:
+                          ((status?.activeJobs ?? 0) > 0 || _isStatusLoading)
+                          ? null
+                          : _loadIndexingStatus,
+                      icon: _isStatusLoading
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                strokeCap: StrokeCap.round,
+                              ),
+                            )
+                          : const Icon(Icons.refresh_rounded, size: 18),
+                      label: Text(_isStatusLoading ? '' : 'Refresh'),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              if (_isStatusLoading && recentJobs.isEmpty)
+                if (_isGridView)
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16),
+                    gridDelegate:
+                        const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 180,
+                          childAspectRatio: 0.85,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                        ),
+                    itemCount: 8,
+                    itemBuilder: (context, index) => CompactIndexCard.skeleton(
+                      isListView: false,
+                    ),
+                  )
+                else
+                  ListView.separated(
+                    physics: const NeverScrollableScrollPhysics(),
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: 8,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 8),
+                    itemBuilder: (context, index) => CompactIndexCard.skeleton(
+                      isListView: true,
+                    ),
+                  )
+              else if (recentJobs.isEmpty)
+                _buildEmptyState(colorScheme, textTheme)
+              else if (_isGridView)
+                Stack(
                   children: [
-                    IconButton(
-                      icon: const Icon(Icons.grid_view_rounded, size: 18),
-                      onPressed: () => setState(() => _isGridView = true),
-                      color: _isGridView
-                          ? colorScheme.primary
-                          : colorScheme.onSurfaceVariant,
-                      style: IconButton.styleFrom(
-                        backgroundColor: _isGridView
-                            ? colorScheme.primaryContainer.withAlpha(150)
-                            : null,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(16),
+                      gridDelegate:
+                          const SliverGridDelegateWithMaxCrossAxisExtent(
+                            maxCrossAxisExtent: 180,
+                            childAspectRatio: 0.85,
+                            crossAxisSpacing: 16,
+                            mainAxisSpacing: 16,
+                          ),
+                      itemCount: recentJobs.length,
+                      itemBuilder: (context, index) {
+                        final job = recentJobs[index];
+                        return CompactIndexCard(
+                          job: job,
+                          onRefresh: _loadIndexingStatus,
+                          isListView: false,
+                        );
+                      },
+                    ),
+                    if (_isStatusLoading)
+                      Positioned.fill(
+                        child: Container(
+                          color: colorScheme.surface.withValues(alpha: 0.3),
                         ),
                       ),
+                  ],
+                )
+              else
+                Stack(
+                  children: [
+                    ListView.separated(
+                      physics: const NeverScrollableScrollPhysics(),
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.all(16),
+                      itemCount: recentJobs.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final job = recentJobs[index];
+                        return CompactIndexCard(
+                          job: job,
+                          onRefresh: _loadIndexingStatus,
+                          isListView: true,
+                        );
+                      },
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.view_list_rounded, size: 18),
-                      onPressed: () => setState(() => _isGridView = false),
-                      color: !_isGridView
-                          ? colorScheme.primary
-                          : colorScheme.onSurfaceVariant,
-                      style: IconButton.styleFrom(
-                        backgroundColor: !_isGridView
-                            ? colorScheme.primaryContainer.withAlpha(150)
-                            : null,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                    if (_isStatusLoading)
+                      Positioned.fill(
+                        child: Container(
+                          color: colorScheme.surface.withValues(alpha: 0.3),
                         ),
                       ),
-                    ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 8),
-              if (recentJobs.isNotEmpty)
-                TextButton.icon(
-                  onPressed: ((status?.activeJobs ?? 0) > 0 || _isStatusLoading)
-                      ? null
-                      : _loadIndexingStatus,
-                  icon: _isStatusLoading
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            strokeCap: StrokeCap.round,
-                          ),
-                        )
-                      : const Icon(Icons.refresh_rounded, size: 18),
-                  label: Text(_isStatusLoading ? '' : 'Refresh'),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                  ),
-                ),
+
+              // Bottom spacer
+              const SizedBox(height: 48),
             ],
           ),
-          const SizedBox(height: 16),
-
-          if (_isStatusLoading && recentJobs.isEmpty)
-            if (_isGridView)
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 180,
-                  childAspectRatio: 0.85,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                ),
-                itemCount: 8,
-                itemBuilder: (context, index) => CompactIndexCard.skeleton(
-                  isListView: false,
-                ),
-              )
-            else
-              ListView.separated(
-                physics: const NeverScrollableScrollPhysics(),
-                shrinkWrap: true,
-                padding: const EdgeInsets.all(16),
-                itemCount: 8,
-                separatorBuilder: (context, index) => const SizedBox(height: 8),
-                itemBuilder: (context, index) => CompactIndexCard.skeleton(
-                  isListView: true,
-                ),
-              )
-          else if (recentJobs.isEmpty)
-            _buildEmptyState(colorScheme, textTheme)
-          else if (_isGridView)
-            Stack(
-              children: [
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 180,
-                    childAspectRatio: 0.85,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                  ),
-                  itemCount: recentJobs.length,
-                  itemBuilder: (context, index) {
-                    final job = recentJobs[index];
-                    return CompactIndexCard(
-                      job: job,
-                      onRefresh: _loadIndexingStatus,
-                      isListView: false,
-                    );
-                  },
-                ),
-                if (_isStatusLoading)
-                  Positioned.fill(
-                    child: Container(
-                      color: colorScheme.surface.withValues(alpha: 0.3),
-                    ),
-                  ),
-              ],
-            )
-          else
-            Stack(
-              children: [
-                ListView.separated(
-                  physics: const NeverScrollableScrollPhysics(),
-                  shrinkWrap: true,
-                  padding: const EdgeInsets.all(16),
-                  itemCount: recentJobs.length,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    final job = recentJobs[index];
-                    return CompactIndexCard(
-                      job: job,
-                      onRefresh: _loadIndexingStatus,
-                      isListView: true,
-                    );
-                  },
-                ),
-                if (_isStatusLoading)
-                  Positioned.fill(
-                    child: Container(
-                      color: colorScheme.surface.withValues(alpha: 0.3),
-                    ),
-                  ),
-              ],
-            ),
-
-          // Bottom spacer
-          const SizedBox(height: 48),
-        ],
+        ),
       ),
     );
   }
@@ -1001,18 +1007,19 @@ class _StatCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
-      width: 100,
-      padding: const EdgeInsets.all(12),
+      constraints: const BoxConstraints(minWidth: 160),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       decoration: BoxDecoration(
-        border: Border.all(color: colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(12),
+        color: color.withValues(alpha: 0.05),
+        border: Border.all(color: color.withValues(alpha: 0.1)),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         children: [
           Icon(icon, color: color, size: 24),
           const SizedBox(height: 8),
           TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0, end: numericValue),
+            tween: Tween(begin: 0.0, end: numericValue),
             duration: const Duration(seconds: 1),
             curve: Curves.easeOutCubic,
             builder: (context, value, child) {
@@ -1040,6 +1047,10 @@ class _StatCard extends StatelessWidget {
 
 /// Custom search delegate for Material 3 search with dynamic suggestions
 class _SemanticSearchDelegate extends SearchDelegate<String> {
+  final WidgetRef ref;
+
+  _SemanticSearchDelegate(this.ref);
+
   // Cache for search history
   List<SearchHistory>? _searchHistoryCache;
   bool _isLoadingHistory = false;
@@ -1217,7 +1228,8 @@ class _SemanticSearchDelegate extends SearchDelegate<String> {
 
     _isLoadingHistory = true;
     try {
-      final history = await client.butler.getSearchHistory(
+      final apiClient = ref.read(clientProvider);
+      final history = await apiClient.butler.getSearchHistory(
         limit: 10,
         offset: 0,
       );

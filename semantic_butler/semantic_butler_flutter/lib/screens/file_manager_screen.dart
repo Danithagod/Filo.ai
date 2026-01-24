@@ -12,6 +12,7 @@ import '../widgets/file_manager/file_grid_item.dart';
 import '../widgets/file_manager/file_manager_sidebar.dart';
 import '../widgets/file_manager/file_manager_toolbar.dart';
 import '../widgets/file_manager/summary_dialog.dart';
+import 'search_results_screen.dart';
 import '../providers/directory_cache_provider.dart';
 import '../providers/navigation_provider.dart';
 
@@ -33,18 +34,15 @@ class _FileManagerScreenState extends ConsumerState<FileManagerScreen> {
   bool _isGridView = false;
   bool _isSearching = false;
   final TextEditingController _searchController = TextEditingController();
+  String? _highlightedPath;
 
   // ValueNotifier for reactive filtering without full rebuilds
   final ValueNotifier<List<FileSystemEntry>> _filteredEntriesNotifier =
       ValueNotifier<List<FileSystemEntry>>([]);
 
-  // Directory cache instance
-  late final DirectoryCacheProvider _directoryCache;
-
   @override
   void initState() {
     super.initState();
-    _directoryCache = DirectoryCacheProvider(client);
     _loadDrives();
     _searchController.addListener(_updateFilteredEntries);
   }
@@ -136,7 +134,8 @@ class _FileManagerScreenState extends ConsumerState<FileManagerScreen> {
   /// Record local search to history
   Future<void> _recordLocalSearch(String query, int resultCount) async {
     try {
-      await client.butler.recordLocalSearch(
+      final apiClient = ref.read(clientProvider);
+      await apiClient.butler.recordLocalSearch(
         query.trim(),
         _currentPath,
         resultCount,
@@ -158,7 +157,8 @@ class _FileManagerScreenState extends ConsumerState<FileManagerScreen> {
     });
 
     try {
-      final drives = await client.fileSystem.getDrives();
+      final apiClient = ref.read(clientProvider);
+      final drives = await apiClient.fileSystem.getDrives();
       if (!mounted) return;
       setState(() {
         _drives = drives;
@@ -192,7 +192,7 @@ class _FileManagerScreenState extends ConsumerState<FileManagerScreen> {
 
     try {
       // Use cache to avoid repeated API calls
-      final entries = await _directoryCache.getDirectory(path);
+      final entries = await ref.read(directoryCacheProvider).getDirectory(path);
       if (!mounted) return;
       setState(() {
         _entries = entries;
@@ -206,6 +206,41 @@ class _FileManagerScreenState extends ConsumerState<FileManagerScreen> {
         _error = 'Failed to load directory: $e';
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _handleDeepLink(String path) async {
+    try {
+      final isDir = await Directory(path).exists();
+      final isFile = await File(path).exists();
+
+      if (isDir) {
+        setState(() {
+          _highlightedPath = null;
+        });
+        _loadDirectory(path);
+      } else if (isFile) {
+        final parent = p.dirname(path);
+        setState(() {
+          _highlightedPath = path;
+        });
+        _loadDirectory(parent);
+      } else {
+        // Fallback for non-local paths or ambiguous cases
+        // If it has an extension, assume it's a file
+        if (p.extension(path).isNotEmpty) {
+          final parent = p.dirname(path);
+          setState(() {
+            _highlightedPath = path;
+          });
+          _loadDirectory(parent);
+        } else {
+          _loadDirectory(path);
+        }
+      }
+    } catch (e) {
+      // On error, just try to load as directory
+      _loadDirectory(path);
     }
   }
 
@@ -258,9 +293,10 @@ class _FileManagerScreenState extends ConsumerState<FileManagerScreen> {
                 ListTile(
                   leading: Icon(
                     Icons.dns,
-                    color: _currentPath.toLowerCase().startsWith(
-                              drive.path.toLowerCase(),
-                            )
+                    color:
+                        _currentPath.toLowerCase().startsWith(
+                          drive.path.toLowerCase(),
+                        )
                         ? colorScheme.primary
                         : colorScheme.onSurfaceVariant,
                   ),
@@ -298,12 +334,23 @@ class _FileManagerScreenState extends ConsumerState<FileManagerScreen> {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
+    ref.listen<NavigationState>(navigationProvider, (previous, next) {
+      if (next.fileTargetPath != null &&
+          next.fileTargetPath != previous?.fileTargetPath) {
+        _handleDeepLink(next.fileTargetPath!);
+        // Consumed the target
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ref.read(navigationProvider.notifier).clearFileTarget();
+        });
+      }
+    });
+
     return Row(
       children: [
         // Floating Sidebar
         Container(
           width: 260,
-          margin: const EdgeInsets.all(16),
+          margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLow,
             borderRadius: BorderRadius.circular(24),
@@ -519,8 +566,10 @@ class _FileManagerScreenState extends ConsumerState<FileManagerScreen> {
                     final entry = displayEntries[index];
                     return FileGridItem(
                       entry: entry,
+                      isHighlighted: _highlightedPath == entry.path,
                       onTap: () {
                         if (entry.isDirectory) {
+                          setState(() => _highlightedPath = null);
                           _loadDirectory(entry.path);
                           _searchController.clear();
                           _isSearching = false;
@@ -540,8 +589,10 @@ class _FileManagerScreenState extends ConsumerState<FileManagerScreen> {
                     final entry = displayEntries[index];
                     return FileListItem(
                       entry: entry,
+                      isHighlighted: _highlightedPath == entry.path,
                       onTap: () {
                         if (entry.isDirectory) {
+                          setState(() => _highlightedPath = null);
                           _loadDirectory(entry.path);
                           _searchController.clear();
                           _isSearching = false;
@@ -614,6 +665,14 @@ class _FileManagerScreenState extends ConsumerState<FileManagerScreen> {
                   _summarizeFile(entry);
                 },
               ),
+              ListTile(
+                leading: const Icon(Icons.find_in_page_outlined),
+                title: const Text('Search Similar'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _searchSimilar(entry);
+                },
+              ),
             ],
 
             // Indexing Action
@@ -653,6 +712,18 @@ class _FileManagerScreenState extends ConsumerState<FileManagerScreen> {
               },
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _searchSimilar(FileSystemEntry entry) {
+    // Navigate to Search with filename as initial query
+    // This effectively performs a semantic search for files like this one
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => SearchResultsScreen(
+          query: entry.name,
         ),
       ),
     );
@@ -702,7 +773,8 @@ class _FileManagerScreenState extends ConsumerState<FileManagerScreen> {
 
     try {
       // Call the summarization endpoint
-      final summaryJson = await client.butler.summarizeFile(entry.path);
+      final apiClient = ref.read(clientProvider);
+      final summaryJson = await apiClient.butler.summarizeFile(entry.path);
 
       if (!mounted) return;
 
@@ -740,13 +812,14 @@ class _FileManagerScreenState extends ConsumerState<FileManagerScreen> {
 
   Future<void> _toggleIndex(FileSystemEntry entry) async {
     try {
+      final apiClient = ref.read(clientProvider);
       if (entry.isIndexed) {
-        await client.butler.removeFromIndex(path: entry.path);
+        await apiClient.butler.removeFromIndex(path: entry.path);
       } else {
-        await client.butler.startIndexing(entry.path);
+        await apiClient.butler.startIndexing(entry.path);
       }
       // Invalidate cache to show updated index status
-      _directoryCache.invalidate(_currentPath);
+      ref.read(directoryCacheProvider).invalidate(_currentPath);
       _loadDirectory(_currentPath);
     } catch (e) {
       AppLogger.error('Failed to toggle index: $e');
@@ -808,9 +881,14 @@ class _FileManagerScreenState extends ConsumerState<FileManagerScreen> {
       }
 
       try {
-        await client.fileSystem.rename(entry.path, result, entry.isDirectory);
+        final apiClient = ref.read(clientProvider);
+        await apiClient.fileSystem.rename(
+          entry.path,
+          result,
+          entry.isDirectory,
+        );
         // Invalidate cache after file operation
-        _directoryCache.invalidate(_currentPath);
+        ref.read(directoryCacheProvider).invalidate(_currentPath);
         _loadDirectory(_currentPath);
       } catch (e) {
         if (mounted) {
@@ -919,10 +997,11 @@ class _FileManagerScreenState extends ConsumerState<FileManagerScreen> {
       final originalPath = entry.path;
 
       // Move file to trash using server API
-      await client.fileSystem.move(entry.path, trashEntryPath);
+      final apiClient = ref.read(clientProvider);
+      await apiClient.fileSystem.move(entry.path, trashEntryPath);
 
       // Invalidate cache and refresh
-      _directoryCache.invalidate(_currentPath);
+      ref.read(directoryCacheProvider).invalidate(_currentPath);
       await _loadDirectory(_currentPath);
 
       if (!mounted) return;
@@ -950,8 +1029,9 @@ class _FileManagerScreenState extends ConsumerState<FileManagerScreen> {
             onPressed: () async {
               try {
                 // Restore from trash
-                await client.fileSystem.move(trashEntryPath, originalPath);
-                _directoryCache.invalidate(_currentPath);
+                final apiClient = ref.read(clientProvider);
+                await apiClient.fileSystem.move(trashEntryPath, originalPath);
+                ref.read(directoryCacheProvider).invalidate(_currentPath);
                 await _loadDirectory(_currentPath);
 
                 if (!mounted) return;
@@ -962,7 +1042,10 @@ class _FileManagerScreenState extends ConsumerState<FileManagerScreen> {
                   ),
                 );
               } catch (e) {
-                AppLogger.error('Failed to restore file: $e', tag: 'FileManager');
+                AppLogger.error(
+                  'Failed to restore file: $e',
+                  tag: 'FileManager',
+                );
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(

@@ -19,6 +19,9 @@ mixin FileTaggingMixin<T extends StatefulWidget> on State<T> {
   /// Current tag query string
   String tagQuery = '';
 
+  /// Layer link for positioning the overlay relative to the input field
+  LayerLink get tagLayerLink;
+
   /// Overlay entry for tag suggestions
   OverlayEntry? tagOverlayEntry;
 
@@ -29,7 +32,10 @@ mixin FileTaggingMixin<T extends StatefulWidget> on State<T> {
 
   /// Clean up tag resources
   void disposeFileTagging() {
-    hideTagOverlay();
+    try {
+      tagOverlayEntry?.remove();
+      tagOverlayEntry = null;
+    } catch (_) {}
     tagTextController.removeListener(_handleTagTextChange);
   }
 
@@ -63,34 +69,46 @@ mixin FileTaggingMixin<T extends StatefulWidget> on State<T> {
 
   /// Show tag overlay widget
   void showTagOverlayWidget() {
+    if (!mounted) return;
+
     if (tagOverlayEntry != null) {
       // Update existing overlay
       tagOverlayEntry!.markNeedsBuild();
       return;
     }
 
-    // Position overlay above input field, to the right of sidebar
-    final position = const Offset(280, 80);
-
     tagOverlayEntry = OverlayEntry(
-      builder: (context) => FileTagOverlay(
-        query: tagQuery,
-        position: position,
-        onFileSelected: onFileTagged,
-        onDismiss: hideTagOverlay,
+      builder: (context) => CompositedTransformFollower(
+        link: tagLayerLink,
+        showWhenUnlinked: false,
+        targetAnchor: Alignment.topLeft,
+        followerAnchor: Alignment.bottomLeft,
+        offset: const Offset(0, -8),
+        child: FileTagOverlay(
+          query: tagQuery,
+          position: Offset.zero,
+          onFileSelected: onFileTagged,
+          onDismiss: hideTagOverlay,
+        ),
       ),
     );
 
-    Overlay.of(context).insert(tagOverlayEntry!);
-    setState(() => showTagOverlay = true);
+    try {
+      Overlay.of(context).insert(tagOverlayEntry!);
+      setState(() => showTagOverlay = true);
+    } catch (e) {
+      // If overlay insertion fails, clean up
+      tagOverlayEntry = null;
+    }
   }
 
   /// Hide tag overlay
   void hideTagOverlay() {
     tagOverlayEntry?.remove();
     tagOverlayEntry = null;
-    if (showTagOverlay) {
+    if (showTagOverlay && mounted) {
       setState(() => showTagOverlay = false);
+      tagFocusNode.requestFocus();
     }
   }
 

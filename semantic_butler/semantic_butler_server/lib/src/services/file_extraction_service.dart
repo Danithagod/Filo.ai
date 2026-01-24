@@ -31,6 +31,58 @@ class FileExtractionService {
   /// PDF extensions (require special handling)
   static const Set<String> pdfExtensions = {'.pdf'};
 
+  /// Media file extensions (images, videos, audio) - metadata only indexing
+  static const Set<String> _mediaExtensions = {
+    // Images
+    '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp', '.svg', '.ico',
+    '.heic', '.heif', '.raw', '.cr2', '.nef', '.arw',
+    // Videos
+    '.mp4',
+    '.avi',
+    '.mov',
+    '.mkv',
+    '.wmv',
+    '.flv',
+    '.webm',
+    '.m4v',
+    '.mpg',
+    '.mpeg',
+    '.3gp', '.ogv', '.ts', '.m2ts',
+    // Audio
+    '.mp3',
+    '.wav',
+    '.flac',
+    '.aac',
+    '.ogg',
+    '.wma',
+    '.m4a',
+    '.opus',
+    '.aiff',
+    '.aif',
+    '.amr', '.ac3',
+  };
+
+  /// Archive and binary file extensions
+  static const Set<String> _archiveExtensions = {
+    '.zip',
+    '.tar',
+    '.gz',
+    '.rar',
+    '.7z',
+    '.xz',
+    '.bz2',
+    '.tar.gz',
+    '.tgz',
+    '.exe',
+    '.dll',
+    '.so',
+    '.dylib',
+    '.app',
+    '.dmg',
+    '.iso',
+    '.img',
+  };
+
   /// Code file extensions
   static const Set<String> _codeExtensions = {
     '.dart',
@@ -86,21 +138,29 @@ class FileExtractionService {
     '.csv',
   };
 
-  /// Check if a file extension is supported
+  /// Check if a file extension is supported for text extraction
   static bool isSupported(String filePath) {
     final ext = path.extension(filePath).toLowerCase();
     return supportedExtensions.contains(ext) || pdfExtensions.contains(ext);
   }
 
+  /// Check if a file can have its text content extracted
+  static bool canExtractText(String filePath) {
+    return isSupported(filePath);
+  }
+
   /// Get document category based on file extension
   static DocumentCategory getDocumentCategory(String filePath) {
     final ext = path.extension(filePath).toLowerCase();
+    final fileName = path.basename(filePath).toLowerCase();
 
-    if (_codeExtensions.contains(ext)) {
+    if (_codeExtensions.contains(ext) || _codeExtensions.contains(fileName)) {
       return DocumentCategory.code;
-    } else if (_configExtensions.contains(ext)) {
+    } else if (_configExtensions.contains(ext) ||
+        _configExtensions.contains(fileName)) {
       return DocumentCategory.config;
-    } else if (_dataExtensions.contains(ext)) {
+    } else if (_dataExtensions.contains(ext) ||
+        _dataExtensions.contains(fileName)) {
       return DocumentCategory.data;
     } else if (pdfExtensions.contains(ext) ||
         ext == '.txt' ||
@@ -108,6 +168,10 @@ class FileExtractionService {
         ext == '.markdown' ||
         ext == '.rtf') {
       return DocumentCategory.document;
+    } else if (_mediaExtensions.contains(ext)) {
+      return DocumentCategory.mediaMetadata;
+    } else if (_archiveExtensions.contains(ext)) {
+      return DocumentCategory.mediaMetadata;
     }
 
     return DocumentCategory.document; // Default
@@ -163,6 +227,30 @@ class FileExtractionService {
       '.rb': 'text/x-ruby',
       '.php': 'text/x-php',
       '.sql': 'application/sql',
+      // Images
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+      '.svg': 'image/svg+xml',
+      // Videos
+      '.mp4': 'video/mp4',
+      '.avi': 'video/x-msvideo',
+      '.mov': 'video/quicktime',
+      '.mkv': 'video/x-matroska',
+      '.webm': 'video/webm',
+      // Audio
+      '.mp3': 'audio/mpeg',
+      '.wav': 'audio/wav',
+      '.ogg': 'audio/ogg',
+      '.m4a': 'audio/mp4',
+      // Archives
+      '.zip': 'application/zip',
+      '.tar': 'application/x-tar',
+      '.gz': 'application/gzip',
+      '.rar': 'application/x-rar-compressed',
+      '.7z': 'application/x-7z-compressed',
     };
 
     return mimeTypes[ext] ?? 'application/octet-stream';
@@ -177,6 +265,51 @@ class FileExtractionService {
       createdAt: stat.changed, // Windows: creation time, Unix: last change
       modifiedAt: stat.modified,
     );
+  }
+
+  /// Extract metadata only for non-text files
+  Future<ExtractionResult> extractMetadataOnly(String filePath) async {
+    final file = File(filePath);
+    if (!await file.exists()) {
+      throw FileExtractionException('File not found: $filePath');
+    }
+
+    final fileName = path.basename(filePath);
+    final fileSize = await file.length();
+    final metadata = await getFileMetadata(filePath);
+    final category = getDocumentCategory(filePath);
+
+    // Use filename as preview for searchability
+    final preview = '[Media File] $fileName';
+
+    return ExtractionResult(
+      content: '',
+      preview: preview,
+      contentHash: _calculateMetadataHash(fileSize, metadata.modifiedAt),
+      fileName: fileName,
+      fileSizeBytes: fileSize,
+      mimeType: getMimeType(filePath),
+      documentCategory: getCategoryString(category),
+      wordCount: 0,
+      fileCreatedAt: metadata.createdAt,
+      fileModifiedAt: metadata.modifiedAt,
+    );
+  }
+
+  String _calculateMetadataHash(int fileSize, DateTime modifiedAt) {
+    final metadataString = '${fileSize}_${modifiedAt.millisecondsSinceEpoch}';
+    final bytes = utf8.encode(metadataString);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
+  }
+
+  /// Extract content or metadata depending on file type
+  Future<ExtractionResult> extract(String filePath) async {
+    if (canExtractText(filePath)) {
+      return extractText(filePath);
+    } else {
+      return extractMetadataOnly(filePath);
+    }
   }
 
   /// Extract text content from a file
@@ -385,9 +518,8 @@ class FileExtractionService {
           continue;
         }
 
-        if (isSupported(entity.path)) {
-          files.add(entity.path);
-        }
+        // Include all files that aren't ignored
+        files.add(entity.path);
       }
     }
 
