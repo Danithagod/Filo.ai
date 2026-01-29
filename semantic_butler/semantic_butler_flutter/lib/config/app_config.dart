@@ -7,7 +7,7 @@ class AppConfig {
 
     switch (env) {
       case 'production':
-        return 'https://semantic-butler-api.serverpod.space/';
+        return 'https://filo-file-manager.api.serverpod.space/';
       case 'staging':
         return 'https://semantic-butler-staging-api.serverpod.space/';
       default:

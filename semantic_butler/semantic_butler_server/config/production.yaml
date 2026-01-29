@@ -9,7 +9,7 @@ apiServer:
   port: 8080
   # UPDATE AFTER DEPLOYMENT: Replace with your actual Serverpod Cloud domain
   # Format: <project-id>.api.serverpod.space
-  publicHost: semantic-butler-api.serverpod.space
+  publicHost: filo-file-manager.api.serverpod.space
   publicPort: 443
   publicScheme: https
 
@@ -18,7 +18,7 @@ insightsServer:
   port: 8081
   # UPDATE AFTER DEPLOYMENT: Replace with your actual Serverpod Cloud domain
   # Format: <project-id>.insights.serverpod.space
-  publicHost: semantic-butler-insights.serverpod.space
+  publicHost: filo-file-manager.insights.serverpod.space
   publicPort: 443
   publicScheme: https
 
@@ -27,7 +27,7 @@ webServer:
   port: 8082
   # UPDATE AFTER DEPLOYMENT: Replace with your actual Serverpod Cloud domain
   # Format: <project-id>.serverpod.space
-  publicHost: semantic-butler.serverpod.space
+  publicHost: filo-file-manager.serverpod.space
   publicPort: 443
   publicScheme: https
 

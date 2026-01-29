@@ -19,7 +19,7 @@ class ToolResultLimiter {
   static String limitString(String input, {int? maxSize}) {
     final limit = maxSize ?? maxResultSize;
     if (input.length > limit) {
-      return input.substring(0, limit) + '\n[TRUNCATED - exceeded $limit characters]';
+      return '${input.substring(0, limit)}\n[TRUNCATED - exceeded $limit characters]';
     }
     return input;
   }

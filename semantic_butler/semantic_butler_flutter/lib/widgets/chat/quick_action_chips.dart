@@ -118,7 +118,7 @@ class _QuickActionChipsState extends State<QuickActionChips> {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 itemCount: widget.actions.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (context, index) {
                   final action = widget.actions[index];
                   return _QuickActionChip(

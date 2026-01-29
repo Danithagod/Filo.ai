@@ -322,8 +322,9 @@ class LocalIndexingService {
           // Skip folders that start with . (like .git, .dart_tool)
           if (entity.path
               .split(path.separator)
-              .any((p) => p.startsWith('.') && p != '.'))
+              .any((p) => p.startsWith('.') && p != '.')) {
             continue;
+          }
 
           // Index ALL non-hidden files (Metadata-only if unsupported)
           files.add(entity);

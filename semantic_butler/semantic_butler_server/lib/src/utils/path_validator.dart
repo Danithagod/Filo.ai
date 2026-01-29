@@ -90,7 +90,7 @@ class PathValidator {
   static bool hasPathTraversal(String path) {
     return path.contains('..') || 
            path.contains('~') ||
-           path.contains('\0');
+           path.contains('0');
   }
 
   /// Get list of allowed base paths for current platform

@@ -4,7 +4,7 @@ description: Starting point for a Serverpod server.
 # homepage: https://www.example.com
 
 environment:
-  sdk: '^3.8.0'
+  sdk: '^3.5.0'
 
 dependencies:
   crypto: ^3.0.7
@@ -35,4 +35,4 @@ serverpod:
     # Unfortunately, we can't use the `-o` flag directly because of an error
     # that happens on windows. Issue is tracked in the flutter
     # repository here: https://github.com/flutter/flutter/issues/157886
-    flutter_build: cd ../semantic_butler_flutter && flutter build web --base-href /app/ --wasm && rm -rf ../semantic_butler_server/web/app && mv build/web/ ../semantic_butler_server/web/app
+    flutter_build: cd ../semantic_butler_flutter && flutter build web --base-href /app/ --wasm && (if exist ..\semantic_butler_server\web\app rmdir /s /q ..\semantic_butler_server\web\app) && move build\web ..\semantic_butler_server\web\app

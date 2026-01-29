@@ -220,7 +220,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             );
           },
           loading: () => const SizedBox.shrink(),
-          error: (_, _) => const SizedBox.shrink(),
+          error: (_, __) => const SizedBox.shrink(),
         );
       },
     );
@@ -311,7 +311,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   Future<void> _handleRegenerateResponse(ChatMessage message) async {
     final messages =
         ref.read(chatHistoryProvider).value?.currentConversation?.messages ??
-        [];
+            [];
     final index = messages.indexOf(message);
     if (index == -1 || index == 0) return;
 
@@ -389,25 +389,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       final history = (historyState?.currentConversation?.messages ?? [])
           .where((m) => !m.hasError)
           .map((m) {
-            String content = m.content;
-            if (m.role == MessageRole.assistant &&
-                m.toolResults != null &&
-                m.toolResults!.isNotEmpty) {
-              final toolSummary = m.toolResults!
-                  .map(
-                    (r) =>
-                        '- ${r.tool}: ${r.success ? "Success" : "Failed"} (${r.result})',
-                  )
-                  .join('\n');
-              content +=
-                  '\n\n[System Note: Your previous actions in this turn:]\n$toolSummary';
-            }
-            return AgentMessage(
-              role: m.role == MessageRole.user ? 'user' : 'assistant',
-              content: content,
-            );
-          })
-          .toList();
+        String content = m.content;
+        if (m.role == MessageRole.assistant &&
+            m.toolResults != null &&
+            m.toolResults!.isNotEmpty) {
+          final toolSummary = m.toolResults!
+              .map(
+                (r) =>
+                    '- ${r.tool}: ${r.success ? "Success" : "Failed"} (${r.result})',
+              )
+              .join('\n');
+          content +=
+              '\n\n[System Note: Your previous actions in this turn:]\n$toolSummary';
+        }
+        return AgentMessage(
+          role: m.role == MessageRole.user ? 'user' : 'assistant',
+          content: content,
+        );
+      }).toList();
 
       // Show loading
       setState(() {
@@ -502,9 +501,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                 role: MessageRole.assistant,
                 content: contentBuffer.toString(),
                 currentTool: null,
-                statusMessage: toolSuccess
-                    ? 'Action completed'
-                    : 'Action failed',
+                statusMessage:
+                    toolSuccess ? 'Action completed' : 'Action failed',
                 toolsUsed: toolsUsed,
                 toolResults: List.of(toolResults),
                 isStreaming: true,
@@ -890,8 +888,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                                     16,
                                     16,
                                   ),
-                                  itemCount:
-                                      messages.length +
+                                  itemCount: messages.length +
                                       (streaming != null ? 1 : 0) +
                                       (hasMore ? 1 : 0),
                                   itemBuilder: (context, index) {
@@ -899,9 +896,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                                       return _buildLoadMoreIndicator(state);
                                     }
 
-                                    final messageIndex = hasMore
-                                        ? index - 1
-                                        : index;
+                                    final messageIndex =
+                                        hasMore ? index - 1 : index;
 
                                     if (streaming != null &&
                                         messageIndex == messages.length) {

@@ -11,47 +11,39 @@
 # Configuration for the main API server.
 apiServer:
   port: 8080
-  publicHost: api-staging.examplepod.com
+  publicHost: semantic-butler-staging-api.serverpod.space
   publicPort: 443
   publicScheme: https
 
 # Configuration for the Insights server.
 insightsServer:
   port: 8081
-  publicHost: insights-staging.examplepod.com
+  publicHost: semantic-butler-staging-insights.serverpod.space
   publicPort: 443
   publicScheme: https
 
 # Configuration for the web server.
 webServer:
   port: 8082
-  publicHost: app-staging.examplepod.com
+  publicHost: semantic-butler-staging.serverpod.space
   publicPort: 443
   publicScheme: https
 
-# This is the database setup for your servers. The default for the Google Cloud
-# Engine Terraform configuration is to connect on a private IP address.
-# If you are connecting on a public IP (e.g. on AWS or Google Cloud Run), you
-# connect on the public IP of the database e.g. database-staging.examplepod.com.
+# This is the database setup for your servers.
 database:
-  host: database.private-staging.examplepod.com
+  host: database-staging.serverpod.cloud
   port: 5432
-  name: serverpod
-  user: postgres
+  name: semantic_butler
+  user: serverpod
   requireSsl: true
-  #isUnixSocket: true # defaults to false
-  #maxConnectionCount: 10 # Defaults to 10, a negative or null value removes the limit
+  #maxConnectionCount: 10
 
-# This is the setup for Redis. The default for the Google Cloud Engine Terraform
-# configuration is to connect on a private IP address.
-# If you are connecting on a public IP (e.g. on AWS or Google Cloud Run), you
-# connect on the public IP of the database e.g. redis-staging.examplepod.com.
+# This is the setup for Redis.
 redis:
   enabled: false
-  host: redis.private-staging.examplepod.com
+  host: redis-staging.serverpod.cloud
   port: 6379
-  #user: # defaults to empty
-  #requireSsl: true # defaults to false
+  #requireSsl: true
 
 maxRequestSize: 524288 # The maximum size of requests allowed in bytes
 
