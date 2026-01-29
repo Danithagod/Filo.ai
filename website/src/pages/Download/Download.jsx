@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { gsap } from 'gsap';
-import { Monitor, Apple, Terminal } from 'lucide-react';
+import { Monitor } from 'lucide-react';
 import Logo from '../../components/Logo/Logo';
 import './Download.css';
 
@@ -34,21 +34,8 @@ const Download = ({ show }) => {
       name: 'Windows',
       icon: <Monitor size={48} />,
       desc: 'Native performance for Windows 10 & 11. Optimized for modern multi-core CPUs.',
-      version: 'v1.0.4-stable'
-    },
-    {
-      id: 'macos',
-      name: 'macOS',
-      icon: <Apple size={48} />,
-      desc: 'Universal binary with native support for Apple Silicon (M1/M2/M3) and Intel.',
-      version: 'v1.0.4-stable'
-    },
-    {
-      id: 'linux',
-      name: 'Linux',
-      icon: <Terminal size={48} />,
-      desc: 'Distributed via AppImage and Snap. Built for speed and flexibility.',
-      version: 'v1.0.4-beta'
+      version: 'v1.0.4-stable',
+      href: '/downloads/filo-windows.msix'
     }
   ];
 
@@ -79,9 +66,15 @@ const Download = ({ show }) => {
               <p className="platform-desc">{platform.desc}</p>
 
               <div className="platform-actions">
-                <button className="btn-primary-large">
-                  Download for {platform.name}
-                </button>
+                {platform.href ? (
+                  <a href={platform.href} className="btn-primary-large" download>
+                    Download for {platform.name}
+                  </a>
+                ) : (
+                  <button className="btn-primary-large" disabled>
+                    Coming Soon
+                  </button>
+                )}
               </div>
             </div>
           ))}

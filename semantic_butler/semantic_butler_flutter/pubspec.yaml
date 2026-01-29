@@ -111,7 +111,7 @@ msix_config:
   publisher_display_name: Desk-Sense
   publisher: CN=Desk-Sense, O=Desk-Sense, L=San Francisco, S=California, C=US
   identity_name: com.desksense.filo
-  msix_version: 1.0.4.0
+  msix_version: 1.0.5.0
   logo_path: assets/filo_logo.png
   capabilities: internetClient, location, microphone, privateNetworkClientServer
   install_certificate: true

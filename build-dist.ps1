@@ -31,7 +31,7 @@ Write-Host "`n🎁 Creating MSIX installer..." -ForegroundColor Yellow
 # Run msix:create using dart run
 dart run msix:create
 
-$msixPath = Join-Path $flutterPath "build\windows\runner\Release\Filo.msix"
+$msixPath = Join-Path $flutterPath "build\windows\x64\runner\Release\semantic_butler_flutter.msix"
 
 if (Test-Path $msixPath) {
     Write-Host "`n✅ MSIX Installer created successfully at: $msixPath" -ForegroundColor Green
