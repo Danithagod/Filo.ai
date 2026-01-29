@@ -57,6 +57,7 @@ dev_dependencies:
   plugin_platform_interface: ^2.1.8
   flutter_launcher_icons: ^0.14.1
   image: ^4.1.7
+  msix: ^3.10.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -104,3 +105,13 @@ dependency_overrides:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/custom-fonts/#from-packages
+# MSIX Configuration
+msix_config:
+  display_name: Filo
+  publisher_display_name: Desk-Sense
+  publisher: CN=Desk-Sense, O=Desk-Sense, L=San Francisco, S=California, C=US
+  identity_name: com.desksense.filo
+  msix_version: 1.0.4.0
+  logo_path: assets/filo_logo.png
+  capabilities: internetClient, location, microphone, privateNetworkClientServer
+  install_certificate: true

@@ -36,7 +36,7 @@ const Home = ({ show }) => {
       currentIndex = (currentIndex + 1) % words.length;
       const element = rotatingTextRef.current;
       const mask = maskRef.current;
-      
+
       if (!element || !mask) return;
 
       // Create a temporary span to measure the width of the next word
@@ -54,7 +54,7 @@ const Home = ({ show }) => {
       document.body.removeChild(temp);
 
       const tl = gsap.timeline();
-      
+
       tl.to(element, {
         yPercent: -120,
         opacity: 0,
@@ -65,17 +65,17 @@ const Home = ({ show }) => {
           gsap.set(element, { yPercent: 120, opacity: 0 });
         }
       })
-      .to(mask, {
-        width: nextWidth,
-        duration: 0.6,
-        ease: 'power4.inOut'
-      }, '-=0.3')
-      .to(element, {
-        yPercent: 0,
-        opacity: 1,
-        duration: 0.6,
-        ease: 'power4.out'
-      }, '-=0.3');
+        .to(mask, {
+          width: nextWidth,
+          duration: 0.6,
+          ease: 'power4.inOut'
+        }, '-=0.3')
+        .to(element, {
+          yPercent: 0,
+          opacity: 1,
+          duration: 0.6,
+          ease: 'power4.out'
+        }, '-=0.3');
     };
 
     const rotationInterval = setInterval(rotateText, 3000);
@@ -286,16 +286,18 @@ const Home = ({ show }) => {
         </div>
 
         <div className="hero-visual-container" ref={visualRef}>
-          <div className="hero-visual glass-card">
-            <div className="visual-inner">
-              <div className="scan-line"></div>
-              <Database size={80} className="visual-icon pulse" />
-              <div className="data-points">
-                {[...Array(12)].map((_, i) => (
-                  <div key={i} className={`point point-${i}`}></div>
-                ))}
-              </div>
-            </div>
+          <div className="hero-video-box glass-card">
+            <video
+              autoPlay
+              muted
+              loop
+              playsInline
+              className="demo-video"
+            >
+              <source src="/filo.mp4" type="video/mp4" />
+              Your browser does not support the video tag.
+            </video>
+            <div className="video-overlay"></div>
           </div>
         </div>
       </section>
@@ -377,7 +379,7 @@ const Home = ({ show }) => {
               </div>
               <h2 className="section-title">Local-First <span className="text-gradient">Privacy</span> Architecture</h2>
               <p>Filo is built on a local-first philosophy. Your file index and document metadata stay on your machine. Only search queries are sent to AI models for processing, not your full documents.</p>
-              
+
               <div className="privacy-features">
                 <div className="p-feat">
                   <Lock size={20} />

@@ -243,13 +243,20 @@ class _FileTagOverlayState extends ConsumerState<FileTagOverlay> {
           },
           child: Material(
             elevation: 12,
-            borderRadius: BorderRadius.circular(16),
             color: colorScheme.surfaceContainerHigh,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(
+                color: colorScheme.primary.withValues(alpha: 0.6),
+                width: 1.5,
+              ),
+            ),
             child: Container(
-              width: 384, // 320 * 1.2 = 384
+              width: 420, // Slightly wider for better readability
               constraints: const BoxConstraints(
-                maxHeight: 336,
-              ), // 280 * 1.2 = 336
+                maxHeight: 400, // Increased max height
+                maxWidth: 420,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,

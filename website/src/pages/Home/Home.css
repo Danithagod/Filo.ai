@@ -143,128 +143,50 @@
   opacity: 0;
 }
 
-.hero-visual {
+/* Main Visual Section */
+.hero-visual-container {
+  margin-top: 4rem;
+}
+
+/* Main Visual Stack - Obsolete */
+/* (Removed main-visual-stack) */
+
+/* Demo Video Box */
+.hero-video-box {
   width: 100%;
-  height: clamp(300px, 50vh, 550px);
-  border-radius: 40px;
-  position: relative;
+  border-radius: 16px;
+  /* Matching the main visual card radius */
   overflow: hidden;
-  box-shadow: 0 60px 120px rgba(0, 0, 0, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 100%);
-}
-
-.visual-inner {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   position: relative;
-  background: radial-gradient(circle at center, rgba(103, 80, 164, 0.1) 0%, transparent 70%);
+  box-shadow: 0 40px 80px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #000;
+  transform: translateZ(0);
+  /* Fix for some browsers layering */
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  line-height: 0;
 }
 
-.scan-line {
-  position: absolute;
-  top: 0;
-  left: 0;
+.hero-video-box:hover {
+  transform: translateY(-10px) scale(1.01);
+  border-color: rgba(197, 180, 241, 0.3);
+}
+
+.demo-video {
   width: 100%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--primary-light), transparent);
-  box-shadow: 0 0 15px var(--primary-light);
-  opacity: 0.5;
-  animation: scan 6s linear infinite;
+  height: auto;
+  display: block;
+  object-fit: cover;
+  border-radius: inherit;
+  /* Critical for edge-to-edge matching */
 }
 
-@keyframes scan {
-  0% {
-    transform: translateY(0);
-  }
-
-  100% {
-    transform: translateY(100%);
-  }
-}
-
-.visual-icon {
-  color: var(--primary-light);
-  filter: drop-shadow(0 0 20px rgba(103, 80, 164, 0.5));
-}
-
-.data-points {
+.video-overlay {
   position: absolute;
   inset: 0;
+  background: linear-gradient(180deg, transparent 80%, rgba(0, 0, 0, 0.2) 100%);
   pointer-events: none;
-}
-
-.point {
-  position: absolute;
-  width: 4px;
-  height: 4px;
-  background: var(--primary-light);
-  border-radius: 50%;
-  opacity: 0.3;
-}
-
-/* Generate positions for points */
-.point-0 {
-  top: 20%;
-  left: 30%;
-}
-
-.point-1 {
-  top: 40%;
-  left: 70%;
-}
-
-.point-2 {
-  top: 70%;
-  left: 20%;
-}
-
-.point-3 {
-  top: 80%;
-  left: 80%;
-}
-
-.point-4 {
-  top: 10%;
-  left: 60%;
-}
-
-.point-5 {
-  top: 50%;
-  left: 40%;
-}
-
-.point-6 {
-  top: 30%;
-  left: 10%;
-}
-
-.point-7 {
-  top: 60%;
-  left: 90%;
-}
-
-.point-8 {
-  top: 90%;
-  left: 50%;
-}
-
-.point-9 {
-  top: 15%;
-  left: 85%;
-}
-
-.point-10 {
-  top: 75%;
-  left: 35%;
-}
-
-.point-11 {
-  top: 45%;
-  left: 15%;
+  border-radius: inherit;
 }
 
 /* Trust Ticker */
@@ -329,7 +251,7 @@
   display: flex;
   flex-direction: column;
   gap: 2rem;
-  border-radius: 40px;
+  border-radius: 48px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(20px);
@@ -557,7 +479,7 @@
   align-items: center;
   justify-content: center;
   position: relative;
-  border-radius: 40px;
+  border-radius: 48px;
   background: radial-gradient(circle at center, rgba(103, 80, 164, 0.15) 0%, transparent 70%);
 }
 
@@ -645,7 +567,7 @@
   gap: 5rem;
   padding: 5rem;
   align-items: center;
-  border-radius: 40px;
+  border-radius: 48px;
 }
 
 .integration-text h2 {

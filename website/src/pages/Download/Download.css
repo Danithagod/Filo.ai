@@ -9,15 +9,39 @@
 }
 
 .download-hero .hero-title {
-  font-size: clamp(3rem, 8vw, 5rem);
-  margin-bottom: 1.5rem;
+  margin-bottom: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.get-text {
+  font-size: clamp(3rem, 10vw, 6rem);
+  line-height: 1;
+  color: var(--on-surface);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.logo-title-wrapper {
+  line-height: 0;
+  margin-top: -1rem;
+}
+
+.hero-logo-svg {
+  color: var(--primary-light);
+  filter: drop-shadow(0 0 30px rgba(103, 80, 164, 0.4));
+  /* Applying gradient if possible via complex CSS, but currentColor is cleaner for now */
+  /* We can use CSS masks or just leave it as solid light purple for a premium look */
 }
 
 .download-hero .hero-subtitle {
   font-size: 1.25rem;
   opacity: 0.7;
-  max-width: 600px;
+  max-width: 700px;
   margin: 0 auto;
+  line-height: 1.6;
 }
 
 .download-grid {
@@ -28,12 +52,13 @@
 
 .download-section {
   padding: 4rem;
-  border-radius: 40px;
+  border-radius: 48px;
+  /* Standardized to match Home page */
   display: grid;
   grid-template-columns: 1fr 1.5fr 1fr;
   align-items: center;
   gap: 3rem;
-  transition: all 0.4s ease;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .download-section:hover {

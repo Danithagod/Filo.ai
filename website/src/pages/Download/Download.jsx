@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { gsap } from 'gsap';
 import { Monitor, Apple, Terminal } from 'lucide-react';
+import Logo from '../../components/Logo/Logo';
 import './Download.css';
 
 const Download = ({ show }) => {
@@ -55,7 +56,12 @@ const Download = ({ show }) => {
     <div className={`download-page page-content${show ? ' visible' : ''}`}>
       <section className="download-hero">
         <div className="container">
-          <h1 className="hero-title">Get <span className="text-gradient">Filo</span></h1>
+          <h1 className="hero-title">
+            <span className="get-text">Get</span>
+            <div className="logo-title-wrapper">
+              <Logo size={280} className="hero-logo-svg" />
+            </div>
+          </h1>
           <p className="hero-subtitle">Choose your platform and start searching your local data with AI-powered intelligence.</p>
         </div>
       </section>
@@ -69,7 +75,7 @@ const Download = ({ show }) => {
                 <h2>{platform.name}</h2>
                 <span className="version-badge">{platform.version}</span>
               </div>
-              
+
               <p className="platform-desc">{platform.desc}</p>
 
               <div className="platform-actions">

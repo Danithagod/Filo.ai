@@ -84,11 +84,14 @@ mixin FileTaggingMixin<T extends StatefulWidget> on State<T> {
         targetAnchor: Alignment.topLeft,
         followerAnchor: Alignment.bottomLeft,
         offset: const Offset(0, -8),
-        child: FileTagOverlay(
-          query: tagQuery,
-          position: Offset.zero,
-          onFileSelected: onFileTagged,
-          onDismiss: hideTagOverlay,
+        child: Align(
+          alignment: Alignment.bottomLeft,
+          child: FileTagOverlay(
+            query: tagQuery,
+            position: Offset.zero,
+            onFileSelected: onFileTagged,
+            onDismiss: hideTagOverlay,
+          ),
         ),
       ),
     );
