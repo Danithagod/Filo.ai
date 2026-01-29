@@ -1,1 +1,33 @@
+# Plan mode files
 /.plan
+
+# Environment files with secrets
+.env
+.env.local
+.env.production
+.env.*.local
+**/.env
+
+# Password files
+**/passwords.yaml
+**/passwords.yml
+
+# API keys and secrets
+**/firebase_service_account_key.json
+**/*.secret
+**/*.key
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+build/
+dist/
+node_modules/
