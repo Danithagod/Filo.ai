@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/app_config.dart';
 
 /// Provider for the SettingsService using AsyncNotifier
 final settingsProvider = AsyncNotifierProvider<SettingsNotifier, AppSettings>(
@@ -25,11 +26,12 @@ class AppSettings {
     this.userName,
   });
 
-  /// Default settings used during loading
+  /// Default settings used during loading (serverUrl will be overridden by config)
   static const defaultSettings = AppSettings(
     themeMode: ThemeMode.dark,
     aiProvider: 'OpenRouter',
-    serverUrl: 'http://127.0.0.1:8080/',
+    serverUrl:
+        'http://127.0.0.1:8080/', // Fallback only, config.json takes precedence
     hasSeenOnboarding: false,
     userName: null,
   );
@@ -46,9 +48,8 @@ class AppSettings {
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
       aiProvider: aiProvider ?? this.aiProvider,
-      openRouterKey: clearOpenRouterKey
-          ? null
-          : (openRouterKey ?? this.openRouterKey),
+      openRouterKey:
+          clearOpenRouterKey ? null : (openRouterKey ?? this.openRouterKey),
       serverUrl: serverUrl ?? this.serverUrl,
       hasSeenOnboarding: hasSeenOnboarding ?? this.hasSeenOnboarding,
       userName: userName ?? this.userName,
@@ -81,8 +82,40 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
 
     final aiProvider = _prefs.getString(_keyAiProvider) ?? 'OpenRouter';
     final openRouterKey = _prefs.getString(_keyOpenRouterKey);
-    final serverUrl =
-        _prefs.getString(_keyServerUrl) ?? 'http://127.0.0.1:8080/';
+
+    // Load default serverUrl from config.json if not already stored in preferences
+    // Also migrate from localhost to production URL for existing users
+    String serverUrl;
+    final storedServerUrl = _prefs.getString(_keyServerUrl);
+
+    // Load config.json to get the bundled production URL
+    String configUrl;
+    try {
+      final config = await AppConfig.loadConfig();
+      configUrl = config.apiUrl;
+    } catch (e) {
+      configUrl = 'http://127.0.0.1:8080/';
+    }
+
+    if (storedServerUrl == null) {
+      // First run: use URL from config.json
+      serverUrl = configUrl;
+      await _prefs.setString(_keyServerUrl, serverUrl);
+    } else if (storedServerUrl.contains('127.0.0.1') ||
+        storedServerUrl.contains('localhost')) {
+      // Migration: existing users with localhost should switch to production URL
+      // Only migrate if config.json has a non-localhost URL
+      if (!configUrl.contains('127.0.0.1') &&
+          !configUrl.contains('localhost')) {
+        serverUrl = configUrl;
+        await _prefs.setString(_keyServerUrl, serverUrl);
+      } else {
+        serverUrl = storedServerUrl;
+      }
+    } else {
+      serverUrl = storedServerUrl;
+    }
+
     final hasSeenOnboarding = _prefs.getBool(_keyHasSeenOnboarding) ?? false;
     final userName = _prefs.getString(_keyUserName);
 

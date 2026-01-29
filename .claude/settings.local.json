@@ -38,7 +38,8 @@
       "Bash(python:*)",
       "Bash(tasklist:*)",
       "Bash(netstat:*)",
-      "Bash(gh pr:*)"
+      "Bash(gh pr:*)",
+      "Bash(git rm:*)"
     ]
   },
   "outputStyle": "default"
