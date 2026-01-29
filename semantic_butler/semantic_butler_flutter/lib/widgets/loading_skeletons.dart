@@ -187,7 +187,7 @@ class SearchResultsSkeletonList extends StatelessWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: itemCount,
-      itemBuilder: (context, index) => const SearchResultSkeleton(),
+      itemBuilder: (context, index) => SearchResultSkeleton(),
     );
   }
 }

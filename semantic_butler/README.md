@@ -1,4 +1,4 @@
-# Semantic Desktop Butler
+# Filo - Private AI Assistant
 
 A semantic search application for your local files, powered by Flutter, Serverpod, and OpenRouter.
 

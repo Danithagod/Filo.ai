@@ -12,48 +12,51 @@ class SuggestionService {
     final suggestions = <SearchSuggestion>[];
     if (query.trim().isEmpty) return suggestions;
 
-    final lowerQuery = query.toLowerCase();
-
     // 1. Tag Suggestions (High priority for structured search)
-    // In a real implementation, we'd query the DB or TagTaxonomyService
-    // For now, we mock some common tags or use what we can get
-    final tags = ['important', 'work', 'personal', 'finance', 'project'];
-    for (final tag in tags) {
-      if (tag.contains(lowerQuery)) {
+    try {
+      final tags = await TagTaxonomy.db.find(
+        session,
+        where: (t) => t.tagValue.ilike('%$query%'),
+        limit: 5,
+        orderBy: (t) => t.frequency,
+        orderDescending: true,
+      );
+      for (final tag in tags) {
         suggestions.add(
           SearchSuggestion(
-            text: tag,
+            text: tag.tagValue,
             type: 'tag',
             score: 1.0,
-            metadata: 'Tag',
+            metadata: 'Tag (${tag.category})',
           ),
         );
       }
+    } catch (e) {
+      // Fallback to mocked tags if table doesn't exist or error
     }
 
     // 2. Preset Suggestions (Saved Searches)
-    // We can query SavedSearchPreset if we had the table
-    // For now, let's assume we can query existing ones
-
-    /*
     try {
       final presets = await SavedSearchPreset.db.find(
         session,
         where: (t) => t.name.ilike('%$query%'),
-        limit: 5,
+        limit: 3,
+        orderBy: (t) => t.usageCount,
+        orderDescending: true,
       );
       for (final p in presets) {
-        suggestions.add(SearchSuggestion(
-          text: p.name,
-          type: 'preset',
-          score: 0.9,
-          metadata: 'Saved Search',
-        ));
+        suggestions.add(
+          SearchSuggestion(
+            text: p.name,
+            type: 'preset',
+            score: 0.9,
+            metadata: 'Saved Search',
+          ),
+        );
       }
     } catch (e) {
-      // Ignore if table doesn't exist yet
+      // Ignore
     }
-    */
 
     // 3. History Suggestions
     try {
@@ -80,9 +83,44 @@ class SuggestionService {
         );
       }
     } catch (e) {
-      // Ignore errors
+      // Ignore
     }
 
-    return suggestions.take(limit).toList();
+    // 4. Filename Suggestions (Discoverability)
+    try {
+      final files = await FileIndex.db.find(
+        session,
+        where: (t) => t.fileName.ilike('%$query%'),
+        limit: 5,
+        orderBy: (t) => t.indexedAt,
+        orderDescending: true,
+      );
+      for (final f in files) {
+        suggestions.add(
+          SearchSuggestion(
+            text: f.fileName,
+            type: 'file',
+            score: 0.7,
+            metadata: 'File Match',
+          ),
+        );
+      }
+    } catch (e) {
+      // Ignore
+    }
+
+    // Sort by score and unique text
+    final seen = <String>{};
+    final finalSuggestions = <SearchSuggestion>[];
+
+    suggestions.sort((a, b) => b.score.compareTo(a.score));
+
+    for (final s in suggestions) {
+      if (seen.contains(s.text.toLowerCase())) continue;
+      seen.add(s.text.toLowerCase());
+      finalSuggestions.add(s);
+    }
+
+    return finalSuggestions.take(limit).toList();
   }
 }

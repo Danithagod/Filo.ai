@@ -1,4 +1,7 @@
 import 'dart:convert';
+import 'dart:async';
+import 'dart:math';
+
 import 'package:http/http.dart' as http;
 
 /// OpenRouter API client for unified access to multiple AI providers
@@ -57,29 +60,31 @@ class OpenRouterClient {
     if (maxTokens != null) body['max_tokens'] = maxTokens;
     if (stream != null) body['stream'] = stream;
 
-    final response = await _httpClient
-        .post(
-          Uri.parse('$baseUrl/chat/completions'),
-          headers: _headers,
-          body: jsonEncode(body),
-        )
-        .timeout(
-          const Duration(seconds: 60),
-          onTimeout: () => throw OpenRouterException(
-            'Chat completion timed out after 60 seconds',
-            statusCode: 408,
-          ),
+    return _withRetries(() async {
+      final response = await _httpClient
+          .post(
+            Uri.parse('$baseUrl/chat/completions'),
+            headers: _headers,
+            body: jsonEncode(body),
+          )
+          .timeout(
+            const Duration(seconds: 60),
+            onTimeout: () => throw OpenRouterException(
+              'Chat completion timed out after 60 seconds',
+              statusCode: 408,
+            ),
+          );
+
+      if (response.statusCode != 200) {
+        throw OpenRouterException(
+          'Chat completion failed',
+          statusCode: response.statusCode,
+          body: response.body,
         );
+      }
 
-    if (response.statusCode != 200) {
-      throw OpenRouterException(
-        'Chat completion failed',
-        statusCode: response.statusCode,
-        body: response.body,
-      );
-    }
-
-    return ChatCompletionResponse.fromJson(jsonDecode(response.body));
+      return ChatCompletionResponse.fromJson(jsonDecode(response.body));
+    });
   }
 
   /// Streaming chat completion with token-by-token responses
@@ -172,32 +177,34 @@ class OpenRouterClient {
     required String model,
     required List<String> input,
   }) async {
-    final response = await _httpClient
-        .post(
-          Uri.parse('$baseUrl/embeddings'),
-          headers: _headers,
-          body: jsonEncode({
-            'model': model,
-            'input': input,
-          }),
-        )
-        .timeout(
-          const Duration(seconds: 30),
-          onTimeout: () => throw OpenRouterException(
-            'Embeddings timed out after 30 seconds',
-            statusCode: 408,
-          ),
+    return _withRetries(() async {
+      final response = await _httpClient
+          .post(
+            Uri.parse('$baseUrl/embeddings'),
+            headers: _headers,
+            body: jsonEncode({
+              'model': model,
+              'input': input,
+            }),
+          )
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () => throw OpenRouterException(
+              'Embeddings timed out after 30 seconds',
+              statusCode: 408,
+            ),
+          );
+
+      if (response.statusCode != 200) {
+        throw OpenRouterException(
+          'Embeddings failed',
+          statusCode: response.statusCode,
+          body: response.body,
         );
+      }
 
-    if (response.statusCode != 200) {
-      throw OpenRouterException(
-        'Embeddings failed',
-        statusCode: response.statusCode,
-        body: response.body,
-      );
-    }
-
-    return EmbeddingResponse.fromJson(jsonDecode(response.body));
+      return EmbeddingResponse.fromJson(jsonDecode(response.body));
+    });
   }
 
   /// Get list of available models
@@ -238,6 +245,46 @@ class OpenRouterClient {
     final json = jsonDecode(response.body);
     final data = json['data'] as List<dynamic>;
     return data.map((m) => ModelInfo.fromJson(m)).toList();
+  }
+
+  /// Helper to execute a task with exponential backoff retries
+  Future<T> _withRetries<T>(
+    Future<T> Function() task, {
+    int maxRetries = 3,
+    Duration initialDelay = const Duration(seconds: 2),
+  }) async {
+    int attempt = 0;
+    while (true) {
+      try {
+        return await task();
+      } catch (e) {
+        attempt++;
+        if (attempt > maxRetries) rethrow;
+
+        bool shouldRetry = false;
+        if (e is OpenRouterException) {
+          final sc = e.statusCode;
+          // Retry on Rate Limit (429) or Server Errors (5xx)
+          if (sc == 429 || (sc != null && sc >= 500 && sc < 600)) {
+            shouldRetry = true;
+          }
+        } else if (e is http.ClientException || e is TimeoutException) {
+          shouldRetry = true;
+        }
+
+        if (!shouldRetry) rethrow;
+
+        // Calculate exponential backoff with jitter
+        // Jitter: ±20% randomization to prevent thundering herd
+        final baseDelay = initialDelay * pow(2, attempt - 1);
+        final jitterFactor = 0.8 + (Random().nextDouble() * 0.4); // 0.8 to 1.2
+        final delay = Duration(
+          milliseconds: (baseDelay.inMilliseconds * jitterFactor).round(),
+        );
+
+        await Future.delayed(delay);
+      }
+    }
   }
 
   void dispose() {

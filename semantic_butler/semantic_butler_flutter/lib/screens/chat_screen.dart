@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../main.dart';
@@ -12,6 +13,8 @@ import '../models/tagged_file.dart';
 import '../models/chat/message_role.dart';
 import '../models/chat/chat_message.dart';
 import '../models/chat/chat_error.dart';
+import '../models/chat/tool_result.dart';
+import '../providers/chat_history_provider.dart';
 import '../mixins/file_tagging_mixin.dart';
 import '../widgets/chat/chat_message_bubble.dart';
 import '../widgets/chat/chat_input_area.dart';
@@ -22,7 +25,6 @@ import '../providers/navigation_provider.dart';
 import 'package:semantic_butler_client/semantic_butler_client.dart';
 import '../widgets/chat_history_sidebar.dart';
 import 'package:intl/intl.dart';
-import '../providers/chat_history_provider.dart';
 import '../widgets/chat/welcome_carousel.dart';
 import '../mixins/slash_command_mixin.dart';
 import '../services/settings_service.dart';
@@ -45,7 +47,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   final List<File> _attachedFiles = [];
   bool _isLoading = false;
   final FocusNode _inputFocusNode = FocusNode();
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   /// Flag to prevent concurrent message sends (race condition fix)
   bool _isSending = false;
@@ -345,10 +346,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       taggedFilesSnapshot,
     );
 
+    // Add user context
+    final settings = ref.read(settingsProvider).value;
+    final userName = settings?.userName;
+    final userContext = (userName != null && userName.isNotEmpty)
+        ? '[User Info] Name: $userName\n\n'
+        : '';
+
     // Combine file context with user message
     final fullMessage = fileContext.isEmpty
-        ? messageContent
-        : '$fileContext$messageContent';
+        ? '$userContext$messageContent'
+        : '$userContext$fileContext$messageContent';
 
     // Create user message
     final userMessage = ChatMessage(
@@ -410,6 +418,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       final contentBuffer = StringBuffer();
       int toolsUsed = 0;
       String? currentTool;
+      final List<ToolResult> toolResults = [];
 
       final apiClient = ref.read(clientProvider);
       await for (final event in apiClient.agent.streamChat(
@@ -479,6 +488,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               toolSuccess = false;
             }
 
+            final resultObj = ToolResult(
+              tool: event.tool ?? 'unknown',
+              result: resultText,
+              success: toolSuccess,
+              timestamp: DateTime.now(),
+            );
+            toolResults.add(resultObj);
+
             _updateStreamingMessage(
               ChatMessage(
                 id: 'streaming',
@@ -489,6 +506,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     ? 'Action completed'
                     : 'Action failed',
                 toolsUsed: toolsUsed,
+                toolResults: List.of(toolResults),
                 isStreaming: true,
               ),
             );
@@ -501,6 +519,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               role: MessageRole.assistant,
               content: finalContent,
               toolsUsed: toolsUsed,
+              toolResults: toolResults.isEmpty ? null : List.of(toolResults),
               timestamp: DateTime.now(),
             );
 
@@ -644,23 +663,40 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         _replyToMessage = null;
       });
 
-      // Build file context
-      final fileContext = await FileContentLoader.buildFileContext(
-        taggedFilesSnapshot,
-      );
+      // Build file context (tagged files + attached files)
+      final mergedFiles = [
+        ...taggedFilesSnapshot.map(
+          (f) => {'path': f.path, 'displayName': f.displayName},
+        ),
+        ...attachedFilesSnapshot.map(
+          (f) => {
+            'path': f.path,
+            'displayName': p.basename(f.path),
+          },
+        ),
+      ];
+
+      final fileContext = await FileContentLoader.buildFileContext(mergedFiles);
 
       // Add reply context if any
       final replyContext = replyToSnapshot != null
-          ? '\n\n[Replying to: ${replyToSnapshot.content.substring(0, 100)}]\n'
+          ? '\n\n[Replying to: ${replyToSnapshot.content.substring(0, replyToSnapshot.content.length > 100 ? 100 : replyToSnapshot.content.length)}]\n'
+          : '';
+
+      // Add user context
+      final settings = ref.read(settingsProvider).value;
+      final userName = settings?.userName;
+      final userContext = (userName != null && userName.isNotEmpty)
+          ? '[User Info] Name: $userName\n\n'
           : '';
 
       // Combine all context
       String fullMessage;
 
       if (fileContext.isNotEmpty) {
-        fullMessage = '$fileContext$messageContent$replyContext';
+        fullMessage = '$userContext$fileContext$messageContent$replyContext';
       } else {
-        fullMessage = '$messageContent$replyContext';
+        fullMessage = '$userContext$messageContent$replyContext';
       }
 
       // Add attachment info
@@ -679,15 +715,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             : null,
         replyToId: replyToSnapshot?.id,
         attachments: attachedFilesSnapshot.isNotEmpty
-            ? attachedFilesSnapshot
-                  .map(
-                    (f) => {
-                      'path': f.path,
-                      'name': f.path.split(RegExp(r'[\\/]')).last,
-                      'size': f.lengthSync(),
-                    },
-                  )
-                  .toList()
+            ? attachedFilesSnapshot.map((f) {
+                final isDir = FileSystemEntity.isDirectorySync(f.path);
+                int? size;
+                if (!isDir) {
+                  try {
+                    size = f.lengthSync();
+                  } catch (_) {}
+                }
+                return {
+                  'path': f.path,
+                  'name': p.basename(f.path),
+                  'size': size,
+                  'isDirectory': isDir,
+                };
+              }).toList()
             : null,
         timestamp: DateTime.now(),
       );
@@ -796,152 +838,164 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
     final historyState = ref.watch(chatHistoryProvider);
 
-    return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.keyH, control: true): () {
-          _scaffoldKey.currentState?.openDrawer();
-        },
-        const SingleActivator(LogicalKeyboardKey.keyH, meta: true): () {
-          _scaffoldKey.currentState?.openDrawer();
-        },
-      },
-      child: Scaffold(
-        key: _scaffoldKey,
-        backgroundColor: Colors.transparent,
-        drawer: const ChatHistorySidebar(),
-        appBar: ChatAppBar(
-          isLoading: _isLoading,
-          messageCount:
-              historyState.value?.currentConversation?.messages.length ?? 0,
-          onClearConversation: _clearConversation,
-        ),
-        body: historyState.isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : FileDropZone(
-                onFilesDropped: _handleFilesDropped,
-                child: Column(
-                  children: [
-                    // Messages list
-                    Expanded(
-                      child: Consumer(
-                        builder: (context, ref, child) {
-                          final state = ref.watch(chatHistoryProvider);
-                          return state.when(
-                            data: (state) {
-                              final messages =
-                                  state.currentConversation?.messages ?? [];
-                              final hasMore = state.hasMoreMessages;
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      drawer: const ChatHistorySidebar(),
+      appBar: ChatAppBar(
+        isLoading: _isLoading,
+        messageCount:
+            historyState.value?.currentConversation?.messages.length ?? 0,
+        onClearConversation: _clearConversation,
+      ),
+      body: Builder(
+        builder: (context) => CallbackShortcuts(
+          bindings: {
+            const SingleActivator(LogicalKeyboardKey.keyH, control: true): () {
+              Scaffold.of(context).openDrawer();
+            },
+            const SingleActivator(LogicalKeyboardKey.keyH, meta: true): () {
+              Scaffold.of(context).openDrawer();
+            },
+          },
+          child: historyState.isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : FileDropZone(
+                  onFilesDropped: _handleFilesDropped,
+                  child: Column(
+                    children: [
+                      // Messages list
+                      Expanded(
+                        child: Consumer(
+                          builder: (context, ref, child) {
+                            final state = ref.watch(chatHistoryProvider);
+                            return state.when(
+                              data: (state) {
+                                final messages =
+                                    state.currentConversation?.messages ?? [];
+                                final hasMore = state.hasMoreMessages;
 
-                              if (messages.isEmpty &&
-                                  state.currentConversationId == null) {
-                                return _buildWelcome(context);
-                              }
+                                if (messages.isEmpty &&
+                                    state.currentConversationId == null) {
+                                  return _buildWelcome(context);
+                                }
 
-                              final streaming = state.streamingMessage;
+                                final streaming = state.streamingMessage;
 
-                              return ListView.builder(
-                                controller: _scrollController,
-                                padding: const EdgeInsets.fromLTRB(
-                                  16,
-                                  24,
-                                  16,
-                                  16,
-                                ),
-                                itemCount:
-                                    messages.length +
-                                    (streaming != null ? 1 : 0) +
-                                    (hasMore ? 1 : 0),
-                                itemBuilder: (context, index) {
-                                  if (hasMore && index == 0) {
-                                    return _buildLoadMoreIndicator(state);
-                                  }
+                                return ListView.builder(
+                                  key: const PageStorageKey('chat_list'),
+                                  controller: _scrollController,
+                                  padding: const EdgeInsets.fromLTRB(
+                                    16,
+                                    24,
+                                    16,
+                                    16,
+                                  ),
+                                  itemCount:
+                                      messages.length +
+                                      (streaming != null ? 1 : 0) +
+                                      (hasMore ? 1 : 0),
+                                  itemBuilder: (context, index) {
+                                    if (hasMore && index == 0) {
+                                      return _buildLoadMoreIndicator(state);
+                                    }
 
-                                  final messageIndex = hasMore
-                                      ? index - 1
-                                      : index;
+                                    final messageIndex = hasMore
+                                        ? index - 1
+                                        : index;
 
-                                  if (streaming != null &&
-                                      messageIndex == messages.length) {
+                                    if (streaming != null &&
+                                        messageIndex == messages.length) {
+                                      return ChatMessageBubble(
+                                        key: ValueKey(
+                                          'streaming_${streaming.id ?? 'stream'}',
+                                        ),
+                                        message: streaming,
+                                        index: messageIndex,
+                                      );
+                                    }
+
+                                    final message = messages[messageIndex];
+
+                                    if (message.hasError &&
+                                        message.error != null) {
+                                      return ErrorMessageBubble(
+                                        key: ValueKey(
+                                          'error_${message.id ?? index}',
+                                        ),
+                                        error: message.error!,
+                                        onRetry: () {
+                                          if (message.id != null) {
+                                            ref
+                                                .read(
+                                                  chatHistoryProvider.notifier,
+                                                )
+                                                .dismissMessage(message.id!);
+                                          }
+                                          if (messageIndex > 0) {
+                                            _resendMessage(
+                                              messages[messageIndex - 1],
+                                            );
+                                          }
+                                        },
+                                        onDismiss: () {
+                                          if (message.id != null) {
+                                            ref
+                                                .read(
+                                                  chatHistoryProvider.notifier,
+                                                )
+                                                .dismissMessage(message.id!);
+                                          }
+                                        },
+                                      );
+                                    }
+
                                     return ChatMessageBubble(
-                                      message: streaming,
+                                      key: ValueKey(
+                                        message.id ??
+                                            'msg_${message.timestamp?.millisecondsSinceEpoch}_$index',
+                                      ),
+                                      message: message,
                                       index: messageIndex,
+                                      onDelete: _handleDeleteMessage,
+                                      onEdit: _handleEditMessage,
+                                      onRegenerate: _handleRegenerateResponse,
+                                      onReply: _handleReply,
+                                      onRemoveAttachment:
+                                          _handleRemoveAttachmentFromMessage,
+                                      onShare: _handleShareMessage,
                                     );
-                                  }
-
-                                  final message = messages[messageIndex];
-
-                                  if (message.hasError &&
-                                      message.error != null) {
-                                    return ErrorMessageBubble(
-                                      error: message.error!,
-                                      onRetry: () {
-                                        if (message.id != null) {
-                                          ref
-                                              .read(
-                                                chatHistoryProvider.notifier,
-                                              )
-                                              .dismissMessage(message.id!);
-                                        }
-                                        if (messageIndex > 0) {
-                                          _resendMessage(
-                                            messages[messageIndex - 1],
-                                          );
-                                        }
-                                      },
-                                      onDismiss: () {
-                                        if (message.id != null) {
-                                          ref
-                                              .read(
-                                                chatHistoryProvider.notifier,
-                                              )
-                                              .dismissMessage(message.id!);
-                                        }
-                                      },
-                                    );
-                                  }
-
-                                  return ChatMessageBubble(
-                                    message: message,
-                                    index: messageIndex,
-                                    onDelete: _handleDeleteMessage,
-                                    onEdit: _handleEditMessage,
-                                    onRegenerate: _handleRegenerateResponse,
-                                    onReply: _handleReply,
-                                    onRemoveAttachment:
-                                        _handleRemoveAttachmentFromMessage,
-                                    onShare: _handleShareMessage,
-                                  );
-                                },
-                              );
-                            },
-                            loading: () => const Center(
-                              child: CircularProgressIndicator(),
-                            ),
-                            error: (err, stack) =>
-                                Center(child: Text('Error: $err')),
-                          );
-                        },
+                                  },
+                                );
+                              },
+                              loading: () => const Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                              error: (err, stack) =>
+                                  Center(child: Text('Error: $err')),
+                            );
+                          },
+                        ),
                       ),
-                    ),
 
-                    // Input area
-                    ChatInputArea(
-                      controller: _messageController,
-                      focusNode: _inputFocusNode,
-                      isLoading: _isSending,
-                      taggedFiles: taggedFiles,
-                      attachedFiles: _attachedFiles,
-                      onSend: _sendMessage,
-                      onRemoveTag: removeTaggedFile,
-                      onRemoveAttachment: _removeAttachedFile,
-                      onFilesDropped: _handleFilesDropped,
-                      replyToMessage: _replyToMessage,
-                      onCancelReply: _cancelReply,
-                      layerLink: tagLayerLink,
-                    ),
-                  ],
+                      // Input area
+                      ChatInputArea(
+                        controller: _messageController,
+                        focusNode: _inputFocusNode,
+                        isLoading: _isSending,
+                        taggedFiles: taggedFiles,
+                        attachedFiles: _attachedFiles,
+                        onSend: _sendMessage,
+                        onRemoveTag: removeTaggedFile,
+                        onRemoveAttachment: _removeAttachedFile,
+                        onFilesDropped: _handleFilesDropped,
+                        replyToMessage: _replyToMessage,
+                        onCancelReply: _cancelReply,
+                        layerLink: tagLayerLink,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+        ),
       ),
     );
   }

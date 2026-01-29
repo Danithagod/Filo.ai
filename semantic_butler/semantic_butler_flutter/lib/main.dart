@@ -16,6 +16,7 @@ import 'services/shortcut_manager.dart' as sm;
 import 'services/shortcut_manager.dart'
     show FocusSearchIntent, NavigateTabIntent;
 import 'providers/navigation_provider.dart';
+import 'providers/search_controller.dart' as sc;
 import 'screens/search_results_screen.dart';
 import 'screens/splash_landing_screen.dart';
 
@@ -57,9 +58,7 @@ void main() async {
       String serverUrl;
       try {
         final config = await AppConfig.loadConfig();
-        serverUrl = serverUrlFromEnv.isEmpty
-            ? config.apiUrl ?? 'http://127.0.0.1:8080/'
-            : serverUrlFromEnv;
+        serverUrl = serverUrlFromEnv.isEmpty ? config.apiUrl : serverUrlFromEnv;
       } catch (e) {
         AppLogger.warning(
           'Failed to load config, using default URL: $e',
@@ -117,7 +116,7 @@ void main() async {
           win.minSize = const Size(800, 600);
           win.size = initialSize;
           win.alignment = Alignment.center;
-          win.title = "Semantic Butler";
+          win.title = "Filo";
           AppLogger.lifecycle('Showing window...');
           win.show();
         });
@@ -148,7 +147,7 @@ class SemanticButlerApp extends ConsumerWidget {
 
     return settingsAsync.when(
       loading: () => MaterialApp(
-        title: 'Semantic Butler',
+        title: 'Filo',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.darkTheme,
         home: const Scaffold(
@@ -156,7 +155,7 @@ class SemanticButlerApp extends ConsumerWidget {
         ),
       ),
       error: (error, stack) => MaterialApp(
-        title: 'Semantic Butler',
+        title: 'Filo',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.darkTheme,
         home: Scaffold(
@@ -183,29 +182,23 @@ class SemanticButlerApp extends ConsumerWidget {
           child: Focus(
             autofocus: false, // Don't steal focus from initial screen
             child: MaterialApp(
-              title: 'Semantic Butler',
+              title: 'Filo',
               debugShowCheckedModeBanner: false,
               theme: AppTheme.lightTheme,
               darkTheme: AppTheme.darkTheme,
               themeMode: settings.themeMode,
+              themeAnimationDuration: const Duration(milliseconds: 500),
+              themeAnimationCurve: Curves.easeInOut,
               home: const SplashLandingScreen(),
               navigatorObservers: [_LoggingNavigatorObserver()],
               builder: (context, child) {
-                return AnimatedTheme(
-                  data: Theme.of(context),
-                  duration: const Duration(milliseconds: 300),
-                  child: Builder(
-                    builder: (context) {
-                      return Material(
-                        color: Theme.of(context).colorScheme.surface,
-                        child: Column(
-                          children: [
-                            const WindowTitleBar(),
-                            Expanded(child: child ?? const SizedBox()),
-                          ],
-                        ),
-                      );
-                    },
+                return Material(
+                  color: Theme.of(context).colorScheme.surface,
+                  child: Column(
+                    children: [
+                      const WindowTitleBar(),
+                      Expanded(child: child ?? const SizedBox()),
+                    ],
                   ),
                 );
               },
@@ -276,7 +269,7 @@ class _GlobalSearchDelegate extends SearchDelegate<String> {
         MaterialPageRoute(
           builder: (context) => SearchResultsScreen(
             query: query,
-            initialMode: SearchMode.hybrid,
+            initialMode: sc.SearchMode.hybrid,
           ),
         ),
       );
@@ -288,13 +281,19 @@ class _GlobalSearchDelegate extends SearchDelegate<String> {
   @override
   Widget buildSuggestions(BuildContext context) {
     // This could show recent searches or suggestions
-    return const Center(
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.search, size: 64, color: Colors.grey),
-          SizedBox(height: 16),
-          Text('Enter keywords to search your files'),
+          Icon(
+            Icons.search,
+            size: 64,
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+          ),
+          const SizedBox(height: 16),
+          const Text('Enter keywords to search your files'),
         ],
       ),
     );

@@ -25,6 +25,9 @@ abstract class SearchResult implements _i1.SerializableModel {
     this.indexedAt,
     required this.fileSizeBytes,
     this.mimeType,
+    this.suggestedQuery,
+    this.nextCursor,
+    this.matchedChunkText,
   });
 
   factory SearchResult({
@@ -37,6 +40,9 @@ abstract class SearchResult implements _i1.SerializableModel {
     DateTime? indexedAt,
     required int fileSizeBytes,
     String? mimeType,
+    String? suggestedQuery,
+    String? nextCursor,
+    String? matchedChunkText,
   }) = _SearchResultImpl;
 
   factory SearchResult.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -52,6 +58,9 @@ abstract class SearchResult implements _i1.SerializableModel {
           : _i1.DateTimeJsonExtension.fromJson(jsonSerialization['indexedAt']),
       fileSizeBytes: jsonSerialization['fileSizeBytes'] as int,
       mimeType: jsonSerialization['mimeType'] as String?,
+      suggestedQuery: jsonSerialization['suggestedQuery'] as String?,
+      nextCursor: jsonSerialization['nextCursor'] as String?,
+      matchedChunkText: jsonSerialization['matchedChunkText'] as String?,
     );
   }
 
@@ -82,6 +91,15 @@ abstract class SearchResult implements _i1.SerializableModel {
   /// MIME type
   String? mimeType;
 
+  /// Suggested query if typos were detected
+  String? suggestedQuery;
+
+  /// Pagination cursor for the next result set
+  String? nextCursor;
+
+  /// The specific text chunk that matched the search query
+  String? matchedChunkText;
+
   /// Returns a shallow copy of this [SearchResult]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
@@ -95,6 +113,9 @@ abstract class SearchResult implements _i1.SerializableModel {
     DateTime? indexedAt,
     int? fileSizeBytes,
     String? mimeType,
+    String? suggestedQuery,
+    String? nextCursor,
+    String? matchedChunkText,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -109,6 +130,9 @@ abstract class SearchResult implements _i1.SerializableModel {
       if (indexedAt != null) 'indexedAt': indexedAt?.toJson(),
       'fileSizeBytes': fileSizeBytes,
       if (mimeType != null) 'mimeType': mimeType,
+      if (suggestedQuery != null) 'suggestedQuery': suggestedQuery,
+      if (nextCursor != null) 'nextCursor': nextCursor,
+      if (matchedChunkText != null) 'matchedChunkText': matchedChunkText,
     };
   }
 
@@ -131,6 +155,9 @@ class _SearchResultImpl extends SearchResult {
     DateTime? indexedAt,
     required int fileSizeBytes,
     String? mimeType,
+    String? suggestedQuery,
+    String? nextCursor,
+    String? matchedChunkText,
   }) : super._(
          id: id,
          path: path,
@@ -141,6 +168,9 @@ class _SearchResultImpl extends SearchResult {
          indexedAt: indexedAt,
          fileSizeBytes: fileSizeBytes,
          mimeType: mimeType,
+         suggestedQuery: suggestedQuery,
+         nextCursor: nextCursor,
+         matchedChunkText: matchedChunkText,
        );
 
   /// Returns a shallow copy of this [SearchResult]
@@ -157,6 +187,9 @@ class _SearchResultImpl extends SearchResult {
     Object? indexedAt = _Undefined,
     int? fileSizeBytes,
     Object? mimeType = _Undefined,
+    Object? suggestedQuery = _Undefined,
+    Object? nextCursor = _Undefined,
+    Object? matchedChunkText = _Undefined,
   }) {
     return SearchResult(
       id: id ?? this.id,
@@ -170,6 +203,13 @@ class _SearchResultImpl extends SearchResult {
       indexedAt: indexedAt is DateTime? ? indexedAt : this.indexedAt,
       fileSizeBytes: fileSizeBytes ?? this.fileSizeBytes,
       mimeType: mimeType is String? ? mimeType : this.mimeType,
+      suggestedQuery: suggestedQuery is String?
+          ? suggestedQuery
+          : this.suggestedQuery,
+      nextCursor: nextCursor is String? ? nextCursor : this.nextCursor,
+      matchedChunkText: matchedChunkText is String?
+          ? matchedChunkText
+          : this.matchedChunkText,
     );
   }
 }

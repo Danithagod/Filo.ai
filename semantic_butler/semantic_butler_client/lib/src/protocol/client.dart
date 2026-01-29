@@ -22,40 +22,37 @@ import 'package:semantic_butler_client/src/protocol/search_suggestion.dart'
     as _i8;
 import 'package:semantic_butler_client/src/protocol/saved_search_preset.dart'
     as _i9;
+import 'package:semantic_butler_client/src/protocol/search_facet.dart' as _i10;
 import 'package:semantic_butler_client/src/protocol/search_history.dart'
-    as _i10;
-import 'package:semantic_butler_client/src/protocol/reset_preview.dart' as _i11;
-import 'package:semantic_butler_client/src/protocol/reset_result.dart' as _i12;
+    as _i11;
+import 'package:semantic_butler_client/src/protocol/reset_preview.dart' as _i12;
+import 'package:semantic_butler_client/src/protocol/reset_result.dart' as _i13;
 import 'package:semantic_butler_client/src/protocol/indexing_status.dart'
-    as _i13;
-import 'package:semantic_butler_client/src/protocol/indexing_progress.dart'
     as _i14;
-import 'package:semantic_butler_client/src/protocol/indexing_job.dart' as _i15;
-import 'package:semantic_butler_client/src/protocol/watched_folder.dart'
+import 'package:semantic_butler_client/src/protocol/error_stats.dart' as _i15;
+import 'package:semantic_butler_client/src/protocol/indexing_progress.dart'
     as _i16;
+import 'package:semantic_butler_client/src/protocol/indexing_job.dart' as _i17;
+import 'package:semantic_butler_client/src/protocol/watched_folder.dart'
+    as _i18;
 import 'package:semantic_butler_client/src/protocol/ignore_pattern.dart'
-    as _i17;
-import 'package:semantic_butler_client/src/protocol/tag_taxonomy.dart' as _i18;
-import 'package:semantic_butler_client/src/protocol/index_health_report.dart'
     as _i19;
-import 'package:semantic_butler_client/src/protocol/ai_search_progress.dart'
-    as _i20;
-import 'package:semantic_butler_client/src/protocol/organization_suggestions.dart'
+import 'package:semantic_butler_client/src/protocol/tag_taxonomy.dart' as _i20;
+import 'package:semantic_butler_client/src/protocol/index_health_report.dart'
     as _i21;
-import 'package:semantic_butler_client/src/protocol/organization_action_result.dart'
+import 'package:semantic_butler_client/src/protocol/ai_search_progress.dart'
     as _i22;
-import 'package:semantic_butler_client/src/protocol/organization_action_request.dart'
-    as _i23;
-import 'package:semantic_butler_client/src/protocol/batch_organization_result.dart'
-    as _i24;
-import 'package:semantic_butler_client/src/protocol/batch_organization_request.dart'
-    as _i25;
 import 'package:semantic_butler_client/src/protocol/file_system_entry.dart'
-    as _i26;
-import 'package:semantic_butler_client/src/protocol/drive_info.dart' as _i27;
+    as _i23;
+import 'package:semantic_butler_client/src/protocol/drive_info.dart' as _i24;
 import 'package:semantic_butler_client/src/protocol/file_operation_result.dart'
+    as _i25;
+import 'package:semantic_butler_client/src/protocol/health_check.dart' as _i26;
+import 'package:semantic_butler_client/src/protocol/file_index.dart' as _i27;
+import 'package:semantic_butler_client/src/protocol/document_embedding.dart'
     as _i28;
-import 'package:semantic_butler_client/src/protocol/health_check.dart' as _i29;
+import 'package:semantic_butler_client/src/protocol/indexing_job_detail.dart'
+    as _i29;
 import 'package:semantic_butler_client/src/protocol/greetings/greeting.dart'
     as _i30;
 import 'protocol.dart' as _i31;
@@ -148,6 +145,30 @@ class EndpointButler extends _i1.EndpointRef {
     },
   );
 
+  /// Stream semantic search results for better perceived performance (Priority 2)
+  _i2.Stream<_i6.SearchResult> semanticSearchStream(
+    String query, {
+    required int limit,
+    required double threshold,
+    required int offset,
+    _i7.SearchFilters? filters,
+  }) =>
+      caller.callStreamingServerEndpoint<
+        _i2.Stream<_i6.SearchResult>,
+        _i6.SearchResult
+      >(
+        'butler',
+        'semanticSearchStream',
+        {
+          'query': query,
+          'limit': limit,
+          'threshold': threshold,
+          'offset': offset,
+          'filters': filters,
+        },
+        {},
+      );
+
   /// Get search suggestions based on query
   _i2.Future<List<_i8.SearchSuggestion>> getSearchSuggestions(
     String query, {
@@ -185,11 +206,24 @@ class EndpointButler extends _i1.EndpointRef {
         {'presetId': presetId},
       );
 
+  /// Get faceted search counts for filtering
+  _i2.Future<List<_i10.SearchFacet>> getSearchFacets(
+    String query, {
+    _i7.SearchFilters? filters,
+  }) => caller.callServerEndpoint<List<_i10.SearchFacet>>(
+    'butler',
+    'getSearchFacets',
+    {
+      'query': query,
+      'filters': filters,
+    },
+  );
+
   /// Get search history
-  _i2.Future<List<_i10.SearchHistory>> getSearchHistory({
+  _i2.Future<List<_i11.SearchHistory>> getSearchHistory({
     int? limit,
     int? offset,
-  }) => caller.callServerEndpoint<List<_i10.SearchHistory>>(
+  }) => caller.callServerEndpoint<List<_i11.SearchHistory>>(
     'butler',
     'getSearchHistory',
     {
@@ -237,19 +271,19 @@ class EndpointButler extends _i1.EndpointRef {
       );
 
   /// Preview a database reset
-  _i2.Future<_i11.ResetPreview> previewReset() =>
-      caller.callServerEndpoint<_i11.ResetPreview>(
+  _i2.Future<_i12.ResetPreview> previewReset() =>
+      caller.callServerEndpoint<_i12.ResetPreview>(
         'butler',
         'previewReset',
         {},
       );
 
   /// Perform a database reset
-  _i2.Future<_i12.ResetResult> resetDatabase({
+  _i2.Future<_i13.ResetResult> resetDatabase({
     required String scope,
     required String confirmationCode,
     required bool dryRun,
-  }) => caller.callServerEndpoint<_i12.ResetResult>(
+  }) => caller.callServerEndpoint<_i13.ResetResult>(
     'butler',
     'resetDatabase',
     {
@@ -260,18 +294,26 @@ class EndpointButler extends _i1.EndpointRef {
   );
 
   /// Get current indexing status
-  _i2.Future<_i13.IndexingStatus> getIndexingStatus() =>
-      caller.callServerEndpoint<_i13.IndexingStatus>(
+  _i2.Future<_i14.IndexingStatus> getIndexingStatus() =>
+      caller.callServerEndpoint<_i14.IndexingStatus>(
         'butler',
         'getIndexingStatus',
         {},
       );
 
+  /// Get error statistics
+  _i2.Future<_i15.ErrorStats> getErrorStats() =>
+      caller.callServerEndpoint<_i15.ErrorStats>(
+        'butler',
+        'getErrorStats',
+        {},
+      );
+
   /// Stream indexing progress
-  _i2.Stream<_i14.IndexingProgress> streamIndexingProgress(int jobId) =>
+  _i2.Stream<_i16.IndexingProgress> streamIndexingProgress(int jobId) =>
       caller.callStreamingServerEndpoint<
-        _i2.Stream<_i14.IndexingProgress>,
-        _i14.IndexingProgress
+        _i2.Stream<_i16.IndexingProgress>,
+        _i16.IndexingProgress
       >(
         'butler',
         'streamIndexingProgress',
@@ -280,16 +322,16 @@ class EndpointButler extends _i1.EndpointRef {
       );
 
   /// Get details of a specific indexing job
-  _i2.Future<_i15.IndexingJob?> getIndexingJob(int jobId) =>
-      caller.callServerEndpoint<_i15.IndexingJob?>(
+  _i2.Future<_i17.IndexingJob?> getIndexingJob(int jobId) =>
+      caller.callServerEndpoint<_i17.IndexingJob?>(
         'butler',
         'getIndexingJob',
         {'jobId': jobId},
       );
 
   /// Start indexing documents from specified folder path
-  _i2.Future<_i15.IndexingJob> startIndexing(String folderPath) =>
-      caller.callServerEndpoint<_i15.IndexingJob>(
+  _i2.Future<_i17.IndexingJob> startIndexing(String folderPath) =>
+      caller.callServerEndpoint<_i17.IndexingJob>(
         'butler',
         'startIndexing',
         {'folderPath': folderPath},
@@ -304,8 +346,8 @@ class EndpointButler extends _i1.EndpointRef {
       );
 
   /// Enable smart indexing for a folder
-  _i2.Future<_i16.WatchedFolder> enableSmartIndexing(String folderPath) =>
-      caller.callServerEndpoint<_i16.WatchedFolder>(
+  _i2.Future<_i18.WatchedFolder> enableSmartIndexing(String folderPath) =>
+      caller.callServerEndpoint<_i18.WatchedFolder>(
         'butler',
         'enableSmartIndexing',
         {'folderPath': folderPath},
@@ -320,16 +362,16 @@ class EndpointButler extends _i1.EndpointRef {
       );
 
   /// Toggle smart indexing for a folder
-  _i2.Future<_i16.WatchedFolder?> toggleSmartIndexing(String folderPath) =>
-      caller.callServerEndpoint<_i16.WatchedFolder?>(
+  _i2.Future<_i18.WatchedFolder?> toggleSmartIndexing(String folderPath) =>
+      caller.callServerEndpoint<_i18.WatchedFolder?>(
         'butler',
         'toggleSmartIndexing',
         {'folderPath': folderPath},
       );
 
   /// Get all watched folders
-  _i2.Future<List<_i16.WatchedFolder>> getWatchedFolders() =>
-      caller.callServerEndpoint<List<_i16.WatchedFolder>>(
+  _i2.Future<List<_i18.WatchedFolder>> getWatchedFolders() =>
+      caller.callServerEndpoint<List<_i18.WatchedFolder>>(
         'butler',
         'getWatchedFolders',
         {},
@@ -338,11 +380,11 @@ class EndpointButler extends _i1.EndpointRef {
   /// Add an ignore pattern
   /// [pattern] - Glob pattern like "*.log", "node_modules/**"
   /// [patternType] - Type: "file", "directory", or "both"
-  _i2.Future<_i17.IgnorePattern> addIgnorePattern(
+  _i2.Future<_i19.IgnorePattern> addIgnorePattern(
     String pattern, {
     required String patternType,
     String? description,
-  }) => caller.callServerEndpoint<_i17.IgnorePattern>(
+  }) => caller.callServerEndpoint<_i19.IgnorePattern>(
     'butler',
     'addIgnorePattern',
     {
@@ -361,8 +403,8 @@ class EndpointButler extends _i1.EndpointRef {
       );
 
   /// List all ignore patterns
-  _i2.Future<List<_i17.IgnorePattern>> listIgnorePatterns() =>
-      caller.callServerEndpoint<List<_i17.IgnorePattern>>(
+  _i2.Future<List<_i19.IgnorePattern>> listIgnorePatterns() =>
+      caller.callServerEndpoint<List<_i19.IgnorePattern>>(
         'butler',
         'listIgnorePatterns',
         {},
@@ -402,10 +444,10 @@ class EndpointButler extends _i1.EndpointRef {
   /// Estimate database size based on content
   /// This is an approximation based on indexed content
   /// Get top tags by frequency
-  _i2.Future<List<_i18.TagTaxonomy>> getTopTags({
+  _i2.Future<List<_i20.TagTaxonomy>> getTopTags({
     String? category,
     int? limit,
-  }) => caller.callServerEndpoint<List<_i18.TagTaxonomy>>(
+  }) => caller.callServerEndpoint<List<_i20.TagTaxonomy>>(
     'butler',
     'getTopTags',
     {
@@ -415,11 +457,11 @@ class EndpointButler extends _i1.EndpointRef {
   );
 
   /// Search tags for autocomplete
-  _i2.Future<List<_i18.TagTaxonomy>> searchTags(
+  _i2.Future<List<_i20.TagTaxonomy>> searchTags(
     String query, {
     String? category,
     int? limit,
-  }) => caller.callServerEndpoint<List<_i18.TagTaxonomy>>(
+  }) => caller.callServerEndpoint<List<_i20.TagTaxonomy>>(
     'butler',
     'searchTags',
     {
@@ -480,107 +522,6 @@ class EndpointButler extends _i1.EndpointRef {
         {},
       );
 
-  /// Get AI cost summary
-  _i2.Future<Map<String, dynamic>> getAICostSummary({
-    DateTime? startDate,
-    DateTime? endDate,
-  }) => caller.callServerEndpoint<Map<String, dynamic>>(
-    'butler',
-    'getAICostSummary',
-    {
-      'startDate': startDate,
-      'endDate': endDate,
-    },
-  );
-
-  /// Check budget status
-  _i2.Future<Map<String, dynamic>> checkBudget({
-    required double budgetLimit,
-    DateTime? periodStart,
-    DateTime? periodEnd,
-  }) => caller.callServerEndpoint<Map<String, dynamic>>(
-    'butler',
-    'checkBudget',
-    {
-      'budgetLimit': budgetLimit,
-      'periodStart': periodStart,
-      'periodEnd': periodEnd,
-    },
-  );
-
-  /// Get projected costs
-  _i2.Future<Map<String, dynamic>> getProjectedCosts({
-    int? lookbackDays,
-    int? forecastDays,
-  }) => caller.callServerEndpoint<Map<String, dynamic>>(
-    'butler',
-    'getProjectedCosts',
-    {
-      'lookbackDays': lookbackDays,
-      'forecastDays': forecastDays,
-    },
-  );
-
-  /// Get daily costs
-  _i2.Future<List<Map<String, dynamic>>> getDailyCosts({
-    required DateTime startDate,
-    required DateTime endDate,
-  }) => caller.callServerEndpoint<List<Map<String, dynamic>>>(
-    'butler',
-    'getDailyCosts',
-    {
-      'startDate': startDate,
-      'endDate': endDate,
-    },
-  );
-
-  /// Get cost breakdown by feature
-  _i2.Future<Map<String, double>> getCostByFeature({
-    DateTime? startDate,
-    DateTime? endDate,
-  }) => caller.callServerEndpoint<Map<String, double>>(
-    'butler',
-    'getCostByFeature',
-    {
-      'startDate': startDate,
-      'endDate': endDate,
-    },
-  );
-
-  /// Get cost breakdown by model
-  _i2.Future<Map<String, double>> getCostByModel({
-    DateTime? startDate,
-    DateTime? endDate,
-  }) => caller.callServerEndpoint<Map<String, double>>(
-    'butler',
-    'getCostByModel',
-    {
-      'startDate': startDate,
-      'endDate': endDate,
-    },
-  );
-
-  /// Record AI API call cost
-  _i2.Future<void> recordAICost({
-    required String feature,
-    required String model,
-    required int inputTokens,
-    required int outputTokens,
-    required double cost,
-    Map<String, dynamic>? metadata,
-  }) => caller.callServerEndpoint<void>(
-    'butler',
-    'recordAICost',
-    {
-      'feature': feature,
-      'model': model,
-      'inputTokens': inputTokens,
-      'outputTokens': outputTokens,
-      'cost': cost,
-      'metadata': metadata,
-    },
-  );
-
   /// Hybrid search combining semantic and keyword search
   _i2.Future<List<_i6.SearchResult>> hybridSearch(
     String query, {
@@ -604,9 +545,29 @@ class EndpointButler extends _i1.EndpointRef {
     },
   );
 
+  /// Fuzzy filename search using pg_trgm similarity
+  ///
+  /// Handles typos and partial matches in filenames
+  /// [query] - Filename or partial filename to search for
+  /// [limit] - Maximum number of results (default: 10)
+  /// [minSimilarity] - Minimum similarity threshold 0.0-1.0 (default: 0.3)
+  _i2.Future<List<_i6.SearchResult>> fuzzyFilenameSearch(
+    String query, {
+    required int limit,
+    required double minSimilarity,
+  }) => caller.callServerEndpoint<List<_i6.SearchResult>>(
+    'butler',
+    'fuzzyFilenameSearch',
+    {
+      'query': query,
+      'limit': limit,
+      'minSimilarity': minSimilarity,
+    },
+  );
+
   /// Generate index health report
-  _i2.Future<_i19.IndexHealthReport> getIndexHealthReport() =>
-      caller.callServerEndpoint<_i19.IndexHealthReport>(
+  _i2.Future<_i21.IndexHealthReport> getIndexHealthReport() =>
+      caller.callServerEndpoint<_i21.IndexHealthReport>(
         'butler',
         'getIndexHealthReport',
         {},
@@ -652,15 +613,15 @@ class EndpointButler extends _i1.EndpointRef {
   /// [maxResults] - Maximum number of results to return
   ///
   /// Returns a stream of [AISearchProgress] events for real-time feedback
-  _i2.Stream<_i20.AISearchProgress> aiSearch(
+  _i2.Stream<_i22.AISearchProgress> aiSearch(
     String query, {
     String? strategy,
     int? maxResults,
     _i7.SearchFilters? filters,
   }) =>
       caller.callStreamingServerEndpoint<
-        _i2.Stream<_i20.AISearchProgress>,
-        _i20.AISearchProgress
+        _i2.Stream<_i22.AISearchProgress>,
+        _i22.AISearchProgress
       >(
         'butler',
         'aiSearch',
@@ -687,106 +648,6 @@ class EndpointButler extends _i1.EndpointRef {
         'summarizeFile',
         {'filePath': filePath},
       );
-
-  /// Get file organization suggestions including duplicates, naming issues,
-  /// and semantically similar documents
-  ///
-  /// [rootPath] - Optional root path to limit analysis to a specific folder
-  _i2.Future<_i21.OrganizationSuggestions> getOrganizationSuggestions({
-    String? rootPath,
-  }) => caller.callServerEndpoint<_i21.OrganizationSuggestions>(
-    'butler',
-    'getOrganizationSuggestions',
-    {'rootPath': rootPath},
-  );
-
-  /// Apply an organization action (resolve duplicates, fix naming, organize similar)
-  ///
-  /// [request] - The organization action request with action type and parameters
-  _i2.Future<_i22.OrganizationActionResult> applyOrganizationAction(
-    _i23.OrganizationActionRequest request,
-  ) => caller.callServerEndpoint<_i22.OrganizationActionResult>(
-    'butler',
-    'applyOrganizationAction',
-    {'request': request},
-  );
-
-  /// Apply multiple organization actions as a batch
-  ///
-  /// [request] - The batch organization request with multiple actions
-  _i2.Future<_i24.BatchOrganizationResult> applyBatchOrganization(
-    _i25.BatchOrganizationRequest request,
-  ) => caller.callServerEndpoint<_i24.BatchOrganizationResult>(
-    'butler',
-    'applyBatchOrganization',
-    {'request': request},
-  );
-
-  /// Resolve duplicate files by keeping one and deleting the rest
-  ///
-  /// Convenience method for duplicate resolution
-  ///
-  /// [contentHash] - Hash identifying the duplicate group
-  /// [keepFilePath] - Path to the file to keep
-  /// [deleteFilePaths] - Paths to duplicate files to delete
-  /// [dryRun] - If true, preview without executing
-  _i2.Future<_i22.OrganizationActionResult> resolveDuplicates({
-    required String contentHash,
-    required String keepFilePath,
-    required List<String> deleteFilePaths,
-    required bool dryRun,
-  }) => caller.callServerEndpoint<_i22.OrganizationActionResult>(
-    'butler',
-    'resolveDuplicates',
-    {
-      'contentHash': contentHash,
-      'keepFilePath': keepFilePath,
-      'deleteFilePaths': deleteFilePaths,
-      'dryRun': dryRun,
-    },
-  );
-
-  /// Fix naming issues for multiple files
-  ///
-  /// Convenience method for naming fixes
-  ///
-  /// [renameOldPaths] - List of old file paths
-  /// [renameNewNames] - List of new names (parallel to renameOldPaths)
-  /// [dryRun] - If true, preview without executing
-  _i2.Future<_i22.OrganizationActionResult> fixNamingIssues({
-    required List<String> renameOldPaths,
-    required List<String> renameNewNames,
-    required bool dryRun,
-  }) => caller.callServerEndpoint<_i22.OrganizationActionResult>(
-    'butler',
-    'fixNamingIssues',
-    {
-      'renameOldPaths': renameOldPaths,
-      'renameNewNames': renameNewNames,
-      'dryRun': dryRun,
-    },
-  );
-
-  /// Organize similar files into a target folder
-  ///
-  /// Convenience method for organizing similar content
-  ///
-  /// [filePaths] - Paths to files to organize
-  /// [targetFolder] - Destination folder path
-  /// [dryRun] - If true, preview without executing
-  _i2.Future<_i22.OrganizationActionResult> organizeSimilarFiles({
-    required List<String> filePaths,
-    required String targetFolder,
-    required bool dryRun,
-  }) => caller.callServerEndpoint<_i22.OrganizationActionResult>(
-    'butler',
-    'organizeSimilarFiles',
-    {
-      'filePaths': filePaths,
-      'targetFolder': targetFolder,
-      'dryRun': dryRun,
-    },
-  );
 }
 
 /// Endpoint for filesystem browsing and operations
@@ -798,27 +659,27 @@ class EndpointFileSystem extends _i1.EndpointRef {
   String get name => 'fileSystem';
 
   /// List contents of a directory
-  _i2.Future<List<_i26.FileSystemEntry>> listDirectory(String path) =>
-      caller.callServerEndpoint<List<_i26.FileSystemEntry>>(
+  _i2.Future<List<_i23.FileSystemEntry>> listDirectory(String path) =>
+      caller.callServerEndpoint<List<_i23.FileSystemEntry>>(
         'fileSystem',
         'listDirectory',
         {'path': path},
       );
 
   /// Get available drives on the system
-  _i2.Future<List<_i27.DriveInfo>> getDrives() =>
-      caller.callServerEndpoint<List<_i27.DriveInfo>>(
+  _i2.Future<List<_i24.DriveInfo>> getDrives() =>
+      caller.callServerEndpoint<List<_i24.DriveInfo>>(
         'fileSystem',
         'getDrives',
         {},
       );
 
   /// Rename a file or folder
-  _i2.Future<_i28.FileOperationResult> rename(
+  _i2.Future<_i25.FileOperationResult> rename(
     String path,
     String newName,
     bool isDirectory,
-  ) => caller.callServerEndpoint<_i28.FileOperationResult>(
+  ) => caller.callServerEndpoint<_i25.FileOperationResult>(
     'fileSystem',
     'rename',
     {
@@ -829,10 +690,10 @@ class EndpointFileSystem extends _i1.EndpointRef {
   );
 
   /// Move a file or folder
-  _i2.Future<_i28.FileOperationResult> move(
+  _i2.Future<_i25.FileOperationResult> move(
     String sourcePath,
     String destFolder,
-  ) => caller.callServerEndpoint<_i28.FileOperationResult>(
+  ) => caller.callServerEndpoint<_i25.FileOperationResult>(
     'fileSystem',
     'move',
     {
@@ -842,16 +703,16 @@ class EndpointFileSystem extends _i1.EndpointRef {
   );
 
   /// Delete a file or folder
-  _i2.Future<_i28.FileOperationResult> delete(String path) =>
-      caller.callServerEndpoint<_i28.FileOperationResult>(
+  _i2.Future<_i25.FileOperationResult> delete(String path) =>
+      caller.callServerEndpoint<_i25.FileOperationResult>(
         'fileSystem',
         'delete',
         {'path': path},
       );
 
   /// Create a new folder
-  _i2.Future<_i28.FileOperationResult> createFolder(String path) =>
-      caller.callServerEndpoint<_i28.FileOperationResult>(
+  _i2.Future<_i25.FileOperationResult> createFolder(String path) =>
+      caller.callServerEndpoint<_i25.FileOperationResult>(
         'fileSystem',
         'createFolder',
         {'path': path},
@@ -869,12 +730,130 @@ class EndpointHealth extends _i1.EndpointRef {
 
   /// Check system health
   /// Returns overall status and component-level health metrics
-  _i2.Future<_i29.HealthCheck> check() =>
-      caller.callServerEndpoint<_i29.HealthCheck>(
+  _i2.Future<_i26.HealthCheck> check() =>
+      caller.callServerEndpoint<_i26.HealthCheck>(
         'health',
         'check',
         {},
       );
+}
+
+/// Endpoint for handling hybrid indexing (Client-side indexing, Cloud storage)
+/// {@category Endpoint}
+class EndpointIndexing extends _i1.EndpointRef {
+  EndpointIndexing(_i1.EndpointCaller caller) : super(caller);
+
+  @override
+  String get name => 'indexing';
+
+  /// Upload a file index and its embeddings from the client
+  /// This allows the client to do local processing (text extraction, embedding generation)
+  /// and upload the result to the cloud database.
+  _i2.Future<void> uploadIndex({
+    required _i27.FileIndex fileIndex,
+    required List<_i28.DocumentEmbedding> embeddings,
+  }) => caller.callServerEndpoint<void>(
+    'indexing',
+    'uploadIndex',
+    {
+      'fileIndex': fileIndex,
+      'embeddings': embeddings,
+    },
+  );
+
+  /// Batch upload (DEPRECATED: Use uploadIndex for multi-chunk support)
+  _i2.Future<void> uploadIndexBatch(
+    List<_i27.FileIndex> files,
+    List<_i28.DocumentEmbedding> embeddings,
+  ) => caller.callServerEndpoint<void>(
+    'indexing',
+    'uploadIndexBatch',
+    {
+      'files': files,
+      'embeddings': embeddings,
+    },
+  );
+
+  /// Create a indexing job record for client-managed indexing
+  _i2.Future<_i17.IndexingJob?> createClientJob(
+    String folderPath,
+    int totalFiles,
+  ) => caller.callServerEndpoint<_i17.IndexingJob?>(
+    'indexing',
+    'createClientJob',
+    {
+      'folderPath': folderPath,
+      'totalFiles': totalFiles,
+    },
+  );
+
+  /// Update the status/progress of a client-managed indexing job
+  _i2.Future<_i17.IndexingJob?> updateJobStatus({
+    required int jobId,
+    required String status,
+    required int processedFiles,
+    required int failedFiles,
+    required int skippedFiles,
+    String? errorMessage,
+  }) => caller.callServerEndpoint<_i17.IndexingJob?>(
+    'indexing',
+    'updateJobStatus',
+    {
+      'jobId': jobId,
+      'status': status,
+      'processedFiles': processedFiles,
+      'failedFiles': failedFiles,
+      'skippedFiles': skippedFiles,
+      'errorMessage': errorMessage,
+    },
+  );
+
+  /// Update detailed status for a specific file in a job
+  _i2.Future<_i29.IndexingJobDetail> updateJobDetail({
+    required int jobId,
+    required String filePath,
+    required String status,
+    String? errorMessage,
+    String? errorCategory,
+  }) => caller.callServerEndpoint<_i29.IndexingJobDetail>(
+    'indexing',
+    'updateJobDetail',
+    {
+      'jobId': jobId,
+      'filePath': filePath,
+      'status': status,
+      'errorMessage': errorMessage,
+      'errorCategory': errorCategory,
+    },
+  );
+
+  /// Get all detailed file statuses for a specific job
+  _i2.Future<List<_i29.IndexingJobDetail>> getJobDetails(int jobId) =>
+      caller.callServerEndpoint<List<_i29.IndexingJobDetail>>(
+        'indexing',
+        'getJobDetails',
+        {'jobId': jobId},
+      );
+
+  /// Check if a file with the given path and hash already exists in the index
+  _i2.Future<_i27.FileIndex?> checkHash({
+    required String path,
+    required String contentHash,
+  }) => caller.callServerEndpoint<_i27.FileIndex?>(
+    'indexing',
+    'checkHash',
+    {
+      'path': path,
+      'contentHash': contentHash,
+    },
+  );
+
+  /// Cancel an active indexing job
+  _i2.Future<bool> cancelJob(int jobId) => caller.callServerEndpoint<bool>(
+    'indexing',
+    'cancelJob',
+    {'jobId': jobId},
+  );
 }
 
 /// This is an example endpoint that returns a greeting message through
@@ -928,6 +907,7 @@ class Client extends _i1.ServerpodClientShared {
     butler = EndpointButler(this);
     fileSystem = EndpointFileSystem(this);
     health = EndpointHealth(this);
+    indexing = EndpointIndexing(this);
     greeting = EndpointGreeting(this);
   }
 
@@ -939,6 +919,8 @@ class Client extends _i1.ServerpodClientShared {
 
   late final EndpointHealth health;
 
+  late final EndpointIndexing indexing;
+
   late final EndpointGreeting greeting;
 
   @override
@@ -947,6 +929,7 @@ class Client extends _i1.ServerpodClientShared {
     'butler': butler,
     'fileSystem': fileSystem,
     'health': health,
+    'indexing': indexing,
     'greeting': greeting,
   };
 

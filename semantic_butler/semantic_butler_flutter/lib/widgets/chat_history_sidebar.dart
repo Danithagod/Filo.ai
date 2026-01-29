@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -17,123 +16,150 @@ class ChatHistorySidebar extends ConsumerWidget {
     final colorScheme = theme.colorScheme;
 
     final screenWidth = MediaQuery.of(context).size.width;
-    final drawerWidth = screenWidth < 600 ? screenWidth * 0.8 : 320.0;
+    final drawerWidth = screenWidth < 600 ? screenWidth * 0.8 : 260.0;
 
     return Drawer(
       width: drawerWidth,
-      backgroundColor: Colors.transparent,
-      child: BackdropFilter(
-        filter: ImageFilter.blur(
-          sigmaX: theme.brightness == Brightness.dark ? 20 : 0,
-          sigmaY: theme.brightness == Brightness.dark ? 20 : 0,
+      backgroundColor: colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topRight: Radius.circular(16),
+          bottomRight: Radius.circular(16),
         ),
-        child: Container(
-          decoration: BoxDecoration(
-            color: theme.brightness == Brightness.dark
-                ? colorScheme.surface.withValues(alpha: 0.7)
-                : colorScheme.surface,
-            border: Border(
-              left: BorderSide(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.2),
-                width: 1,
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: const BorderRadius.only(
+            topRight: Radius.circular(16),
+            bottomRight: Radius.circular(16),
+          ),
+          border: Border.all(
+            color: colorScheme.outlineVariant,
+            width: 1.5,
+          ),
+        ),
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 48, 16, 12),
+              child: Row(
+                children: [
+                  Text(
+                    'History',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.add_rounded, size: 20),
+                    onPressed: () {
+                      ref
+                          .read(chatHistoryProvider.notifier)
+                          .createNewConversation();
+                      Navigator.pop(context); // Close drawer on mobile
+                    },
+                    tooltip: 'New Chat',
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
               ),
             ),
-          ),
-          child: Column(
-            children: [
-              // Header
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 48, 16, 16),
-                child: Row(
-                  children: [
-                    Text(
-                      'History',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.add),
-                      onPressed: () {
-                        ref
-                            .read(chatHistoryProvider.notifier)
-                            .createNewConversation();
-                        Navigator.pop(context); // Close drawer on mobile
-                      },
-                      tooltip: 'New Chat',
-                    ),
-                  ],
-                ),
-              ),
 
-              // Search Header
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: TextField(
-                  onChanged: (value) => ref
-                      .read(chatSearchQueryProvider.notifier)
-                      .setQuery(value),
-                  decoration: InputDecoration(
-                    hintText: 'Search chats...',
-                    prefixIcon: const Icon(Icons.search, size: 20),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    filled: true,
-                    fillColor:
-                        Theme.of(
-                          context,
-                        ).colorScheme.surfaceContainerHighest.withValues(
-                          alpha: 0.5,
-                        ),
+            // Search Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: TextField(
+                onChanged: (value) =>
+                    ref.read(chatSearchQueryProvider.notifier).setQuery(value),
+                style: theme.textTheme.bodyMedium,
+                decoration: InputDecoration(
+                  hintText: 'Search chats...',
+                  prefixIcon: const Icon(Icons.search, size: 18),
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: 4,
+                    horizontal: 12,
                   ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: colorScheme.outlineVariant,
+                      width: 1.5,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: colorScheme.outlineVariant,
+                      width: 1.5,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: colorScheme.primary,
+                      width: 1.5,
+                    ),
+                  ),
+                  filled: true,
+                  fillColor: colorScheme.surfaceContainerLow,
                 ),
               ),
-              const SizedBox(height: 12),
+            ),
+            const SizedBox(height: 8),
 
-              // List
-              Expanded(
-                child: _buildMainContent(context, ref),
-              ),
+            // List
+            Expanded(
+              child: _buildMainContent(context, ref),
+            ),
 
-              // Bottom Actions (e.g., Clear All)
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: OutlinedButton.icon(
-                  onPressed: () async {
-                    final confirm = await showDialog<bool>(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Clear All Status'),
-                        content: const Text(
-                          'Are you sure you want to delete all chat history?',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, false),
-                            child: const Text('Cancel'),
-                          ),
-                          FilledButton(
-                            onPressed: () => Navigator.pop(context, true),
-                            child: const Text('Clear'),
-                          ),
-                        ],
+            // Bottom Actions (e.g., Clear All)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 32),
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Clear All History'),
+                      content: const Text(
+                        'Are you sure you want to delete all chat history?',
                       ),
-                    );
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('Cancel'),
+                        ),
+                        FilledButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text('Clear'),
+                        ),
+                      ],
+                    ),
+                  );
 
-                    if (confirm == true) {
-                      ref.read(chatHistoryProvider.notifier).clearHistory();
-                    }
-                  },
-                  icon: const Icon(Icons.delete_sweep),
-                  label: const Text('Clear All History'),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 48),
+                  if (confirm == true) {
+                    ref.read(chatHistoryProvider.notifier).clearHistory();
+                  }
+                },
+                icon: const Icon(Icons.delete_sweep_outlined, size: 18),
+                label: const Text('Clear All History'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 36),
+                  textStyle: theme.textTheme.labelMedium,
+                  side: BorderSide(
+                    color: colorScheme.outlineVariant,
+                    width: 1.5,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -155,14 +181,19 @@ class ChatHistorySidebar extends ConsumerWidget {
             itemBuilder: (context, index) {
               final result = results[index];
               return ListTile(
-                leading: const Icon(Icons.search),
+                leading: const Icon(Icons.search_rounded, size: 18),
+                dense: true,
                 title: Text(
                   result['content'] ?? '',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontSize: 13,
+                  ),
                 ),
                 subtitle: Text(
                   'In: ${result['conversation_title'] ?? 'Unknown Chat'}',
+                  style: Theme.of(context).textTheme.labelSmall,
                 ),
                 onTap: () {
                   ref
@@ -297,8 +328,8 @@ class _ConversationTileState extends State<_ConversationTile> {
             selectedTileColor: colorScheme.primaryContainer,
             selectedColor: colorScheme.onPrimaryContainer,
             contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 4,
+              horizontal: 12,
+              vertical: 2,
             ),
             title: _isEditing
                 ? TextField(
@@ -306,6 +337,7 @@ class _ConversationTileState extends State<_ConversationTile> {
                     autofocus: true,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w500,
+                      fontSize: 13,
                     ),
                     decoration: const InputDecoration(
                       isDense: true,
@@ -318,11 +350,18 @@ class _ConversationTileState extends State<_ConversationTile> {
                     widget.conversation.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w500),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 13,
+                    ),
                   ),
             subtitle: Text(
-              DateFormat.yMMMd().add_jm().format(widget.conversation.updatedAt),
-              style: theme.textTheme.bodySmall,
+              DateFormat('MMM d, h:mm a').format(widget.conversation.updatedAt),
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant.withValues(
+                  alpha: 0.7,
+                ),
+              ),
             ),
             onTap: _isEditing ? null : widget.onTap,
             onLongPress: () => setState(() => _isEditing = true),

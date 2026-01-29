@@ -1,20 +1,36 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import Home from '../src/pages/Home/Home';
 
 describe('Home Page', () => {
   it('renders without crashing', () => {
-    render(<Home show={true} />);
-    expect(screen.getByText(/Your Second Brain/i)).toBeInTheDocument();
+    render(
+      <MemoryRouter>
+        <Home show={true} />
+      </MemoryRouter>
+    );
+    expect(screen.getByText((content, element) => {
+      const hasText = (node) => node.textContent === "Your Intelligent Assistant for Local Files";
+      return element.tagName.toLowerCase() === 'h1' && hasText(element);
+    })).toBeInTheDocument();
   });
 
-  it('renders Get Started button', () => {
-    render(<Home show={true} />);
-    expect(screen.getByText(/Get Started Free/i)).toBeInTheDocument();
+  it('renders Download Now button', () => {
+    render(
+      <MemoryRouter>
+        <Home show={true} />
+      </MemoryRouter>
+    );
+    expect(screen.getByText(/Download Now/i)).toBeInTheDocument();
   });
 
   it('renders View GitHub button', () => {
-    render(<Home show={true} />);
+    render(
+      <MemoryRouter>
+        <Home show={true} />
+      </MemoryRouter>
+    );
     expect(screen.getByText(/View GitHub/i)).toBeInTheDocument();
   });
 });

@@ -4,7 +4,6 @@
 ### manually. If a collision is detected in this file when doing a code merge, resolve
 ### the conflict by removing and recreating the conflicting migration.
 
-20250116_add_vector_index
 20251217175548820
 20251217202628604
 20251221225505777
@@ -14,3 +13,6 @@
 20260118163519353
 20260121183056295
 20260121185034969
+20260125151255224
+20260126214343119
+20260129123148665

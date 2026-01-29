@@ -26,6 +26,8 @@ fields:
   fileModifiedAt: DateTime?
   ### Number of words in the document
   wordCount: int?
+  ### Number of pages in the document (for PDFs/DOCX)
+  pageCount: int?
   ### Whether this file contains readable text content
   isTextContent: bool
   ### Status: pending, indexing, indexed, failed, skipped
@@ -46,3 +48,9 @@ indexes:
     fields: status
   file_index_category:
     fields: documentCategory
+  idx_file_index_filename_trgm:
+    fields: fileName
+    type: gin
+  idx_file_index_content_preview_trgm:
+    fields: contentPreview
+    type: gin

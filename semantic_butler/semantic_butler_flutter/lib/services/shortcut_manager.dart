@@ -48,11 +48,6 @@ class ShortcutManager {
           const NavigateTabIntent(4),
       const SingleActivator(LogicalKeyboardKey.digit5, meta: true):
           const NavigateTabIntent(4),
-
-      const SingleActivator(LogicalKeyboardKey.digit6, control: true):
-          const NavigateTabIntent(5),
-      const SingleActivator(LogicalKeyboardKey.digit6, meta: true):
-          const NavigateTabIntent(5),
     };
   }
 }

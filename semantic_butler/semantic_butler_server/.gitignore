@@ -11,8 +11,28 @@ web/app
 # Directory created by dartdoc
 doc/api/
 
+
 # Passwords file
 config/passwords.yaml
 
 # Firebase service account key for Firebase auth
 config/firebase_service_account_key.json
+
+# ================================
+# SERVERPOD CLOUD ADDITIONS
+# ================================
+
+# scloud deployment generated files
+**/.scloud/
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.*.local
+
+# scloud package cache
+.scloud-cache/
+
+# Deployment logs
+*.deployment.log

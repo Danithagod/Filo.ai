@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../home/filo_hero_logo.dart';
 
 class WelcomeCarousel extends StatefulWidget {
   final VoidCallback onGetStarted;
@@ -11,43 +12,29 @@ class WelcomeCarousel extends StatefulWidget {
 
 class _WelcomeCarouselState extends State<WelcomeCarousel> {
   final PageController _pageController = PageController();
-  int _currentIndex = 0;
+  int _currentPage = 0;
 
-  final List<_OnboardingSlide> _slides = [
-    const _OnboardingSlide(
-      title: 'Welcome to Desk Sense',
+  final List<WelcomeSlide> _slides = [
+    WelcomeSlide(
+      title: 'Welcome to Filo',
       description:
-          'Your intelligent companion for natural language file management.',
-      icon: Icons.smart_toy_outlined,
-      color: Colors.blue,
-    ),
-    const _OnboardingSlide(
-      title: 'Tag Files with @',
-      description:
-          'Type @ in the chat to tag files or folders. I\'ll use them as context for your questions.',
-      icon: Icons.alternate_email,
-      color: Colors.purple,
-    ),
-    const _OnboardingSlide(
-      title: 'Natural Language Search',
-      description:
-          'Ask me to "find all pdfs from last week" or "search for project notes in my documents".',
-      icon: Icons.search,
-      color: Colors.green,
-    ),
-    const _OnboardingSlide(
-      title: 'Smart Organization',
-      description:
-          'Let me help you organize your workspace. "Move all screenshots to a new folder called Images".',
-      icon: Icons.folder_open,
-      color: Colors.orange,
-    ),
-    const _OnboardingSlide(
-      title: 'Ready to Begin?',
-      description:
-          'Start a conversation and see how I can simplify your workflow.',
+          'The intelligent way to search and organize your local files.',
       icon: Icons.auto_awesome,
-      color: Colors.teal,
+    ),
+    WelcomeSlide(
+      title: 'Semantic Search',
+      description: 'Find what you need by meaning, not just keywords.',
+      icon: Icons.search_rounded,
+    ),
+    WelcomeSlide(
+      title: 'Privacy First',
+      description: 'Your data stays on your machine. Broad indexing is local.',
+      icon: Icons.security_rounded,
+    ),
+    WelcomeSlide(
+      title: 'Instant Actions',
+      description: 'Organize, summarize, and move files with ease.',
+      icon: Icons.bolt_rounded,
     ),
   ];
 
@@ -59,139 +46,155 @@ class _WelcomeCarouselState extends State<WelcomeCarousel> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
-    return Stack(
-      children: [
-        // Skip button top-right
-        Positioned(
-          top: 12,
-          right: 12,
-          child: TextButton(
-            onPressed: widget.onGetStarted,
-            child: const Text('Skip'),
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
+        child: Container(
+          margin: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(32),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: colorScheme.shadow.withValues(alpha: 0.1),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
-        ),
-        Center(
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Carousel
-                SizedBox(
-                  height: 350,
-                  child: PageView.builder(
-                    controller: _pageController,
-                    onPageChanged: (index) =>
-                        setState(() => _currentIndex = index),
-                    itemCount: _slides.length,
-                    itemBuilder: (context, index) {
-                      final slide = _slides[index];
-                      return Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(24),
-                              decoration: BoxDecoration(
-                                color: slide.color.withValues(alpha: 0.1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                slide.icon,
-                                size: 64,
-                                color: slide.color,
-                              ),
-                            ),
-                            const SizedBox(height: 32),
-                            Text(
-                              slide.title,
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              slide.description,
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+          child: Column(
+            children: [
+              // Use the FiloHeroLogo as a persistent header
+              const SizedBox(height: 32),
+              SizedBox(
+                height: 80,
+                child: FiloHeroLogo(
+                  size: 80,
                 ),
+              ),
 
-                // Indicator & Action
-                Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Dots
-                      Row(
-                        children: List.generate(
-                          _slides.length,
-                          (index) => AnimatedContainer(
-                            duration: const Duration(milliseconds: 300),
-                            margin: const EdgeInsets.only(right: 8),
-                            height: 8,
-                            width: _currentIndex == index ? 24 : 8,
+              Expanded(
+                child: PageView.builder(
+                  controller: _pageController,
+                  itemCount: _slides.length,
+                  onPageChanged: (index) =>
+                      setState(() => _currentPage = index),
+                  itemBuilder: (context, index) {
+                    final data = _slides[index];
+                    final color = [
+                      colorScheme.primary,
+                      colorScheme.tertiary,
+                      colorScheme.secondary,
+                      colorScheme.primary,
+                    ][index];
+
+                    return Padding(
+                      padding: const EdgeInsets.all(32.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(24),
                             decoration: BoxDecoration(
-                              color: _currentIndex == index
-                                  ? colorScheme.primary
-                                  : colorScheme.outlineVariant,
-                              borderRadius: BorderRadius.circular(4),
+                              color: color.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
                             ),
+                            child: Icon(
+                              data.icon,
+                              size: 64,
+                              color: color,
+                            ),
+                          ),
+                          const SizedBox(height: 32),
+                          Text(
+                            data.title,
+                            textAlign: TextAlign.center,
+                            style: textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            data.description,
+                            textAlign: TextAlign.center,
+                            style: textTheme.bodyLarge?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+              // Indicators and Button
+              Padding(
+                padding: const EdgeInsets.fromLTRB(32, 0, 32, 32),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(
+                        _slides.length,
+                        (index) => Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          height: 8,
+                          width: _currentPage == index ? 24 : 8,
+                          decoration: BoxDecoration(
+                            color: _currentPage == index
+                                ? colorScheme.primary
+                                : colorScheme.outlineVariant,
+                            borderRadius: BorderRadius.circular(4),
                           ),
                         ),
                       ),
-
-                      // Button
-                      if (_currentIndex == _slides.length - 1)
-                        FilledButton.icon(
-                          onPressed: widget.onGetStarted,
-                          icon: const Icon(Icons.rocket_launch),
-                          label: const Text('Get Started'),
-                        )
-                      else
-                        TextButton(
-                          onPressed: () {
-                            _pageController.nextPage(
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeInOut,
-                            );
-                          },
-                          child: const Text('Next'),
+                    ),
+                    const SizedBox(height: 32),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: _currentPage == _slides.length - 1
+                            ? widget.onGetStarted
+                            : () => _pageController.nextPage(
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeInOut,
+                              ),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
-                    ],
-                  ),
+                        child: Text(
+                          _currentPage == _slides.length - 1
+                              ? 'Get Started'
+                              : 'Next',
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
-      ],
+      ),
     );
   }
 }
 
-class _OnboardingSlide {
+class WelcomeSlide {
   final String title;
   final String description;
   final IconData icon;
-  final Color color;
 
-  const _OnboardingSlide({
+  WelcomeSlide({
     required this.title,
     required this.description,
     required this.icon,
-    required this.color,
   });
 }

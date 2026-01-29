@@ -1,63 +1,75 @@
-# This is the configuration file for your production environment.
-# Typically, you will want to route the traffic through a load balancer
-# which adds SSL security through https. If you use Serverpod's standard
-# Terraform scripts to deploy your server, all you need to change in
-# this file is the examplepod.com domain name.
+# ===========================================
+# ServerPod Cloud Production Configuration
+# ===========================================
+# This file is configured for ServerPod Cloud deployment
+# After deployment, update these values with your actual Serverpod Cloud URLs
 
 # Configuration for the main API server.
 apiServer:
   port: 8080
-  publicHost: localhost
-  publicPort: 8080
-  publicScheme: http
+  # UPDATE AFTER DEPLOYMENT: Replace with your actual Serverpod Cloud domain
+  # Format: <project-id>.api.serverpod.space
+  publicHost: semantic-butler-api.serverpod.space
+  publicPort: 443
+  publicScheme: https
 
 # Configuration for the Insights server.
 insightsServer:
   port: 8081
-  publicHost: localhost
-  publicPort: 8081
-  publicScheme: http
+  # UPDATE AFTER DEPLOYMENT: Replace with your actual Serverpod Cloud domain
+  # Format: <project-id>.insights.serverpod.space
+  publicHost: semantic-butler-insights.serverpod.space
+  publicPort: 443
+  publicScheme: https
 
 # Configuration for the web server.
 webServer:
   port: 8082
-  publicHost: localhost
-  publicPort: 8082
-  publicScheme: http
+  # UPDATE AFTER DEPLOYMENT: Replace with your actual Serverpod Cloud domain
+  # Format: <project-id>.serverpod.space
+  publicHost: semantic-butler.serverpod.space
+  publicPort: 443
+  publicScheme: https
 
-# This is the database setup for your servers. The default for the Google Cloud
-# Engine Terraform configuration is to connect on a private IP address.
-# If you are connecting on a public IP (e.g. on AWS or Google Cloud Run), you
-# connect on the public IP of the database e.g. database.examplepod.com.
+# ===========================================
+# DATABASE
+# ===========================================
+# Serverpod Cloud provides a managed PostgreSQL database.
+# Connection details are automatically configured by the cloud platform.
+# The password should be set via scloud secrets, not in this file.
 database:
-  host: ep-purple-block-ahv7qmg4-pooler.c-3.us-east-1.aws.neon.tech
+  # Database host is managed by Serverpod Cloud
+  # Update after deployment with actual cloud database host
+  host: database.serverpod.cloud
   port: 5432
-  name: neondb
-  user: neondb_owner
+  name: semantic_butler
+  user: serverpod
   requireSsl: true
-  #isUnixSocket: true # defaults to false
-  #maxConnectionCount: 10 # Defaults to 10, a negative or null value removes the limit
+  # maxConnectionCount: 10
 
-# This is the setup for Redis. The default for the Google Cloud Engine Terraform
-# configuration is to connect on a private IP address.
-# If you are connecting on a public IP (e.g. on AWS or Google Cloud Run), you
-# connect on the public IP of the database e.g. redis.examplepod.com.
+# ===========================================
+# REDIS (Optional)
+# ===========================================
+# Serverpod Cloud provides managed Redis.
+# Enable this if you need caching functionality.
 redis:
-  enabled: false
-  host: redis.private-production.examplepod.com
+  enabled: false  # Set to true to enable Redis caching
+  host: redis.serverpod.cloud
   port: 6379
-  #user: # defaults to empty
-  #requireSsl: true # defaults to false
+  # requireSsl: true
 
-maxRequestSize: 524288 # The maximum size of requests allowed in bytes
+# ===========================================
+# SERVICE SETTINGS
+# ===========================================
+maxRequestSize: 524288  # 512KB - Adjust based on file upload needs
 
 sessionLogs:
   consoleEnabled: true
   persistentEnabled: true
-  consoleLogFormat: text # Defaults to "json", options are "text" or "json"
+  consoleLogFormat: text  # Options: text, json
 
-# futureCallExecutionEnabled: true # Defaults to true
-
-#futureCall:
-#  concurrencyLimit: 1 # Defaults to 1, a negative or null value removes the limit
-#  scanInterval: 5000 # Unit in milliseconds, defaults to 5000
+# Future calls (background tasks)
+futureCallExecutionEnabled: true
+futureCall:
+  concurrencyLimit: 1
+  scanInterval: 5000  # milliseconds

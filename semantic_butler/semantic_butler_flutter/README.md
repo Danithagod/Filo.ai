@@ -1,4 +1,4 @@
-# semantic_butler_flutter
+# Filo App
 
 A new Flutter project with Serverpod.
 

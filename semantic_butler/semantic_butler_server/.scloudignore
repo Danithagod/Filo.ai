@@ -1,0 +1,77 @@
+# ================================
+# SERVERPOD CLOUD DEPLOYMENT IGNORE
+# ================================
+
+# Test files and directories
+test/
+testing/
+integration_test/
+test_integration/
+
+# Documentation
+*.md
+docs/
+README.md
+CHANGELOG.md
+CONTRIBUTING.md
+
+# Build artifacts (not needed in deployment)
+build/
+.dart_tool/
+.scloud/
+
+# Development tools
+.devcontainer/
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+
+# Migration scripts (keep in git, don't deploy)
+bin/migrate_*.dart
+bin/check_*.dart
+bin/direct_*.dart
+
+# SQL and database files
+*.sql
+*.sql.backup
+*.db
+*.sqlite
+
+# Logs
+*.log
+logs/
+
+# Docker files (not needed for cloud deployment)
+docker-compose.yaml
+docker-compose.*.yaml
+Dockerfile
+Dockerfile.*
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Large data files
+*.csv
+*.json.backup
+*.backup
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+migration_error.log
+nul
+
+# Development specific
+*.env.example
+deployment_*.md
+HACKATHON_*.md
+CROSS_PLATFORM_*.md
+SMART_ORGANIZATION_*.md
+INDEXING_*.md
+CHAT_*.md

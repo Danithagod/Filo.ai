@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
+import '../utils/app_logger.dart';
 
 import '../models/chat/chat_message.dart';
 import '../models/chat/conversation.dart';
@@ -28,6 +29,10 @@ class ChatStorageService {
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
+      AppLogger.info(
+        'Saved conversation metadata: ${conversation.id}',
+        tag: 'ChatStorage',
+      );
 
       // Save messages (latest ones)
       // Usually we only save the full list when it's small or we just save the new messages.
@@ -44,6 +49,32 @@ class ChatStorageService {
     String? updateTitle,
   }) async {
     final db = await _dbHelper.database;
+
+    // Defensive check: Ensure conversation exists before adding message to avoid FK violation
+    final conversationExists = await db.query(
+      'conversations',
+      where: 'id = ?',
+      whereArgs: [conversationId],
+      limit: 1,
+    );
+
+    if (conversationExists.isEmpty) {
+      AppLogger.warning(
+        'Attempted to add message to non-existent conversation: $conversationId. Creating placeholder.',
+        tag: 'ChatStorage',
+      );
+      await db.insert(
+        'conversations',
+        {
+          'id': conversationId,
+          'title': updateTitle ?? 'New Chat',
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    }
+
     await _saveMessageTxn(db, message, conversationId);
 
     // Update conversation updatedAt and optionally title
@@ -93,6 +124,10 @@ class ChatStorageService {
         'metadata': await _backgroundProcessor.encodeJson(metadata),
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    AppLogger.info(
+      'Saved message: ${message.id} for conv: $conversationId',
+      tag: 'ChatStorage',
     );
   }
 

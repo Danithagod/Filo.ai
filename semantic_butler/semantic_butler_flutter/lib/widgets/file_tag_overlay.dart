@@ -40,10 +40,6 @@ class _FileTagOverlayState extends ConsumerState<FileTagOverlay> {
     super.initState();
     _keyboardFocusNode = FocusNode();
     _loadDrives();
-    // Request focus after the frame is built
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _keyboardFocusNode.requestFocus();
-    });
   }
 
   @override
@@ -176,8 +172,17 @@ class _FileTagOverlayState extends ConsumerState<FileTagOverlay> {
     }
   }
 
-  void _handleKeyEvent(KeyEvent event) {
-    if (event is! KeyDownEvent) return;
+  KeyEventResult _handleKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+
+    // Request focus when navigation keys are pressed
+    if (event.logicalKey == LogicalKeyboardKey.arrowDown ||
+        event.logicalKey == LogicalKeyboardKey.arrowUp ||
+        event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.escape ||
+        event.logicalKey == LogicalKeyboardKey.backspace) {
+      _keyboardFocusNode.requestFocus();
+    }
 
     if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
       setState(() {
@@ -204,6 +209,8 @@ class _FileTagOverlayState extends ConsumerState<FileTagOverlay> {
     } else if (event.logicalKey == LogicalKeyboardKey.backspace) {
       _navigateUp();
     }
+
+    return KeyEventResult.handled;
   }
 
   void _scrollToSelected() {
@@ -224,188 +231,205 @@ class _FileTagOverlayState extends ConsumerState<FileTagOverlay> {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return KeyboardListener(
-      focusNode: _keyboardFocusNode,
-      onKeyEvent: _handleKeyEvent,
-      child: Material(
-        elevation: 12,
-        borderRadius: BorderRadius.circular(16),
-        color: colorScheme.surfaceContainerHigh,
-        child: Container(
-          width: 384, // 320 * 1.2 = 384
-          constraints: const BoxConstraints(
-            maxHeight: 336,
-          ), // 280 * 1.2 = 336
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Header with path/breadcrumb
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer.withValues(alpha: 0.3),
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(12),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    if (_currentPath != null)
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back, size: 18),
-                        onPressed: _navigateUp,
-                        tooltip: 'Back',
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                          minWidth: 28,
-                          minHeight: 28,
-                        ),
-                      ),
-                    const SizedBox(width: 4),
-                    Icon(
-                      _currentPath == null ? Icons.storage : Icons.folder_open,
-                      size: 16,
-                      color: colorScheme.primary,
+    return FocusScope(
+      skipTraversal: true,
+      child: KeyboardListener(
+        focusNode: _keyboardFocusNode,
+        onKeyEvent: _handleKeyEvent,
+        child: GestureDetector(
+          onTap: () {
+            // Only request focus when user explicitly clicks on overlay
+            FocusScope.of(context).requestFocus(_keyboardFocusNode);
+          },
+          child: Material(
+            elevation: 12,
+            borderRadius: BorderRadius.circular(16),
+            color: colorScheme.surfaceContainerHigh,
+            child: Container(
+              width: 384, // 320 * 1.2 = 384
+              constraints: const BoxConstraints(
+                maxHeight: 336,
+              ), // 280 * 1.2 = 336
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Header with path/breadcrumb
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _currentPath ?? 'Select Drive',
-                        style: textTheme.labelMedium?.copyWith(
-                          color: colorScheme.onSurface,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        overflow: TextOverflow.ellipsis,
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer.withValues(
+                        alpha: 0.3,
+                      ),
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(12),
                       ),
                     ),
-                    if (_currentPath != null)
-                      TextButton.icon(
-                        onPressed: _selectCurrentAsFolder,
-                        icon: const Icon(Icons.check, size: 16),
-                        label: const Text('Select'),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-
-              // Content
-              Flexible(
-                child: _isLoading
-                    ? const Padding(
-                        padding: EdgeInsets.all(20),
-                        child: Center(
-                          child: SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                    child: Row(
+                      children: [
+                        if (_currentPath != null)
+                          IconButton(
+                            icon: const Icon(Icons.arrow_back, size: 18),
+                            onPressed: _navigateUp,
+                            tooltip: 'Back',
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minWidth: 28,
+                              minHeight: 28,
+                            ),
                           ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          _currentPath == null
+                              ? Icons.storage
+                              : Icons.folder_open,
+                          size: 16,
+                          color: colorScheme.primary,
                         ),
-                      )
-                    : _filteredItems.isEmpty
-                    ? Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Center(
+                        const SizedBox(width: 8),
+                        Expanded(
                           child: Text(
-                            widget.query.isEmpty ? 'Empty' : 'No matches',
-                            style: textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
+                            _currentPath ?? 'Select Drive',
+                            style: textTheme.labelMedium?.copyWith(
+                              color: colorScheme.onSurface,
+                              fontWeight: FontWeight.w500,
                             ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                      )
-                    : ListView.builder(
-                        controller: _scrollController,
-                        shrinkWrap: true,
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        itemCount: _filteredItems.length,
-                        itemBuilder: (context, index) {
-                          final item = _filteredItems[index];
-                          final isSelected = index == _selectedIndex;
-
-                          return InkWell(
-                            onTap: () => _selectItem(item),
-                            onLongPress: item.isDirectory
-                                ? () => _selectItem(item, forceSelect: true)
-                                : null,
-                            child: Container(
+                        if (_currentPath != null)
+                          TextButton.icon(
+                            onPressed: _selectCurrentAsFolder,
+                            icon: const Icon(Icons.check, size: 16),
+                            label: const Text('Select'),
+                            style: TextButton.styleFrom(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 10,
+                                horizontal: 8,
                               ),
-                              color: isSelected
-                                  ? colorScheme.primaryContainer.withValues(
-                                      alpha: 0.5,
-                                    )
-                                  : null,
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    item.isDrive
-                                        ? Icons.storage_rounded
-                                        : item.isDirectory
-                                        ? Icons.folder_rounded
-                                        : Icons.insert_drive_file_outlined,
-                                    size: 20,
-                                    color: item.isDrive || item.isDirectory
-                                        ? colorScheme.primary
-                                        : colorScheme.onSurfaceVariant,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      item.name,
-                                      style: textTheme.bodyMedium?.copyWith(
-                                        fontWeight: isSelected
-                                            ? FontWeight.w600
-                                            : null,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  if (item.isDirectory)
-                                    Icon(
-                                      Icons.chevron_right,
-                                      size: 18,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                ],
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+
+                  // Content
+                  Flexible(
+                    child: _isLoading
+                        ? const Padding(
+                            padding: EdgeInsets.all(20),
+                            child: Center(
+                              child: SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               ),
                             ),
-                          );
-                        },
-                      ),
-              ),
+                          )
+                        : _filteredItems.isEmpty
+                        ? Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Center(
+                              child: Text(
+                                widget.query.isEmpty ? 'Empty' : 'No matches',
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                          )
+                        : ListView.builder(
+                            controller: _scrollController,
+                            shrinkWrap: true,
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            itemCount: _filteredItems.length,
+                            itemBuilder: (context, index) {
+                              final item = _filteredItems[index];
+                              final isSelected = index == _selectedIndex;
 
-              // Footer hint
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
-                  borderRadius: const BorderRadius.vertical(
-                    bottom: Radius.circular(16),
+                              return InkWell(
+                                onTap: () => _selectItem(item),
+                                onLongPress: item.isDirectory
+                                    ? () => _selectItem(item, forceSelect: true)
+                                    : null,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 10,
+                                  ),
+                                  color: isSelected
+                                      ? colorScheme.primaryContainer.withValues(
+                                          alpha: 0.5,
+                                        )
+                                      : null,
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        item.isDrive
+                                            ? Icons.storage_rounded
+                                            : item.isDirectory
+                                            ? Icons.folder_rounded
+                                            : Icons.insert_drive_file_outlined,
+                                        size: 20,
+                                        color: item.isDrive || item.isDirectory
+                                            ? colorScheme.primary
+                                            : colorScheme.onSurfaceVariant,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          item.name,
+                                          style: textTheme.bodyMedium?.copyWith(
+                                            fontWeight: isSelected
+                                                ? FontWeight.w600
+                                                : null,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      if (item.isDirectory)
+                                        Icon(
+                                          Icons.chevron_right,
+                                          size: 18,
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
                   ),
-                ),
-                child: Text(
-                  '↑↓ Navigate • Enter Select • Hold to select folder',
-                  style: textTheme.labelSmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
+
+                  // Footer hint
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest,
+                      borderRadius: const BorderRadius.vertical(
+                        bottom: Radius.circular(16),
+                      ),
+                    ),
+                    child: Text(
+                      '↑↓ Navigate • Enter Select • Hold to select folder',
+                      style: textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
-                  textAlign: TextAlign.center,
-                ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

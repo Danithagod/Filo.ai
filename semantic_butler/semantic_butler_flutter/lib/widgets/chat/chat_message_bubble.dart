@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../models/chat/chat_message.dart';
 import '../../models/chat/message_role.dart';
 import '../../utils/thought_parser.dart';
 import 'agent_thought_expander.dart';
 import 'tool_result_badge.dart';
+// No import needed here if unused, but let's see. Wait, if it defines MessageActionsToolbar, it IS used.
+// The analyzer says it's unused because I haven't renamed the usage yet.
 import 'message_actions_menu.dart';
 import '../markdown/markdown_body.dart';
 import '../../utils/background_processor.dart';
@@ -96,10 +99,15 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
                   CircleAvatar(
                     radius: 14,
                     backgroundColor: colorScheme.secondaryContainer,
-                    child: Icon(
-                      Icons.smart_toy_outlined,
-                      size: 16,
-                      color: colorScheme.onSecondaryContainer,
+                    child: Padding(
+                      padding: const EdgeInsets.all(6.0),
+                      child: SvgPicture.asset(
+                        'assets/filo_logo.svg',
+                        colorFilter: ColorFilter.mode(
+                          colorScheme.onSecondaryContainer,
+                          BlendMode.srcIn,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -131,15 +139,17 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
                               decoration: BoxDecoration(
                                 color: isUser
                                     ? colorScheme.primaryContainer
-                                    : (widget.message.isError
+                                    : (widget.message.error != null
                                           ? colorScheme.errorContainer
-                                          : colorScheme.surfaceContainerHighest
-                                                .withValues(alpha: 0.5)),
+                                          : (theme.brightness == Brightness.dark
+                                                ? colorScheme.surfaceContainer
+                                                : colorScheme
+                                                      .surfaceContainerHigh)),
                                 borderRadius: BorderRadius.only(
-                                  topLeft: const Radius.circular(16),
-                                  topRight: const Radius.circular(16),
-                                  bottomLeft: Radius.circular(isUser ? 16 : 4),
-                                  bottomRight: Radius.circular(isUser ? 4 : 16),
+                                  topLeft: const Radius.circular(20),
+                                  topRight: const Radius.circular(20),
+                                  bottomLeft: Radius.circular(isUser ? 20 : 4),
+                                  bottomRight: Radius.circular(isUser ? 4 : 20),
                                 ),
                               ),
                               child: Column(
@@ -180,15 +190,15 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
                               ),
                             ),
 
-                            // Action Buttons (Always visible but minimal)
+                            // Action Buttons (Moved higher to avoid overlapping text)
                             if (!widget.message.isStreaming)
                               Positioned(
-                                top: -12,
-                                right: isUser ? null : -8,
-                                left: isUser ? -8 : null,
+                                top: -24,
+                                right: isUser ? 4 : null,
+                                left: isUser ? null : 4,
                                 child: AnimatedOpacity(
                                   duration: const Duration(milliseconds: 200),
-                                  opacity: _isHovering ? 1.0 : 0.6,
+                                  opacity: _isHovering ? 1.0 : 0.0,
                                   child: _buildActionButtons(context, isUser),
                                 ),
                               ),
@@ -375,11 +385,11 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
           switch (status.type) {
             case 'success':
               icon = Icons.check_circle_outline;
-              color = Colors.green;
+              color = colorScheme.tertiary;
               break;
             case 'warning':
               icon = Icons.warning_amber_outlined;
-              color = Colors.orange;
+              color = colorScheme.secondary;
               break;
             case 'error':
               icon = Icons.error_outline;
@@ -440,7 +450,7 @@ class _ChatMessageBubbleState extends State<ChatMessageBubble> {
   }
 
   Widget _buildActionButtons(BuildContext context, bool isUser) {
-    return MessageActionButtons(
+    return MessageActionsToolbar(
       role: widget.message.role,
       timestamp: widget.message.timestamp ?? DateTime.now(),
       content: widget.message.content,

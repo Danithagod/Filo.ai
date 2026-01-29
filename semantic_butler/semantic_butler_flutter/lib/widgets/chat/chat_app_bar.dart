@@ -34,10 +34,10 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
               color: colorScheme.primaryContainer,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              Icons.smart_toy_outlined,
-              color: colorScheme.onPrimaryContainer,
-              size: 20,
+            child: Image.asset(
+              'assets/filo_navbar.png',
+              width: 20,
+              height: 20,
             ),
           ),
           const SizedBox(width: 12),
@@ -46,7 +46,7 @@ class ChatAppBar extends StatelessWidget implements PreferredSizeWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Semantic Butler',
+                  'Filo',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),

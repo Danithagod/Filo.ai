@@ -33,7 +33,12 @@
       "Bash(start:*)",
       "WebSearch",
       "Bash(flutter doctor:*)",
-      "Bash(claude mcp list:*)"
+      "Bash(claude mcp list:*)",
+      "Bash(flutter:*)",
+      "Bash(python:*)",
+      "Bash(tasklist:*)",
+      "Bash(netstat:*)",
+      "Bash(gh pr:*)"
     ]
   },
   "outputStyle": "default"

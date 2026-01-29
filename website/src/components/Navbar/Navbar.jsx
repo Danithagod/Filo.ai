@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Brain, Menu, X } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { gsap } from 'gsap';
+import Logo from '../Logo/Logo';
 import './Navbar.css';
 
 const Navbar = ({ show }) => {
@@ -23,16 +24,14 @@ const Navbar = ({ show }) => {
   const navLinks = [
     { name: 'Home', path: '/' },
     { name: 'Features', path: '/features' },
-    { name: 'Pricing', path: '/pricing' },
     { name: 'About', path: '/about' },
   ];
 
   return (
     <nav className="navbar-container" ref={navRef} style={{ opacity: 0, transform: 'translateY(-100px)' }} role="navigation" aria-label="Main navigation">
       <div className="navbar-pill">
-        <Link to="/" className="nav-logo" aria-label="Semantic Butler Home">
-          <Brain size={24} className="logo-icon" />
-          <span>Semantic Butler</span>
+        <Link to="/" className="nav-logo" aria-label="Filo Home">
+          <Logo size={56} className="logo-icon" />
         </Link>
 
         <div className={`nav-links ${isOpen ? 'active' : ''}`} role="menubar">
@@ -48,7 +47,7 @@ const Navbar = ({ show }) => {
               {link.name}
             </Link>
           ))}
-          <Link to="/pricing" className="btn-nav-primary" role="menuitem" aria-label="Download Semantic Butler">Download</Link>
+          <Link to="/download" className="btn-nav-primary" role="menuitem" aria-label="Download Filo">Download</Link>
         </div>
 
         <button className="nav-toggle" onClick={() => setIsOpen(!isOpen)} aria-label={isOpen ? 'Close navigation menu' : 'Open navigation menu'} aria-expanded={isOpen}>

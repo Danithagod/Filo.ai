@@ -2,13 +2,15 @@ import 'dart:convert';
 
 import 'package:serverpod/serverpod.dart';
 import '../generated/protocol.dart';
+import '../prompts/agent_system_prompt.dart';
 import '../services/openrouter_client.dart';
 import '../services/ai_service.dart';
-import '../services/file_operations_service.dart';
-import '../services/terminal_service.dart';
 import '../services/auth_service.dart';
+import '../services/file_operations_service.dart';
 import '../services/rate_limit_service.dart';
+import '../services/terminal_service.dart';
 import '../config/ai_models.dart';
+import '../utils/client_identifier.dart';
 import '../utils/error_sanitizer.dart';
 import 'butler_endpoint.dart';
 import '../../server.dart' show getEnv;
@@ -79,52 +81,7 @@ class AgentEndpoint extends Endpoint {
   }
 
   /// System prompt for the agent
-  static const String systemPrompt = '''
-You are Semantic Butler, a high-performance file assistant.
-You have access to the local file system and can execute terminal commands.
-
-# SEARCH PROTOCOL (FOLLOW STRICTLY)
-
-If the user asks for a file or folder and you don't know the exact path:
-
-1. **DISCOVER DRIVES**: Always call `get_drives()` first to see all available storage (C:, D:, E:, etc.).
-2. **DEEP SEARCH EACH DRIVE**: Use `deep_search(pattern, directory, folders_only)` for EVERY drive found.
-   - For a folder named "Gemma 2", try `deep_search("gemma", "D:\\", folders_only=true)`.
-3. **TRY VARIATIONS**: If first search fails, try variations:
-   - Partial names: "gemma" instead of "Gemma 2"
-   - Removing spaces: "gemma2"
-   - Using wildcards: "*gemma*"
-4. **USE TERMINAL**: If tools fail, use `run_command("dir /s /b *gemma*", working_directory: "D:\\")`.
-5. **ONLY ASK USER AS LAST RESORT**: You must try at least 3 different drives/patterns before giving up.
-
-# OUTPUT FORMAT
-
-You MUST structure your response exactly like this template:
-
-<thinking>
-Identify the drives, choose search patterns, and explain your strategy.
-</thinking>
-
-[Optional Call to Tools here]
-
-<message>
-Your natural language response. NO markdown (no **, no #).
-</message>
-
-<status type="success/warning/info/error">
-Brief summary of action result.
-</status>
-
-<result type="file/folder" path="...">
-[Optional child items if listing directory]
-</result>
-
-# STRICTURES
-- NEVER output text outside of the XML tags defined above.
-- NEVER use markdown like **bold** in the <message> tag.
-- ALWAYS use backslashes for Windows paths (e.g., C:\\Users\\...).
-- If searching for a folder, set `folders_only: true` in tools.
-''';
+  static const String systemPrompt = AgentSystemPrompt.systemPrompt;
 
   /// Tool definitions for function calling
   List<Tool> get tools => [
@@ -529,7 +486,7 @@ Brief summary of action result.
     AuthService.requireAuth(session);
 
     // Security: Rate limiting
-    final clientId = session.sessionId.toString();
+    final clientId = ClientIdentifier.fromSession(session);
     _rateLimiter.requireRateLimit(clientId, 'agentChat');
 
     // Security: Input validation
@@ -788,7 +745,7 @@ Brief summary of action result.
     AuthService.requireAuth(session);
 
     // Security: Rate limiting
-    final clientId = session.sessionId.toString();
+    final clientId = ClientIdentifier.fromSession(session);
     _rateLimiter.requireRateLimit(clientId, 'agentChat');
 
     // Security: Input validation

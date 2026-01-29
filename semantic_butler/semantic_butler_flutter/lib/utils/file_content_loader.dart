@@ -33,15 +33,104 @@ class FileContentLoader {
     return null;
   }
 
+  /// Load directory structure as a tree-like string
+  static Future<String?> loadDirectoryStructure(String path) async {
+    try {
+      final dir = Directory(path);
+      if (!(await dir.exists())) return null;
+
+      final buffer = StringBuffer();
+      buffer.writeln(
+        'Directory Listing for: ${path.split(Platform.pathSeparator).last}',
+      );
+
+      // Safety limits
+      int fileCount = 0;
+      const int maxFiles = 100;
+      const int maxDepth = 3;
+
+      Future<void> listDir(Directory d, int depth, String prefix) async {
+        if (depth > maxDepth || fileCount >= maxFiles) return;
+
+        try {
+          final entities = await d.list(followLinks: false).toList();
+
+          // Sort explicitly: directories first (alphabetical), then files (alphabetical)
+          entities.sort((a, b) {
+            final aIsDir = a is Directory;
+            final bIsDir = b is Directory;
+            if (aIsDir && !bIsDir) return -1;
+            if (!aIsDir && bIsDir) return 1;
+            return a.path.compareTo(b.path);
+          });
+
+          for (final entity in entities) {
+            if (fileCount >= maxFiles) {
+              buffer.writeln('$prefix... [limit reached]');
+              return;
+            }
+
+            final name = entity.path.split(Platform.pathSeparator).last;
+
+            // Skip hidden files/dirs
+            if (name.startsWith('.')) continue;
+
+            if (entity is Directory) {
+              buffer.writeln('$prefix[DIR] $name/');
+              await listDir(entity, depth + 1, '$prefix  ');
+            } else if (entity is File) {
+              fileCount++;
+              buffer.writeln('$prefix$name');
+            }
+          }
+        } catch (e) {
+          buffer.writeln('$prefix[Access Denied or Error: $e]');
+        }
+      }
+
+      await listDir(dir, 0, '');
+      return buffer.toString();
+    } catch (e) {
+      AppLogger.error('Failed to load directory structure: $e');
+      return null;
+    }
+  }
+
   /// Build file context string from multiple tagged files
   static Future<String> buildFileContext(List<dynamic> taggedFiles) async {
     final contextParts = <String>[];
 
     for (final file in taggedFiles) {
       try {
-        final path = file.path as String;
-        final displayName = file.displayName as String;
-        final content = await loadFileContent(path);
+        String? path;
+        String? displayName;
+
+        if (file is Map) {
+          path = file['path']?.toString();
+          displayName = file['displayName']?.toString();
+        } else {
+          try {
+            path = (file as dynamic).path?.toString();
+            displayName = (file as dynamic).displayName?.toString();
+          } catch (_) {
+            // Not a compatible object
+          }
+        }
+
+        if (path == null) continue;
+        displayName ??= path.split(Platform.pathSeparator).last;
+
+        String? content;
+
+        // Check if it's a directory
+        if (await Directory(path).exists()) {
+          content = await loadDirectoryStructure(path);
+          if (content != null) {
+            displayName = '[FOLDER] $displayName';
+          }
+        } else {
+          content = await loadFileContent(path);
+        }
 
         if (content != null && content.isNotEmpty) {
           contextParts.add(
@@ -49,7 +138,7 @@ class FileContentLoader {
           );
         }
       } catch (e) {
-        AppLogger.warning('Failed to load file ${file.path}: $e');
+        AppLogger.warning('Failed to load file context: $e');
       }
     }
 
@@ -57,6 +146,6 @@ class FileContentLoader {
       return '';
     }
 
-    return '[ATTACHED FILES]\n${contextParts.join('\n\n')}\n[END ATTACHED FILES]\n\n';
+    return '[ATTACHED CONTEXT]\n${contextParts.join('\n\n')}\n[END ATTACHED CONTEXT]\n\n';
   }
 }

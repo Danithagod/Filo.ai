@@ -1,5 +1,6 @@
 import 'package:serverpod/serverpod.dart';
 import 'dart:io';
+import 'dart:math';
 import '../generated/protocol.dart';
 
 /// Service for monitoring and maintaining index health
@@ -14,14 +15,56 @@ class IndexHealthService {
   static Future<IndexHealthReport> generateReport(Session session) async {
     final now = DateTime.now();
 
-    // Run all checks in parallel
+    // Run all checks in parallel with error handling for each
     final results = await Future.wait<dynamic>([
-      _findOrphanedFiles(session),
-      _findStaleEntries(session, staleThresholdDays: 180),
-      _findDuplicateContent(session),
-      _getIndexStatistics(session),
-      _findMissingEmbeddings(session),
-      _detectCorruptedData(session),
+      _findOrphanedFiles(session).catchError((e) {
+        session.log(
+          'IndexHealth: Orphaned files check failed: $e',
+          level: LogLevel.error,
+        );
+        return <String>[];
+      }),
+      _findStaleEntries(session, staleThresholdDays: 180).catchError((e) {
+        session.log(
+          'IndexHealth: Stale entries check failed: $e',
+          level: LogLevel.error,
+        );
+        return <FileIndex>[];
+      }),
+      _findDuplicateContent(session).catchError((e) {
+        session.log(
+          'IndexHealth: Duplicate content check failed: $e',
+          level: LogLevel.error,
+        );
+        return <InternalDuplicateGroup>[];
+      }),
+      _getIndexStatistics(session).catchError((e) {
+        session.log(
+          'IndexHealth: Statistics calculation failed: $e',
+          level: LogLevel.error,
+        );
+        return IndexStatistics(
+          totalIndexed: 0,
+          totalPending: 0,
+          totalFailed: 0,
+          totalEmbeddings: 0,
+          averageFileSizeBytes: 0,
+        );
+      }),
+      _findMissingEmbeddings(session).catchError((e) {
+        session.log(
+          'IndexHealth: Missing embeddings check failed: $e',
+          level: LogLevel.error,
+        );
+        return <FileIndex>[];
+      }),
+      _detectCorruptedData(session).catchError((e) {
+        session.log(
+          'IndexHealth: Corrupted data detection failed: $e',
+          level: LogLevel.error,
+        );
+        return <FileIndex>[];
+      }),
     ]);
 
     final orphanedFiles = results[0] as List<String>;
@@ -152,17 +195,24 @@ class IndexHealthService {
     final totalEmbeddings = await DocumentEmbedding.db.count(session);
 
     // Calculate average file size
-    final allFiles = await FileIndex.db.find(
-      session,
-      where: (t) => t.status.equals('indexed'),
-    );
-
-    final totalSize = allFiles.fold<int>(
-      0,
-      (sum, file) => sum + file.fileSizeBytes,
-    );
-
-    final avgSize = totalIndexed > 0 ? totalSize ~/ totalIndexed : 0;
+    int avgSize = 0;
+    try {
+      final result = await session.db.unsafeQuery(
+        'SELECT AVG("fileSizeBytes") FROM file_index WHERE status = \'indexed\'',
+      );
+      if (result.isNotEmpty &&
+          result.first.isNotEmpty &&
+          result.first.first != null) {
+        // Handle different numeric types from various drivers (double, int, BigInt, etc.)
+        final rawVal = result.first.first;
+        avgSize = (double.tryParse(rawVal.toString()) ?? 0).toInt();
+      }
+    } catch (e) {
+      session.log(
+        'Failed to calculate average file size: $e',
+        level: LogLevel.debug,
+      );
+    }
 
     return IndexStatistics(
       totalIndexed: totalIndexed,
@@ -170,56 +220,41 @@ class IndexHealthService {
       totalFailed: totalFailed,
       totalEmbeddings: totalEmbeddings,
       averageFileSizeBytes: avgSize,
-      oldestIndexedAt: null,
-      newestIndexedAt: null,
     );
   }
 
-  /// Find indexed files missing embeddings
-  static Future<List<FileIndex>> _findMissingEmbeddings(
-    Session session,
-  ) async {
-    final indexed = await FileIndex.db.find(
+  static Future<List<FileIndex>> _findMissingEmbeddings(Session session) async {
+    // Files indexed but having no entries in DocumentEmbedding
+    final result = await session.db.unsafeQuery(
+      'SELECT id FROM file_index f WHERE status = \'indexed\' '
+      'AND NOT EXISTS (SELECT 1 FROM document_embedding de WHERE de."fileIndexId" = f.id)',
+    );
+
+    if (result.isEmpty) return [];
+
+    final ids = result
+        .map((row) => int.tryParse(row.first.toString()) ?? -1)
+        .where((id) => id != -1)
+        .toList();
+    if (ids.isEmpty) return [];
+    return await FileIndex.db.find(
       session,
-      where: (t) => t.status.equals('indexed'),
+      where: (t) => t.id.inSet(ids.toSet()),
     );
-
-    final missing = <FileIndex>[];
-    for (final file in indexed) {
-      final embeddings = await DocumentEmbedding.db.find(
-        session,
-        where: (t) => t.fileIndexId.equals(file.id!),
-      );
-
-      if (embeddings.isEmpty) {
-        missing.add(file);
-      }
-    }
-
-    return missing;
   }
 
-  /// Detect corrupted or invalid data
-  static Future<List<FileIndex>> _detectCorruptedData(
-    Session session,
-  ) async {
-    final corrupted = <FileIndex>[];
-
-    // Find files with null or empty required fields
-    final files = await FileIndex.db.find(session);
-
-    for (final file in files) {
-      if (file.path.isEmpty ||
-          file.fileName.isEmpty ||
-          file.contentHash.isEmpty && file.status == 'indexed') {
-        corrupted.add(file);
-      }
-    }
-
-    return corrupted;
+  static Future<List<FileIndex>> _detectCorruptedData(Session session) async {
+    // Files with invalid content or missing critical metadata
+    return await FileIndex.db.find(
+      session,
+      where: (t) =>
+          t.status.equals('indexed') &
+          (t.contentHash.equals('') |
+              t.fileName.equals('') |
+              t.path.equals('')),
+    );
   }
 
-  /// Calculate overall health score (0-100)
   static double _calculateHealthScore({
     required int totalFiles,
     required int orphanedCount,
@@ -228,25 +263,27 @@ class IndexHealthService {
     required int missingEmbeddingsCount,
     required int corruptedCount,
   }) {
-    if (totalFiles == 0) return 100.0;
+    if (totalFiles == 0) return 0.0; // No files = no index health to measure
 
-    // Weight different issues
-    const orphanedWeight = 0.3;
-    const staleWeight = 0.1;
-    const duplicateWeight = 0.2;
-    const missingEmbeddingsWeight = 0.3;
-    const corruptedWeight = 0.1;
+    // Use exponential penalties for critical issues (orphans, corruption, missing embeddings)
+    // These penalties scale so that even a few issues significantly impact the score
+    double orphanedPenalty = orphanedCount > 0
+        ? 50 * (1 - (pow(0.9, orphanedCount) as double))
+        : 0;
+    double corruptedPenalty = corruptedCount > 0
+        ? 100 * (1 - (pow(0.8, corruptedCount) as double))
+        : 0;
+    double missingEmbeddingsPenalty = missingEmbeddingsCount > 0
+        ? 40 * (1 - (pow(0.95, missingEmbeddingsCount) as double))
+        : 0;
 
-    final orphanedPenalty = (orphanedCount / totalFiles) * 100 * orphanedWeight;
-    final stalePenalty = (staleCount / totalFiles) * 100 * staleWeight;
-    final duplicatePenalty =
-        (duplicateCount / totalFiles) * 100 * duplicateWeight;
-    final missingEmbeddingsPenalty =
-        (missingEmbeddingsCount / totalFiles) * 100 * missingEmbeddingsWeight;
-    final corruptedPenalty =
-        (corruptedCount / totalFiles) * 100 * corruptedWeight;
+    // Linear penalties for less critical issues
+    double stalePenalty = totalFiles > 0 ? (staleCount / totalFiles) * 10 : 0;
+    double duplicatePenalty = totalFiles > 0
+        ? (duplicateCount / totalFiles) * 15
+        : 0;
 
-    final totalPenalty =
+    double totalPenalty =
         orphanedPenalty +
         stalePenalty +
         duplicatePenalty +
@@ -256,29 +293,41 @@ class IndexHealthService {
     return (100 - totalPenalty).clamp(0.0, 100.0);
   }
 
-  /// Clean up orphaned files from index
+  /// Clean up orphaned files from index (using batch operations for scale)
   static Future<int> cleanupOrphanedFiles(Session session) async {
-    final orphaned = await _findOrphanedFiles(session);
+    final orphanedPaths = await _findOrphanedFiles(session);
+    if (orphanedPaths.isEmpty) return 0;
 
-    for (final path in orphaned) {
-      final files = await FileIndex.db.find(
+    // 1. Find all FileIndex records in a single query
+    final filesToRemove = await FileIndex.db.find(
+      session,
+      where: (t) => t.path.inSet(orphanedPaths.toSet()),
+    );
+    if (filesToRemove.isEmpty) return 0;
+
+    final fileIds = filesToRemove.map((f) => f.id!).toList();
+
+    // 2. Perform deletions in a single transaction
+    await session.db.transaction((transaction) async {
+      // Deletions from DocumentEmbedding and FileIndex will handle everything.
+      // SQL CASCADE or explicit deleteWhere below.
+
+      // Batch delete from DocumentEmbedding
+      await DocumentEmbedding.db.deleteWhere(
         session,
-        where: (t) => t.path.equals(path),
+        where: (t) => t.fileIndexId.inSet(fileIds.toSet()),
+        transaction: transaction,
       );
 
-      for (final file in files) {
-        // Delete embeddings first (cascade)
-        await DocumentEmbedding.db.deleteWhere(
-          session,
-          where: (t) => t.fileIndexId.equals(file.id!),
-        );
+      // Batch delete from FileIndex
+      await FileIndex.db.deleteWhere(
+        session,
+        where: (t) => t.id.inSet(fileIds.toSet()),
+        transaction: transaction,
+      );
+    });
 
-        // Delete file index
-        await FileIndex.db.deleteRow(session, file);
-      }
-    }
-
-    return orphaned.length;
+    return filesToRemove.length;
   }
 
   /// Re-index stale entries
@@ -306,16 +355,17 @@ class IndexHealthService {
     return refreshed;
   }
 
-  /// Delete duplicate files (keep one, remove others)
+  /// Delete duplicate files (keep one, remove others - using batch operations)
   static Future<int> removeDuplicates(
     Session session, {
     bool keepNewest = true,
   }) async {
     final duplicates = await _findDuplicateContent(session);
+    if (duplicates.isEmpty) return 0;
 
-    int removed = 0;
+    final fileIdsToRemove = <int>{};
+
     for (final group in duplicates) {
-      // Sort files by indexed date
       final sorted = group.files.toList()
         ..sort((a, b) {
           if (a.indexedAt == null && b.indexedAt == null) return 0;
@@ -326,23 +376,45 @@ class IndexHealthService {
               : a.indexedAt!.compareTo(b.indexedAt!);
         });
 
-      // Keep first (newest or oldest based on flag), remove rest
+      // Keep first, mark rest for removal
       for (int i = 1; i < sorted.length; i++) {
-        final file = sorted[i];
-
-        // Delete embeddings
-        await DocumentEmbedding.db.deleteWhere(
-          session,
-          where: (t) => t.fileIndexId.equals(file.id!),
-        );
-
-        // Delete file index
-        await FileIndex.db.deleteRow(session, file);
-        removed++;
+        fileIdsToRemove.add(sorted[i].id!);
       }
     }
 
-    return removed;
+    if (fileIdsToRemove.isEmpty) return 0;
+
+    // Perform deletions in batches to avoid extremely large transaction logs
+    final idsList = fileIdsToRemove.toList();
+    const batchSize = 100;
+    int totalRemoved = 0;
+
+    for (var i = 0; i < idsList.length; i += batchSize) {
+      final currentBatch = idsList.sublist(
+        i,
+        i + batchSize > idsList.length ? idsList.length : i + batchSize,
+      );
+      final batchSet = currentBatch.toSet();
+
+      await session.db.transaction((transaction) async {
+        // Managed table deletions handle the cleanup.
+
+        await DocumentEmbedding.db.deleteWhere(
+          session,
+          where: (t) => t.fileIndexId.inSet(batchSet),
+          transaction: transaction,
+        );
+
+        await FileIndex.db.deleteWhere(
+          session,
+          where: (t) => t.id.inSet(batchSet),
+          transaction: transaction,
+        );
+      });
+      totalRemoved += currentBatch.length;
+    }
+
+    return totalRemoved;
   }
 
   /// Fix missing embeddings by marking for re-indexing

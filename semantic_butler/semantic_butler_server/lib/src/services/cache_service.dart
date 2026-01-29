@@ -121,24 +121,60 @@ class CacheService {
     String query,
     double threshold,
     int limit,
-    int offset,
+    String? cursor,
     double semanticWeight,
     double keywordWeight,
   ) {
-    final params = '$query:$threshold:$limit:$offset:$semanticWeight:$keywordWeight';
-    final hash = sha256.convert(utf8.encode(params)).toString().substring(0, 16);
+    final params =
+        '$query:$threshold:$limit:$cursor:$semanticWeight:$keywordWeight';
+    final hash = sha256
+        .convert(utf8.encode(params))
+        .toString()
+        .substring(0, 16);
     return 'hybrid:$hash';
   }
 
   /// Generate a cache key for semantic search results
+  /// Includes all filter parameters to prevent incorrect cache hits
   static String semanticSearchKey(
     String query,
     double threshold,
     int limit,
-    int offset,
-  ) {
-    final params = '$query:$threshold:$limit:$offset';
-    final hash = sha256.convert(utf8.encode(params)).toString().substring(0, 16);
+    String? cursor, {
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    List<String>? fileTypes,
+    List<String>? tags,
+    int? minSize,
+    int? maxSize,
+    List<String>? locationPaths,
+    List<String>? contentTerms,
+    int? minCount,
+    int? maxCount,
+  }) {
+    final params = StringBuffer('$query:$threshold:$limit:$cursor');
+    if (dateFrom != null) params.write(':df${dateFrom.millisecondsSinceEpoch}');
+    if (dateTo != null) params.write(':dt${dateTo.millisecondsSinceEpoch}');
+    if (fileTypes != null && fileTypes.isNotEmpty) {
+      params.write(':ft${fileTypes.join(',')}');
+    }
+    if (tags != null && tags.isNotEmpty) {
+      params.write(':tg${tags.join(',')}');
+    }
+    if (minSize != null) params.write(':mn$minSize');
+    if (maxSize != null) params.write(':mx$maxSize');
+    if (locationPaths != null && locationPaths.isNotEmpty) {
+      params.write(':lp${locationPaths.join(',')}');
+    }
+    if (contentTerms != null && contentTerms.isNotEmpty) {
+      params.write(':ct${contentTerms.join(',')}');
+    }
+    if (minCount != null) params.write(':wc$minCount');
+    if (maxCount != null) params.write(':wm$maxCount');
+    final hash = sha256
+        .convert(utf8.encode(params.toString()))
+        .toString()
+        .substring(0, 16);
     return 'semantic:$hash';
   }
 

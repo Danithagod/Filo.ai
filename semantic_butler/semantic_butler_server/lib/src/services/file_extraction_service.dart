@@ -291,6 +291,7 @@ class FileExtractionService {
       mimeType: getMimeType(filePath),
       documentCategory: getCategoryString(category),
       wordCount: 0,
+      pageCount: null,
       fileCreatedAt: metadata.createdAt,
       fileModifiedAt: metadata.modifiedAt,
     );
@@ -329,9 +330,12 @@ class FileExtractionService {
     final category = getDocumentCategory(filePath);
 
     String content;
+    int? pageCount;
 
     if (pdfExtensions.contains(ext)) {
-      content = await _extractPdfText(file);
+      final pdfData = await _extractPdfWithMetadata(file);
+      content = pdfData['content'] as String;
+      pageCount = pdfData['pageCount'] as int?;
     } else if (supportedExtensions.contains(ext)) {
       content = await _extractPlainText(file);
     } else {
@@ -356,50 +360,137 @@ class FileExtractionService {
       mimeType: getMimeType(filePath),
       documentCategory: getCategoryString(category),
       wordCount: wordCount,
+      pageCount: pageCount,
       fileCreatedAt: metadata.createdAt,
       fileModifiedAt: metadata.modifiedAt,
     );
   }
 
-  /// Extract text from plain text files
+  /// Extract text from plain text files with Unicode support
   Future<String> _extractPlainText(File file) async {
+    final bytes = await file.readAsBytes();
+
+    // Try to detect BOM (Byte Order Mark) for encoding detection
+    final encoding = _detectEncoding(bytes);
+
     try {
-      return await file.readAsString(encoding: utf8);
+      return encoding.decode(bytes);
     } catch (e) {
-      // Try with latin1 if utf8 fails
+      // Fallback chain: UTF-8 → Latin1 → ASCII with replacement
       try {
-        return await file.readAsString(encoding: latin1);
-      } catch (e2) {
-        throw FileExtractionException('Failed to read file: $e');
+        return utf8.decode(bytes, allowMalformed: true);
+      } catch (_) {
+        try {
+          return latin1.decode(bytes);
+        } catch (_) {
+          // Last resort: decode as ASCII, replacing invalid chars
+          return String.fromCharCodes(
+            bytes.map((b) => b < 128 ? b : 0x3F), // Replace non-ASCII with '?'
+          );
+        }
       }
     }
   }
 
-  /// Extract text from PDF files using Syncfusion PDF library
-  Future<String> _extractPdfText(File file) async {
-    try {
-      // Read PDF bytes
-      final bytes = await file.readAsBytes();
+  /// Detect encoding from BOM or content analysis
+  Encoding _detectEncoding(List<int> bytes) {
+    if (bytes.length < 2) return utf8;
 
-      // For PDF extraction, we use a simpler approach:
-      // Extract readable text by scanning for text patterns in the PDF
-      // This is a basic implementation - for production, use syncfusion_flutter_pdf
+    // Check for BOM (Byte Order Mark)
+    if (bytes.length >= 3 &&
+        bytes[0] == 0xEF &&
+        bytes[1] == 0xBB &&
+        bytes[2] == 0xBF) {
+      return utf8; // UTF-8 BOM
+    }
+    if (bytes.length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE) {
+      // UTF-16 LE BOM - decode manually since Dart doesn't have built-in UTF-16
+      return utf8; // Will use fallback
+    }
+    if (bytes.length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF) {
+      // UTF-16 BE BOM
+      return utf8; // Will use fallback
+    }
+
+    // Heuristic: check if content looks like valid UTF-8
+    if (_isLikelyUtf8(bytes)) {
+      return utf8;
+    }
+
+    // Default to Latin1 for legacy files
+    return latin1;
+  }
+
+  /// Check if bytes look like valid UTF-8
+  bool _isLikelyUtf8(List<int> bytes) {
+    int i = 0;
+    int invalidCount = 0;
+    final sampleSize = bytes.length > 1000 ? 1000 : bytes.length;
+
+    while (i < sampleSize) {
+      final b = bytes[i];
+      if (b < 0x80) {
+        // ASCII
+        i++;
+      } else if ((b & 0xE0) == 0xC0) {
+        // 2-byte sequence
+        if (i + 1 >= bytes.length || (bytes[i + 1] & 0xC0) != 0x80) {
+          invalidCount++;
+        }
+        i += 2;
+      } else if ((b & 0xF0) == 0xE0) {
+        // 3-byte sequence
+        if (i + 2 >= bytes.length ||
+            (bytes[i + 1] & 0xC0) != 0x80 ||
+            (bytes[i + 2] & 0xC0) != 0x80) {
+          invalidCount++;
+        }
+        i += 3;
+      } else if ((b & 0xF8) == 0xF0) {
+        // 4-byte sequence
+        if (i + 3 >= bytes.length ||
+            (bytes[i + 1] & 0xC0) != 0x80 ||
+            (bytes[i + 2] & 0xC0) != 0x80 ||
+            (bytes[i + 3] & 0xC0) != 0x80) {
+          invalidCount++;
+        }
+        i += 4;
+      } else {
+        // Invalid UTF-8 start byte
+        invalidCount++;
+        i++;
+      }
+    }
+
+    // If less than 5% invalid sequences, assume UTF-8
+    return invalidCount < (sampleSize * 0.05);
+  }
+
+  /// Extract text and metadata from PDF files
+  Future<Map<String, dynamic>> _extractPdfWithMetadata(File file) async {
+    try {
+      final bytes = await file.readAsBytes();
       final content = _extractTextFromPdfBytes(bytes);
 
-      if (content.isEmpty) {
-        // If no text extracted, return filename as content for indexing
-        return 'PDF Document: ${file.path}';
-      }
+      // Basic page count heuristic: count "/Type /Page" or "/Type/Page"
+      final pdfSource = String.fromCharCodes(bytes);
+      final pageCountMatch = RegExp(
+        r'/Type\s*/Page\b',
+      ).allMatches(pdfSource).length;
 
-      return content;
+      return {
+        'content': content,
+        'pageCount': pageCountMatch > 0 ? pageCountMatch : null,
+      };
     } catch (e) {
-      // Return basic info if extraction fails
-      return 'PDF Document: ${file.path} (text extraction failed)';
+      return {
+        'content': 'PDF Document: ${file.path} (extraction failed)',
+        'pageCount': null,
+      };
     }
   }
 
   /// Basic PDF text extraction from bytes
-  /// Scans for text streams in PDF structure
   String _extractTextFromPdfBytes(List<int> bytes) {
     try {
       final content = String.fromCharCodes(bytes, 0, bytes.length);
@@ -452,11 +543,6 @@ class FileExtractionService {
 
   /// Simple glob pattern matching
   static bool _matchesGlob(String filePath, String pattern) {
-    // Convert glob pattern to regex
-    // * matches any characters except path separator
-    // ** matches any characters including path separator
-    // ? matches single character
-
     // Normalize path separators
     final normalizedPath = filePath.replaceAll('\\', '/').toLowerCase();
     final normalizedPattern = pattern.replaceAll('\\', '/').toLowerCase();
@@ -548,6 +634,7 @@ class ExtractionResult {
   final String mimeType;
   final String documentCategory;
   final int wordCount;
+  final int? pageCount;
   final DateTime fileCreatedAt;
   final DateTime fileModifiedAt;
 
@@ -560,6 +647,7 @@ class ExtractionResult {
     required this.mimeType,
     required this.documentCategory,
     required this.wordCount,
+    this.pageCount,
     required this.fileCreatedAt,
     required this.fileModifiedAt,
   });

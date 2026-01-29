@@ -5,9 +5,45 @@ import 'package:watcher/watcher.dart';
 import '../generated/protocol.dart';
 import 'file_extraction_service.dart';
 
+/// Centralized manager for FileWatcherService instances to ensure clean disposal
+class WatcherManager {
+  static FileWatcherService? _instance;
+
+  /// Get or create the singleton instance
+  static FileWatcherService getInstance(Session session) {
+    _instance ??= FileWatcherService(session);
+    return _instance!;
+  }
+
+  /// Configure callbacks for the singleton instance
+  static void setupCallbacks({
+    Future<void> Function(List<String> paths)? onFilesChanged,
+    Future<void> Function(String path)? onFileRemoved,
+  }) {
+    if (_instance != null) {
+      _instance!.onFilesChanged = onFilesChanged;
+      _instance!.onFileRemoved = onFileRemoved;
+    }
+  }
+
+  /// Dispose the singleton instance
+  static Future<void> dispose() async {
+    if (_instance != null) {
+      await _instance!.dispose();
+      _instance = null;
+    }
+  }
+}
+
 /// Service that watches directories for file changes and triggers re-indexing.
 class FileWatcherService {
   final Session _session;
+
+  /// Callback to trigger re-indexing
+  Future<void> Function(List<String> paths)? onFilesChanged;
+
+  /// Callback to handle file removal (for cleanup)
+  Future<void> Function(String path)? onFileRemoved;
 
   /// Active directory watchers: path -> subscription
   final Map<String, StreamSubscription<WatchEvent>> _watchers = {};
@@ -17,12 +53,6 @@ class FileWatcherService {
 
   /// Files queued for re-indexing
   final Set<String> _pendingFiles = {};
-
-  /// Callback to trigger re-indexing
-  final Future<void> Function(List<String> paths)? onFilesChanged;
-
-  /// Callback to handle file removal (for cleanup)
-  final Future<void> Function(String path)? onFileRemoved;
 
   /// Ignore patterns (glob patterns like "*.log", "node_modules/**")
   List<String> _ignorePatterns = [];
@@ -42,8 +72,14 @@ class FileWatcherService {
   /// Pending file removals - delayed to detect moves (Issue #14)
   final Map<String, Timer> _pendingRemovals = {};
 
+  /// Recently removed files with their content hashes for move detection
+  final Map<String, _RemovedFileInfo> _recentlyRemovedFiles = {};
+
   /// Delay before processing REMOVE events to detect file moves
   static const Duration _moveDetectionDelay = Duration(milliseconds: 500);
+
+  /// How long to keep removed file info for cross-path move detection
+  static const Duration _moveDetectionWindow = Duration(seconds: 2);
 
   FileWatcherService(
     this._session, {
@@ -253,7 +289,7 @@ class FileWatcherService {
 
     switch (event.type) {
       case ChangeType.ADD:
-        // Issue #14: Cancel pending removal if this is a file move
+        // Issue #14: Cancel pending removal if this is a file move (same path)
         if (_pendingRemovals.containsKey(path)) {
           _pendingRemovals[path]?.cancel();
           _pendingRemovals.remove(path);
@@ -262,6 +298,13 @@ class FileWatcherService {
             level: LogLevel.debug,
           );
         }
+        // Check for cross-path move (different path, same content)
+        _detectCrossPathMove(path).then((oldPath) {
+          if (oldPath != null) {
+            // Remove the old path from recently removed files
+            _recentlyRemovedFiles.remove(oldPath);
+          }
+        });
         _queueForReindexing(path);
         break;
       case ChangeType.MODIFY:
@@ -314,11 +357,13 @@ class FileWatcherService {
     // Issue #6: Enforce queue size limit to prevent memory leaks
     if (_pendingFiles.length >= maxQueueSize) {
       // LRU eviction - remove oldest entries (first 10%)
-      final evictCount = (maxQueueSize * 0.1).ceil();
-      final toEvict = _pendingFiles.take(evictCount).toList();
-      _pendingFiles.removeAll(toEvict);
+      // Using a slightly more efficient approach for Set eviction
+      final toEvict = _pendingFiles.take((maxQueueSize * 0.1).ceil()).toList();
+      for (final p in toEvict) {
+        _pendingFiles.remove(p);
+      }
       _session.log(
-        'Queue size limit reached, evicted $evictCount oldest entries',
+        'Queue size limit reached, evicted ${toEvict.length} oldest entries',
         level: LogLevel.warning,
       );
     }
@@ -378,6 +423,25 @@ class FileWatcherService {
       'File removed, triggering cleanup: $filePath',
       level: LogLevel.info,
     );
+
+    // Store file info for cross-path move detection before removing from index
+    try {
+      final existingIndex = await FileIndex.db.findFirstRow(
+        _session,
+        where: (t) => t.path.equals(filePath),
+      );
+      if (existingIndex != null && existingIndex.contentHash.isNotEmpty) {
+        _recentlyRemovedFiles[filePath] = _RemovedFileInfo(
+          contentHash: existingIndex.contentHash,
+          removedAt: DateTime.now(),
+        );
+      }
+    } catch (e) {
+      _session.log(
+        'Error storing removed file info: $e',
+        level: LogLevel.debug,
+      );
+    }
 
     // Trigger cleanup callback to remove from index
     if (onFileRemoved != null) {
@@ -477,4 +541,61 @@ class FileWatcherService {
 
   /// Issue #17: Get overall health status of all watchers
   Map<String, bool> get watcherHealthStatus => Map.unmodifiable(_watcherHealth);
+
+  /// Check if a newly added file matches a recently removed file (cross-path move detection)
+  Future<String?> _detectCrossPathMove(String newPath) async {
+    // Clean up expired entries
+    final now = DateTime.now();
+    _recentlyRemovedFiles.removeWhere(
+      (_, info) => now.difference(info.removedAt) > _moveDetectionWindow,
+    );
+
+    if (_recentlyRemovedFiles.isEmpty) return null;
+
+    // Get content hash of the new file
+    try {
+      final file = File(newPath);
+      if (!file.existsSync()) return null;
+
+      final bytes = await file.readAsBytes();
+      final hash = _computeHash(bytes);
+
+      // Check if any recently removed file has the same hash
+      for (final entry in _recentlyRemovedFiles.entries) {
+        if (entry.value.contentHash == hash) {
+          _session.log(
+            'Cross-path move detected: ${entry.key} -> $newPath',
+            level: LogLevel.info,
+          );
+          return entry.key; // Return the old path
+        }
+      }
+    } catch (e) {
+      _session.log(
+        'Error checking for cross-path move: $e',
+        level: LogLevel.debug,
+      );
+    }
+    return null;
+  }
+
+  /// Compute a simple hash for move detection (first 4KB + file size)
+  String _computeHash(List<int> bytes) {
+    // Use first 4KB + size for quick comparison
+    final sampleSize = bytes.length > 4096 ? 4096 : bytes.length;
+    final sample = bytes.sublist(0, sampleSize);
+    var hash = bytes.length;
+    for (final b in sample) {
+      hash = ((hash << 5) - hash + b) & 0xFFFFFFFF;
+    }
+    return '${bytes.length}_$hash';
+  }
+}
+
+/// Info about a recently removed file for move detection
+class _RemovedFileInfo {
+  final String contentHash;
+  final DateTime removedAt;
+
+  _RemovedFileInfo({required this.contentHash, required this.removedAt});
 }

@@ -16,3 +16,5 @@ fields:
   progress: double?
   ### Error message if type is 'error'
   error: String?
+  ### Optional tool result JSON for debugging/tracking
+  toolResultJson: String?

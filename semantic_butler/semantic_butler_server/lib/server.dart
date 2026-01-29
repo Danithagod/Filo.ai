@@ -8,6 +8,7 @@ import 'src/generated/endpoints.dart';
 import 'src/generated/protocol.dart';
 import 'src/web/routes/app_config_route.dart';
 import 'src/web/routes/root.dart';
+import 'src/services/indexing_service.dart';
 
 /// Environment variables loaded from .env file
 late DotEnv env;
@@ -18,7 +19,7 @@ String getEnv(String key, {String defaultValue = ''}) {
 }
 
 /// The starting point of the Serverpod server.
-void run(List<String> args) async {
+Future<void> run(List<String> args) async {
   // Load environment variables from .env file
   env = DotEnv(includePlatformEnvironment: true)..load();
 
@@ -65,20 +66,35 @@ void run(List<String> args) async {
       '/app/**',
     );
   }
-  // Issue #16: Register shutdown hook for graceful cleanup
-  // Handle SIGINT (Ctrl+C) to dispose resources before exit
-  ProcessSignal.sigint.watch().listen((_) async {
-    stdout.writeln('Shutting down gracefully...');
-    await ButlerEndpoint.disposeAll();
-    stdout.writeln('Resources cleaned up. Exiting.');
-    exit(0);
-  });
-
-  // Initialize periodic cleanup of idle file watchers
-  // This prevents memory leaks from accumulated file watchers
-  ButlerEndpoint.initializeWatcherCleanup();
-  stdout.writeln('File watcher cleanup timer initialized.');
-
   // Start the server.
-  await pod.start();
+  stdout.writeln('Starting Serverpod...');
+  try {
+    await pod.start();
+    stdout.writeln('Serverpod started successfully.');
+
+    // Issue #16: Register shutdown hook for graceful cleanup
+    // Handle SIGINT (Ctrl+C) to dispose resources before exit
+    ProcessSignal.sigint.watch().listen((_) async {
+      stdout.writeln('Shutting down gracefully...');
+      await ButlerEndpoint.disposeAll();
+      stdout.writeln('Resources cleaned up. Exiting.');
+      exit(0);
+    });
+
+    // Initialize periodic cleanup of idle file watchers
+    // This prevents memory leaks from accumulated file watchers
+    ButlerEndpoint.initializeWatcherCleanup();
+    stdout.writeln('File watcher cleanup timer initialized.');
+
+    // Startup recovery for indexing jobs
+    final indexingService = IndexingService();
+    await indexingService.recoverStuckJobs(pod);
+    indexingService.initializeWatcherCallbacks(pod);
+    stdout.writeln(
+      'Background job recovery and watcher callbacks initialized.',
+    );
+  } catch (e, stack) {
+    stdout.writeln('CRITICAL: pod.start() failed: $e\n$stack');
+    rethrow;
+  }
 }

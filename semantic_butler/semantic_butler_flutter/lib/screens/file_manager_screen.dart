@@ -15,6 +15,7 @@ import '../widgets/file_manager/summary_dialog.dart';
 import 'search_results_screen.dart';
 import '../providers/directory_cache_provider.dart';
 import '../providers/navigation_provider.dart';
+import '../providers/local_indexing_provider.dart';
 
 /// Full File Manager screen with breadcrumb navigation and drive listing
 class FileManagerScreen extends ConsumerStatefulWidget {
@@ -359,7 +360,7 @@ class _FileManagerScreenState extends ConsumerState<FileManagerScreen> {
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
+                color: colorScheme.shadow.withValues(alpha: 0.1),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -816,7 +817,43 @@ class _FileManagerScreenState extends ConsumerState<FileManagerScreen> {
       if (entry.isIndexed) {
         await apiClient.butler.removeFromIndex(path: entry.path);
       } else {
-        await apiClient.butler.startIndexing(entry.path);
+        // HYBRID ARCHITECTURE: Client-side indexing
+        if (entry.isDirectory) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Indexing folder in background...')),
+          );
+          // Run in background to avoid blocking UI
+          // ignore: unused_result
+          ref
+              .read(localIndexingServiceProvider)
+              .indexDirectory(entry.path)
+              .then((_) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Indexing completed: ${entry.name}'),
+                    ),
+                  );
+                  ref.read(directoryCacheProvider).invalidate(_currentPath);
+                  _loadDirectory(_currentPath);
+                }
+              })
+              .catchError((e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Indexing failed: $e'),
+                      backgroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                  );
+                }
+                return null; // Return to void
+              });
+          return; // Return immediately, don't wait for refresh here
+        } else {
+          // Single file - can await comfortably
+          await ref.read(localIndexingServiceProvider).indexFile(entry.path);
+        }
       }
       // Invalidate cache to show updated index status
       ref.read(directoryCacheProvider).invalidate(_currentPath);
@@ -1012,7 +1049,11 @@ class _FileManagerScreenState extends ConsumerState<FileManagerScreen> {
         SnackBar(
           content: Row(
             children: [
-              const Icon(Icons.delete_outline, color: Colors.white, size: 20),
+              Icon(
+                Icons.delete_outline,
+                color: colorScheme.onInverseSurface,
+                size: 20,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(

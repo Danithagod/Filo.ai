@@ -67,6 +67,21 @@ class SettingsScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 32),
 
+              // Personalization section
+              _SettingsSection(
+                title: 'Personalization',
+                children: [
+                  _SettingsTile(
+                    icon: Icons.person_outline,
+                    title: 'Display Name',
+                    subtitle: settings.userName ?? 'Not set',
+                    onTap: () => _showNameEditDialog(context, ref),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 32),
+
               // Connection section
               _SettingsSection(
                 title: 'Connection',
@@ -130,17 +145,13 @@ class SettingsScreen extends ConsumerWidget {
                   _SettingsTile(
                     icon: settings.themeMode == ThemeMode.dark
                         ? Icons.dark_mode_outlined
-                        : settings.themeMode == ThemeMode.light
-                        ? Icons.light_mode_outlined
-                        : Icons.brightness_auto_outlined,
+                        : Icons.light_mode_outlined,
                     title: 'Theme',
                     subtitle: _formatThemeMode(settings.themeMode),
                     onTap: () {
-                      final nextMode = switch (settings.themeMode) {
-                        ThemeMode.system => ThemeMode.light,
-                        ThemeMode.light => ThemeMode.dark,
-                        ThemeMode.dark => ThemeMode.system,
-                      };
+                      final nextMode = settings.themeMode == ThemeMode.dark
+                          ? ThemeMode.light
+                          : ThemeMode.dark;
                       settingsNotifier.setThemeMode(nextMode);
                     },
                   ),
@@ -170,10 +181,47 @@ class SettingsScreen extends ConsumerWidget {
 
   String _formatThemeMode(ThemeMode mode) {
     return switch (mode) {
-      ThemeMode.system => 'System Preference',
       ThemeMode.light => 'Light Mode',
       ThemeMode.dark => 'Dark Mode',
+      _ => 'Dark Mode', // Fallback for any unexpected states
     };
+  }
+
+  void _showNameEditDialog(BuildContext context, WidgetRef ref) {
+    final currentName = ref.read(settingsProvider).value?.userName ?? '';
+    final controller = TextEditingController(text: currentName);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Display Name'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'Enter your name',
+            border: OutlineInputBorder(),
+          ),
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final newName = controller.text.trim();
+              if (newName.isNotEmpty) {
+                ref.read(settingsProvider.notifier).setUserName(newName);
+              }
+              Navigator.pop(context);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showAiProviderDialog(BuildContext context, WidgetRef ref) {

@@ -3,18 +3,25 @@ class: DocumentEmbedding
 table: document_embedding
 fields:
   ### Reference to the file_index record
-  fileIndexId: int
+  fileIndexId: int, relation(parent=file_index, onDelete=Cascade)
   ### Chunk index (0 for single-chunk docs, 1+ for multi-chunk)
   chunkIndex: int
   ### The text chunk that was embedded
   chunkText: String?
-  ### JSON encoded embedding vector (will use pgvector in Supabase)
-  embeddingJson: String
-  ### Embedding dimensions (e.g., 768, 1536)
-  dimensions: int
+  ### Vector embedding - 768 dimensions for sentence transformers
+  embedding: Vector(768)
+  ### JSON encoded embedding vector (DEPRECATED: Use native embedding field)
+  embeddingJson: String?
+  ### Embedding dimensions (DEPRECATED)
+  dimensions: int?
 indexes:
   document_embedding_file_index:
     fields: fileIndexId
   document_embedding_file_chunk:
     fields: fileIndexId, chunkIndex
     unique: true
+  ### HNSW index for vector similarity search
+  document_embedding_vector_hnsw:
+    fields: embedding
+    type: hnsw
+    distanceFunction: cosine

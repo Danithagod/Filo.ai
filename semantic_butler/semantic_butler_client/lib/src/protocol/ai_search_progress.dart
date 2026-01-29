@@ -25,6 +25,7 @@ abstract class AISearchProgress implements _i1.SerializableModel {
     this.results,
     this.progress,
     this.error,
+    this.toolResultJson,
   });
 
   factory AISearchProgress({
@@ -35,6 +36,7 @@ abstract class AISearchProgress implements _i1.SerializableModel {
     List<_i2.AISearchResult>? results,
     double? progress,
     String? error,
+    String? toolResultJson,
   }) = _AISearchProgressImpl;
 
   factory AISearchProgress.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -50,6 +52,7 @@ abstract class AISearchProgress implements _i1.SerializableModel {
             ),
       progress: (jsonSerialization['progress'] as num?)?.toDouble(),
       error: jsonSerialization['error'] as String?,
+      toolResultJson: jsonSerialization['toolResultJson'] as String?,
     );
   }
 
@@ -74,6 +77,9 @@ abstract class AISearchProgress implements _i1.SerializableModel {
   /// Error message if type is 'error'
   String? error;
 
+  /// Optional tool result JSON for debugging/tracking
+  String? toolResultJson;
+
   /// Returns a shallow copy of this [AISearchProgress]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
@@ -85,6 +91,7 @@ abstract class AISearchProgress implements _i1.SerializableModel {
     List<_i2.AISearchResult>? results,
     double? progress,
     String? error,
+    String? toolResultJson,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -98,6 +105,7 @@ abstract class AISearchProgress implements _i1.SerializableModel {
         'results': results?.toJson(valueToJson: (v) => v.toJson()),
       if (progress != null) 'progress': progress,
       if (error != null) 'error': error,
+      if (toolResultJson != null) 'toolResultJson': toolResultJson,
     };
   }
 
@@ -118,6 +126,7 @@ class _AISearchProgressImpl extends AISearchProgress {
     List<_i2.AISearchResult>? results,
     double? progress,
     String? error,
+    String? toolResultJson,
   }) : super._(
          type: type,
          message: message,
@@ -126,6 +135,7 @@ class _AISearchProgressImpl extends AISearchProgress {
          results: results,
          progress: progress,
          error: error,
+         toolResultJson: toolResultJson,
        );
 
   /// Returns a shallow copy of this [AISearchProgress]
@@ -140,6 +150,7 @@ class _AISearchProgressImpl extends AISearchProgress {
     Object? results = _Undefined,
     Object? progress = _Undefined,
     Object? error = _Undefined,
+    Object? toolResultJson = _Undefined,
   }) {
     return AISearchProgress(
       type: type ?? this.type,
@@ -151,6 +162,9 @@ class _AISearchProgressImpl extends AISearchProgress {
           : this.results?.map((e0) => e0.copyWith()).toList(),
       progress: progress is double? ? progress : this.progress,
       error: error is String? ? error : this.error,
+      toolResultJson: toolResultJson is String?
+          ? toolResultJson
+          : this.toolResultJson,
     );
   }
 }

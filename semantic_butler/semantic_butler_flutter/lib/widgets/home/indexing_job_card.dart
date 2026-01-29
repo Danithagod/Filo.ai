@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:semantic_butler_client/semantic_butler_client.dart';
 import '../../providers/watched_folders_provider.dart';
+import '../../theme/app_theme.dart';
 
 /// Card displaying indexing job information
 class IndexingJobCard extends ConsumerStatefulWidget {
@@ -62,7 +63,10 @@ class _IndexingJobCardState extends ConsumerState<IndexingJobCard> {
                         ? colorScheme.primaryContainer
                         : isFailed
                         ? colorScheme.errorContainer
-                        : colorScheme.tertiaryContainer,
+                        : (Theme.of(context).brightness == Brightness.dark
+                                  ? AppTheme.successColorDark
+                                  : AppTheme.successColor)
+                              .withValues(alpha: 0.2),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -76,7 +80,9 @@ class _IndexingJobCardState extends ConsumerState<IndexingJobCard> {
                         ? colorScheme.onPrimaryContainer
                         : isFailed
                         ? colorScheme.onErrorContainer
-                        : colorScheme.onTertiaryContainer,
+                        : (Theme.of(context).brightness == Brightness.dark
+                              ? AppTheme.successColorDark
+                              : AppTheme.successColor),
                   ),
                 ),
                 const SizedBox(width: 16),

@@ -1,30 +1,126 @@
-# Hackathon Deployment Guide - Semantic Desktop Butler
+# Hackathon Deployment Guide - Filo (Flutter Butler)
 
-**Last Updated:** January 19, 2026
-**Target Date:** Hackathon Submission
+**Last Updated:** January 28, 2026
+**Hackathon:** Build your Flutter Butler with Serverpod
+**Submission Deadline:** January 30, 2026 (5:00 PM CET)
+**Devpost:** https://serverpod.devpost.com/
+
+> **IMPORTANT:** This guide is for the "Build your Flutter Butler with Serverpod" hackathon. All submissions must use Flutter + Serverpod and be newly created during the hackathon period (December 9, 2025 - January 30, 2026).
 
 ---
 
 ## Table of Contents
 
-1. [Quick Start (Development/Demo)](#quick-start-developmentdemo)
-2. [Building the Desktop Installer](#building-the-desktop-installer)
-3. [Deploying Installer to Website](#deploying-installer-to-website)
-4. [Automated Installer Deployment (CI/CD)](#automated-installer-deployment-cicd)
-5. [Version Management](#version-management)
-6. [Critical Security Fixes](#critical-security-fixes-required-before-demo)
-7. [Hackathon Demo Configuration](#hackathon-demo-configuration)
-8. [Demo Script](#demo-script-5-minutes)
-9. [Deployment Options](#deployment-options)
-10. [Download Analytics](#download-analytics--tracking)
-11. [Quick Deploy for Hackathon](#quick-deploy-for-hackathon-one-command)
-12. [Updated Website CI/CD](#updated-website-cicd-with-downloads)
-13. [Environment Variables](#environment-variables-reference)
-14. [Performance Tuning](#performance-tuning-for-demo)
-15. [Troubleshooting](#troubleshooting)
-16. [Monitoring](#monitoring-for-demo)
-17. [Backup & Recovery](#backup--recovery)
-18. [Post-Hackathon Actions](#post-hackathon-actions)
+1. [Hackathon Overview](#hackathon-overview)
+2. [Devpost Submission Checklist](#devpost-submission-checklist)
+3. [Judging Criteria](#judging-criteria)
+4. [Quick Start (Development/Demo)](#quick-start-developmentdemo)
+5. [Building the Desktop Installer](#building-the-desktop-installer)
+6. [Deploying Installer to Website](#deploying-installer-to-website)
+7. [Automated Installer Deployment (CI/CD)](#automated-installer-deployment-cicd)
+8. [Version Management](#version-management)
+9. [Critical Security Fixes](#critical-security-fixes-required-before-demo)
+10. [Hackathon Demo Configuration](#hackathon-demo-configuration)
+11. [Demo Video Script](#demo-video-script-3-minutes)
+12. [Deployment Options](#deployment-options)
+13. [Download Analytics](#download-analytics--tracking)
+14. [Quick Deploy for Hackathon](#quick-deploy-for-hackathon-one-command)
+15. [Updated Website CI/CD](#updated-website-cicd-with-downloads)
+16. [Environment Variables](#environment-variables-reference)
+17. [Performance Tuning](#performance-tuning-for-demo)
+18. [Troubleshooting](#troubleshooting)
+19. [Monitoring](#monitoring-for-demo)
+20. [Backup & Recovery](#backup--recovery)
+21. [Post-Hackathon Actions](#post-hackathon-actions)
+
+---
+
+## Hackathon Overview
+
+### Key Dates
+| Event | Date (CET) |
+|-------|------------|
+| Registration Opens | December 9, 2025 (5:00 PM) |
+| Submission Period | December 9, 2025 - January 30, 2026 (5:00 PM) |
+| Feedback Period | December 9, 2025 - January 30, 2026 (5:00 PM) |
+| Popular Choice Voting | February 9, 2026 (5:00 PM) - February 13, 2026 (5:00 PM) |
+| Judging Period | February 9, 2026 (8:00 AM) - February 20, 2026 (5:00 PM) |
+| Winners Announced | On or around March 2, 2026 (5:00 PM) |
+
+### Prizes
+| Place | Prize |
+|-------|-------|
+| 1st Place | $5,000 Cash + $2,500 Serverpod Cloud Credits |
+| 2nd Place | $3,000 Cash + $2,000 Serverpod Cloud Credits |
+| 3rd Place | $1,000 Cash + $1,500 Serverpod Cloud Credits |
+| 4th Place | $500 Cash + $1,500 Serverpod Cloud Credits |
+| 5th Place | $1,500 Serverpod Cloud Credits |
+| Most Valuable Feedback | $500 Cash + $500 Serverpod Cloud Credits |
+| Popular Choice | $500 Serverpod Cloud Credits |
+
+### Free Resources for Participants
+- **Serverpod Cloud Credits** - Free hosting until March 10, 2026
+- **Gemini API Credits** - For powering AI features
+- **Serverpod Discord Access** - Support and community
+
+### Project Requirements
+- Must be a **Flutter app** powered by **Serverpod**
+- Must function as a personal assistant, automation, or helpful service (your "Flutter Butler")
+- Can be practical, fun, or experimental
+- Must be **newly created** during the hackathon period (no existing projects)
+- Must integrate third-party SDKs/APIs only if you have proper authorization
+
+---
+
+## Devpost Submission Checklist
+
+### Required Components
+- [ ] **Project built with Flutter + Serverpod** - Only new and original projects
+- [ ] **Demo video** - Under 3 minutes (judges will NOT watch beyond 3 minutes)
+- [ ] **Project description** - Explain features and how it was built
+- [ ] **Code repository link** - GitHub or similar
+  - If private: Share with viktor@serverpod.dev, alexander@serverpod.dev, isak@serverpod.dev
+- [ ] **Build/run instructions** - Clear setup steps
+- [ ] **Working project access** - Demo link or test build credentials
+
+### Optional Components
+- [ ] Screenshots
+- [ ] Design mockups
+- [ ] Additional documentation
+- [ ] **Feedback form submission** - For Most Valuable Feedback Prize
+
+### Video Requirements
+- [ ] Under 3 minutes duration
+- [ ] Shows project functioning on target device (desktop)
+- [ ] Uploaded to YouTube, Vimeo, Facebook Video, or Youku
+- [ ] Public link provided in submission form
+- [ ] No third-party trademarks (unless authorized)
+- [ ] No copyrighted music or material
+
+### Language
+- All submission materials must be in **English**
+- Non-English submissions must include English translations
+
+---
+
+## Judging Criteria
+
+### Stage One: Viability Check (Pass/Fail)
+- Does the project fit the "Flutter Butler" theme?
+- Does it properly use Flutter + Serverpod?
+
+### Stage Two: Detailed Scoring (Equally Weighted)
+
+| Criterion | Description | How Filo Excels |
+|-----------|-------------|-----------------|
+| **Innovation** | How original or clever is the idea? | Semantic search "by meaning not keywords" - novel approach to file management using vector embeddings |
+| **Technical Execution & UX** | Is it technically sound, functional, polished? Is the app intuitive? | Flutter UI with Serverpod backend, streaming AI, real-time indexing, polished Material 3 design |
+| **Impact** | Does it meaningfully help users, improve workflows, make life simpler? | Solves universal problem of file clutter; finds files faster, organizes automatically, summarizes documents |
+
+### Tips for High Scores
+1. **Innovation**: Emphasize what makes your project unique
+2. **Technical**: Show clean code, proper error handling, responsive UI
+3. **Impact**: Demonstrate real-world use cases and user benefits
 
 ---
 
@@ -110,7 +206,7 @@ flutter build macos --release
 
 # Output location: build/macos/Build/Products/Release/
 # For DMG creation, use brew install create-dmg
-create-dmg "Semantic Butler.dmg" build/macos/Build/Products/Release/
+create-dmg "Filo.dmg" build/macos/Build/Products/Release/
 ```
 
 ### Linux Installer (AppImage/Deb)
@@ -140,15 +236,15 @@ mkdir -p website/public/downloads
 # Copy built installers to downloads directory
 # Windows
 cp semantic_butler/semantic_butler_flutter/build/windows/runner/Release/*.msix \
-   website/public/downloads/semantic-butler-windows.msix
+   website/public/downloads/filo-windows.msix
 
 # macOS (if built)
 cp semantic_butler/semantic_butler_flutter/build/macos/Build/Products/Release/*.dmg \
-   website/public/downloads/semantic-butler-macos.dmg
+   website/public/downloads/filo-macos.dmg
 
 # Linux (if built)
 cp semantic_butler/semantic_butler_flutter/build/linux/*/release/bundle/*.appimage \
-   website/public/downloads/semantic-butler-linux.appimage
+   website/public/downloads/filo-linux.appimage
 ```
 
 ### Step 2: Update Website Download Links
@@ -166,8 +262,8 @@ const Download = () => {
     <div className="download-page page-content visible">
       <section className="download-hero">
         <div className="container">
-          <h1>Download <span className="text-gradient">Semantic Butler</span></h1>
-          <p>Get the desktop app for your platform</p>
+          <h1>Download <span className="text-gradient">Filo</span></h1>
+          <p>Your AI-powered file assistant, built with Flutter + Serverpod</p>
         </div>
       </section>
 
@@ -175,7 +271,7 @@ const Download = () => {
         <div className="container">
           <div className="download-cards">
             {/* Windows */}
-            <a href="/downloads/semantic-butler-windows.msix" className="download-card">
+            <a href="/downloads/filo-windows.msix" className="download-card">
               <Windows size={48} />
               <h3>Windows</h3>
               <p>Windows 10/11 (MSIX)</p>
@@ -183,7 +279,7 @@ const Download = () => {
             </a>
 
             {/* macOS */}
-            <a href="/downloads/semantic-butler-macos.dmg" className="download-card">
+            <a href="/downloads/filo-macos.dmg" className="download-card">
               <Apple size={48} />
               <h3>macOS</h3>
               <p>macOS 12+ (Intel & Apple Silicon)</p>
@@ -191,7 +287,7 @@ const Download = () => {
             </a>
 
             {/* Linux */}
-            <a href="/downloads/semantic-butler-linux.appimage" className="download-card">
+            <a href="/downloads/filo-linux.appimage" className="download-card">
               <Linux size={48} />
               <h3>Linux</h3>
               <p>Ubuntu, Fedora, Debian (AppImage)</p>
@@ -207,20 +303,6 @@ const Download = () => {
 export default Download;
 ```
 
-#### Option B: Update Existing Pricing Page
-
-Update [website/src/pages/Pricing/Pricing.jsx](website/src/pages/Pricing/Pricing.jsx:78) "Get Started" buttons:
-
-```jsx
-// Change from:
-<Link to="/pricing" className="btn-tier btn-primary">Get Started</Link>
-
-// To:
-<a href="/downloads/semantic-butler-windows.msix" className="btn-tier btn-primary">
-  Download for Windows
-</a>
-```
-
 #### Add Route in App.jsx
 
 Update [website/src/App.jsx](website/src/App.jsx:94-95):
@@ -231,10 +313,6 @@ import Download from './pages/Download/Download';
 // Add route inside Routes:
 <Route path="/download" element={<Download show={!loading} />} />
 ```
-
-#### Update Navbar
-
-Add Download link to [website/src/components/Navbar/Navbar.jsx](website/src/components/Navbar/Navbar.jsx).
 
 ### Step 3: Configure Static File Serving
 
@@ -250,17 +328,6 @@ Create [website/netlify.toml](website/netlify.toml):
   [headers.values]
     Content-Type = "application/octet-stream"
     Content-Disposition = "attachment"
-```
-
-#### Nginx (Self-hosted)
-```nginx
-location /downloads/ {
-    alias /var/www/semantic-butler/website/public/downloads/;
-    types {
-        application/octet-stream .msix .dmg .appimage .exe;
-    }
-    default_type application/octet-stream;
-}
 ```
 
 ---
@@ -330,13 +397,13 @@ jobs:
       - name: Create DMG
         run: |
           brew install create-dmg
-          create-dmg "Semantic Butler.dmg" \
+          create-dmg "Filo.dmg" \
             semantic_butler/semantic_butler_flutter/build/macos/Build/Products/Release/
 
       - name: Upload to Releases
         uses: softprops/action-gh-release@v1
         with:
-          files: Semantic Butler.dmg
+          files: Filo.dmg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -357,8 +424,8 @@ jobs:
       - name: Copy to Website
         run: |
           mkdir -p website/public/downloads
-          mv *.msix website/public/downloads/semantic-butler-windows.msix
-          mv *.dmg website/public/downloads/semantic-butler-macos.dmg
+          mv *.msix website/public/downloads/filo-windows.msix
+          mv *.dmg website/public/downloads/filo-macos.dmg
 
       - name: Deploy to Vercel
         uses: amondnet/vercel-action@v25
@@ -461,27 +528,26 @@ VITE_ENV=demo
 
 ---
 
-## Demo Script (5 Minutes)
+## Demo Video Script (3 Minutes)
 
-1. **Introduction (1 min)**
-   - "Semantic Butler is an AI-powered file search and organization assistant"
-   - "Uses vector embeddings for semantic search across your local files"
-   - Built with Dart/Flutter, Serverpod, and pgvector
+> **CRITICAL:** Judges will NOT watch beyond 3 minutes. Keep it tight!
 
-2. **Semantic Search Demo (2 min)**
-   - Show searching for "quarterly financial reports"
-   - Demonstrate finding related documents even without exact keywords
-   - Show threshold slider for result relevance
+### Time Breakdown
 
-3. **AI Agent Demo (1.5 min)**
-   - Ask agent to "Find all PDFs about budget"
-   - Show agent using tools to search and organize files
-   - Demonstrate natural language file operations
+| Scene | Duration | Key Focus |
+|-------|----------|-----------|
+| Opening | 0:25 | Problem statement + Flutter + Serverpod intro |
+| Semantic Search | 0:30 | Core value prop - search by meaning |
+| AI Chat | 0:35 | AI assistance + file understanding |
+| Serverpod Backend | 0:25 | Technical execution - real-time features |
+| Dashboard | 0:30 | User experience + control |
+| Cross-Platform | 0:20 | Flutter benefits + privacy |
+| Closing | 0:15 | Summary + call to action |
+| **Total** | **3:00** | |
 
-4. **File Organization Demo (0.5 min)**
-   - Show creating a new folder
-   - Show moving files to organized structure
-   - Show undo functionality
+### Full Script
+
+See [DEMO_VIDEO_SCRIPT.md](./DEMO_VIDEO_SCRIPT.md) for the complete 3-minute demo script.
 
 ---
 
@@ -490,14 +556,22 @@ VITE_ENV=demo
 ### Option 1: Docker (Recommended for Demo)
 ```bash
 cd semantic_butler/semantic_butler_server
-docker build -t semantic-butler-server .
+docker build -t filo-server .
 docker run -p 8080:8080 \
   -e OPENROUTER_API_KEY=your-key \
   -e API_KEY=demo-key \
-  semantic-butler-server
+  filo-server
 ```
 
-### Option 2: Cloud Deployment (Vercel/Render)
+### Option 2: Serverpod Cloud (Free for Hackathon)
+```bash
+# Deploy to Serverpod Cloud - free until March 10, 2026
+# Check your hackathon registration email for credits
+
+serverpod deploy
+```
+
+### Option 3: Cloud Deployment (Render)
 
 #### Server (Render.com)
 1. Connect GitHub repository
@@ -544,27 +618,6 @@ if (window.gtag) {
 window.location.href = window.location.pathname.replace('/track/', '/downloads/');
 ```
 
-### Update Download Links with Analytics
-
-```jsx
-// In Download.jsx or Home.jsx
-const handleDownload = (platform) => {
-  // Track with your analytics provider
-  window.gtag?.('event', 'download', {
-    'event_category': 'installer',
-    'event_label': platform
-  });
-
-  // Navigate to download
-  window.location.href = `/downloads/semantic-butler-${platform}.msix`;
-};
-
-<a onClick={() => handleDownload('windows')} className="download-card">
-  <Windows size={48} />
-  <h3>Windows</h3>
-</a>
-```
-
 ---
 
 ## Quick Deploy for Hackathon (One-Command)
@@ -599,7 +652,7 @@ Create [deploy-hackathon.sh](deploy-hackathon.sh) in project root:
 #!/bin/bash
 set -e
 
-echo "🚀 Building Semantic Butler for Hackathon Demo..."
+echo "🚀 Building Filo for Hackathon Demo..."
 
 # Colors
 GREEN='\033[0;32m'
@@ -617,7 +670,7 @@ flutter pub run msix:create
 
 echo -e "${BLUE}Step 3: Copying installer to website...${NC}"
 mkdir -p ../../website/public/downloads
-cp build/windows/runner/Release/*.msix ../../website/public/downloads/semantic-butler-windows.msix
+cp build/windows/runner/Release/*.msix ../../website/public/downloads/filo-windows.msix
 echo -e "${GREEN}✅ Installer copied to website/public/downloads/${NC}"
 
 echo -e "${BLUE}Step 4: Building website...${NC}"
@@ -749,7 +802,7 @@ EMBEDDING_BATCH_SIZE=20
 ### Website (.env)
 ```bash
 VITE_API_BASE_URL=https://your-domain.com
-VITE_APP_NAME=Semantic Butler
+VITE_APP_NAME=Filo
 VITE_ENV=production
 VITE_ENABLE_ANALYTICS=false
 ```
@@ -842,7 +895,7 @@ curl http://localhost:8080/health
 tail -f logs/serverpod.log
 
 # Monitor database
-docker exec -it postgres_container psql -U postgres -d semantic_butler
+docker exec -it postgres_container psql -U postgres semantic_butler
 SELECT COUNT(*) FROM file_index;
 SELECT status, COUNT(*) FROM indexing_job GROUP BY status;
 ```
@@ -906,18 +959,23 @@ docker exec postgres_container psql -U postgres semantic_butler \
 
 ## Resources
 
+- **Hackathon Main Page**: https://serverpod.devpost.com/
+- **Hackathon Rules**: https://serverpod.devpost.com/rules
 - **Server Documentation**: `semantic_butler/semantic_butler_server/README.md`
 - **Flutter Documentation**: `semantic_butler/semantic_butler_flutter/README.md`
-- **Security Report**: `SECURITY_AUDIT.md`
-- **API Documentation**: `semantic_butler/semantic_butler_client/doc/endpoint.md`
+- **Demo Script**: `DEMO_VIDEO_SCRIPT.md`
+- **Serverpod Discord**: https://serverpod.dev/discord
 
 ---
 
 ## Contact & Support
 
 - GitHub Issues: https://github.com/your-repo/desk-sense/issues
-- Documentation: https://docs.semanticbutler.com (when published)
+- Serverpod Discord: #hackathon channel
+- Hackathon Support: support@devpost.com
 
 ---
 
 **Good luck with the hackathon! 🚀**
+
+> Remember: Submission deadline is **January 30, 2026 at 5:00 PM CET**. Don't wait until the last minute!

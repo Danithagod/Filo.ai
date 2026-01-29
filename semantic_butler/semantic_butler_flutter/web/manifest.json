@@ -1,11 +1,11 @@
 {
-    "name": "semantic_butler_flutter",
-    "short_name": "semantic_butler_flutter",
+    "name": "Filo",
+    "short_name": "Filo",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#hex_code",
+    "theme_color": "#hex_code",
+    "description": "Private AI for your local data.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

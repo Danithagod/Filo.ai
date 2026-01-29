@@ -1,5 +1,8 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import '../utils/error_sanitizer.dart';
+import '../utils/cross_platform_paths.dart';
 
 /// Service for executing shell commands securely
 ///
@@ -73,8 +76,20 @@ class TerminalService {
   /// Check if the platform is Windows
   bool get isWindows => Platform.isWindows;
 
+  /// Check if the platform is macOS
+  bool get isMacOS => Platform.isMacOS;
+
+  /// Check if the platform is Linux
+  bool get isLinux => Platform.isLinux;
+
+  /// Check if the platform is Unix (macOS or Linux)
+  bool get isUnix => !Platform.isWindows;
+
   /// Get the appropriate shell for the current platform
-  String get shell => isWindows ? 'cmd.exe' : '/bin/sh';
+  String get shell => isWindows ? 'cmd.exe' : '/bin/bash';
+
+  /// Get the shell name for logging
+  String get shellName => isWindows ? 'cmd.exe' : '/bin/bash';
 
   /// Get shell arguments for command execution
   List<String> shellArgs(String command) =>
@@ -88,12 +103,17 @@ class TerminalService {
     String command, {
     String? workingDirectory,
     Duration? timeout,
+    bool allowPowerShellSearch = false,
   }) async {
-    // Validate the command
-    _validateCommand(command);
+    final allowSafePowerShellSearch =
+        allowPowerShellSearch && _isSafePowerShellSearchCommand(command);
+    if (!allowSafePowerShellSearch) {
+      // Validate the command
+      _validateCommand(command);
 
-    // Check for protected paths in the command
-    _validatePaths(command);
+      // Check for protected paths in the command
+      _validatePaths(command);
+    }
 
     final effectiveTimeout = timeout ?? defaultTimeout;
 
@@ -266,40 +286,194 @@ class TerminalService {
     }
   }
 
+  bool _isSafePowerShellSearchCommand(String command) {
+    if (!isWindows) return false;
+
+    final normalized = command.trim();
+    final lowerCommand = normalized.toLowerCase();
+
+    if (!(lowerCommand.startsWith('powershell ') ||
+        lowerCommand.startsWith('powershell.exe '))) {
+      return false;
+    }
+
+    if (!lowerCommand.contains('-noprofile') ||
+        !lowerCommand.contains('-noninteractive') ||
+        !lowerCommand.contains('-command')) {
+      return false;
+    }
+
+    if (!lowerCommand.contains('get-childitem') ||
+        !lowerCommand.contains('-recurse')) {
+      return false;
+    }
+
+    if (!lowerCommand.contains('select-object') ||
+        !lowerCommand.contains('expandproperty fullname')) {
+      return false;
+    }
+
+    if (RegExp(r'[;&]').hasMatch(command)) {
+      return false;
+    }
+
+    if (command.contains('`') || command.contains(r'$')) {
+      return false;
+    }
+
+    if ('|'.allMatches(command).length > 1) {
+      return false;
+    }
+
+    const forbiddenTokens = [
+      'invoke-expression',
+      'iex',
+      'start-process',
+      'remove-item',
+      'set-item',
+      'add-type',
+      'new-object',
+      'invoke-webrequest',
+      'curl',
+      'wget',
+      'iwr',
+      'irm',
+      'rm ',
+      'del ',
+      'cmd.exe',
+      'cmd /c',
+      '-encodedcommand',
+    ];
+
+    for (final token in forbiddenTokens) {
+      if (lowerCommand.contains(token)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   /// List available drives on the system
   Future<List<DriveInfo>> listDrives() async {
     if (isWindows) {
-      final result = await execute(
-        'wmic logicaldisk get caption,description,freespace,size',
+      // Use PowerShell for safer, more reliable drive listing on modern Windows
+      final result = await _runCommand(
+        'powershell',
+        [
+          '-NoProfile',
+          '-Command',
+          'Get-PSDrive -PSProvider FileSystem | Select-Object Name,DisplayRoot,Free,Used | ConvertTo-Json',
+        ],
+        timeout: const Duration(seconds: 10),
       );
-      return _parseWindowsDrives(result.stdout);
+
+      final parsed =
+          result.success ? _parseWindowsDrivesPs(result.stdout) : <DriveInfo>[];
+      if (parsed.isNotEmpty) return parsed;
+
+      final rootPaths = await CrossPlatformPaths.getRootPaths();
+      return rootPaths
+          .map(
+            (path) => DriveInfo(
+              path: path,
+              description: path.isNotEmpty
+                  ? 'Local Disk (${path[0].toUpperCase()}:)'
+                  : 'Local Disk',
+              freeSpace: null,
+              totalSpace: null,
+            ),
+          )
+          .toList();
     } else {
-      final result = await execute('df -h');
-      return _parseUnixDrives(result.stdout);
+      // Use cross-platform root paths
+      final rootPaths = CrossPlatformPaths.rootPaths;
+      final drives = <DriveInfo>[];
+
+      for (final path in rootPaths) {
+        drives.add(
+          DriveInfo(
+            path: path,
+            description: path == '/' ? 'Root' : 'Mount: $path',
+            freeSpace: null,
+            totalSpace: null,
+          ),
+        );
+      }
+
+      // Try to get more info from df if available
+      try {
+        final result = await execute('df -h');
+        if (result.success) {
+          final dfDrives = _parseUnixDrives(result.stdout);
+          // Merge information
+          for (final dfDrive in dfDrives) {
+            final existing = drives.indexWhere((d) => d.path == dfDrive.path);
+            if (existing >= 0) {
+              drives[existing] = dfDrive;
+            } else {
+              drives.add(dfDrive);
+            }
+          }
+        }
+      } catch (_) {}
+
+      return drives;
     }
   }
 
-  List<DriveInfo> _parseWindowsDrives(String output) {
+  List<DriveInfo> _parseWindowsDrivesPs(String output) {
     final drives = <DriveInfo>[];
-    final lines = output.split('\n').skip(1); // Skip header
+    if (output.trim().isEmpty) return drives;
 
-    for (final line in lines) {
-      if (line.trim().isEmpty) continue;
-      final parts = line.trim().split(RegExp(r'\s{2,}'));
-      if (parts.isNotEmpty &&
-          (parts.first.contains(':') || parts.first.startsWith('/'))) {
-        drives.add(
-          DriveInfo(
-            path: parts.first,
-            description: parts.length > 1 ? parts[1] : '',
-            freeSpace: parts.length > 2 ? int.tryParse(parts[2]) : null,
-            totalSpace: parts.length > 3 ? int.tryParse(parts[3]) : null,
-          ),
-        );
+    try {
+      final decoded = jsonDecode(output);
+      if (decoded is List) {
+        for (final item in decoded) {
+          _addDriveFromJson(drives, item);
+        }
+      } else if (decoded is Map) {
+        _addDriveFromJson(drives, decoded);
+      }
+    } catch (e) {
+      // Fallback for non-JSON or malformed output
+      final lines = output.split(RegExp(r'\r\n|\r|\n'));
+      for (final line in lines) {
+        if (line.contains(':')) {
+          final driveLetter = line.trim().split(':').first;
+          drives.add(
+            DriveInfo(
+              path: '$driveLetter:\\',
+              description: 'Local Disk ($driveLetter:)',
+              freeSpace: null,
+              totalSpace: null,
+            ),
+          );
+        }
       }
     }
 
     return drives;
+  }
+
+  void _addDriveFromJson(List<DriveInfo> drives, dynamic item) {
+    if (item is! Map) return;
+    final name = item['Name']?.toString();
+    if (name == null) return;
+
+    final path = '$name:\\';
+    final free = item['Free'] is num ? (item['Free'] as num).toInt() : null;
+    final used = item['Used'] is num ? (item['Used'] as num).toInt() : null;
+    final total = (free != null && used != null) ? free + used : null;
+
+    drives.add(
+      DriveInfo(
+        path: path,
+        description: 'Local Disk ($name:)',
+        freeSpace: free,
+        totalSpace: total,
+      ),
+    );
   }
 
   List<DriveInfo> _parseUnixDrives(String output) {
@@ -373,7 +547,7 @@ class TerminalService {
 
     // Sanitize pattern by removing ALL special characters that could be used in injection
     // Only keep alphanumeric, spaces, hyphens, underscores, dots, and wildcards
-    var sanitizedPattern = pattern.replaceAll(RegExp(r'[^\w\s\-\.\*]'), '');
+    var sanitizedPattern = pattern.replaceAll(RegExp(r'[^\w\s\-\.\*\?]'), '');
 
     // Handle whitespace: create multiple search patterns
     // "Gemma 2" -> try "gemma2", "gemma*2", "gemma 2"
@@ -414,7 +588,8 @@ class TerminalService {
         .map((p) => "'${_escapePowerShellArgument(p)}'")
         .join(', ');
 
-    final psCommand = '''
+    final psCommand =
+        '''
 \$filters = @($patternLiterals)
 \$results = @()
 foreach (\$f in \$filters) {
@@ -504,6 +679,479 @@ foreach (\$f in \$filters) {
     }
   }
 
+  // ==========================================================================
+  // CROSS-PLATFORM SEARCH METHODS
+  // ==========================================================================
+
+  /// Cross-platform deep search that works on Windows, macOS, and Linux
+  ///
+  /// Uses platform-specific optimizations:
+  /// - Windows: PowerShell with Get-ChildItem
+  /// - macOS: mdfind (Spotlight) with fallback to find
+  /// - Linux: locate with fallback to find
+  Future<CommandResult> crossPlatformSearch(
+    String pattern, {
+    String? directory,
+    bool foldersOnly = false,
+    int maxResults = 1000,
+    int timeoutSeconds = 60,
+  }) async {
+    final searchDir = directory ?? CrossPlatformPaths.rootPath;
+    final expandedDir = CrossPlatformPaths.expand(searchDir);
+
+    // Verify directory exists
+    if (!Directory(expandedDir).existsSync()) {
+      return CommandResult(
+        command: 'search: $pattern in $searchDir',
+        stdout: '',
+        stderr: 'Directory does not exist: $expandedDir',
+        exitCode: 1,
+        truncated: false,
+      );
+    }
+
+    if (isWindows) {
+      return _searchWindowsCrossPlatform(
+        pattern,
+        expandedDir,
+        foldersOnly,
+        maxResults,
+        timeoutSeconds,
+      );
+    } else if (isMacOS) {
+      return _searchMacOSCrossPlatform(
+        pattern,
+        expandedDir,
+        foldersOnly,
+        maxResults,
+        timeoutSeconds,
+      );
+    } else {
+      return _searchLinuxCrossPlatform(
+        pattern,
+        expandedDir,
+        foldersOnly,
+        maxResults,
+        timeoutSeconds,
+      );
+    }
+  }
+
+  /// Windows file search using PowerShell
+  Future<CommandResult> _searchWindowsCrossPlatform(
+    String pattern,
+    String directory,
+    bool foldersOnly,
+    int maxResults,
+    int timeoutSeconds,
+  ) async {
+    try {
+      final patterns = _buildSearchPatterns(pattern);
+
+      // Build PowerShell command
+      final escapedDir = directory
+          .replaceAll('\\', '\\\\')
+          .replaceAll('"', '\\"');
+      final itemType = foldersOnly ? 'Directory' : 'File';
+      final patternLiterals = patterns
+          .map((p) => "'${_escapePowerShellArgument(p)}'")
+          .join(', ');
+
+      final attempts = <int>[15, 30];
+      CommandResult? lastResult;
+
+      for (final depth in attempts) {
+        final psScript =
+            '''
+\$filters = @($patternLiterals)
+\$results = @()
+foreach (\$f in \$filters) {
+  \$results += Get-ChildItem -Path "$escapedDir" -Filter \$f -$itemType -Recurse -Force -ErrorAction SilentlyContinue -Depth $depth |
+    Select-Object -First $maxResults -ExpandProperty FullName
+}
+\$results | Select-Object -First $maxResults -Unique |
+  ForEach-Object { Write-Output \$_.Replace("\$env:USERPROFILE", "~") }
+''';
+
+        lastResult = await _withRetries(
+          () => _executePowerShell(
+            psScript,
+            Duration(seconds: timeoutSeconds),
+          ),
+          maxAttempts: 2,
+        );
+
+        if (lastResult.success && lastResult.stdout.trim().isNotEmpty) {
+          return lastResult;
+        }
+      }
+
+      final fallbackScript =
+          '''
+\$filters = @($patternLiterals)
+\$results = @()
+foreach (\$f in \$filters) {
+  \$results += Get-ChildItem -LiteralPath "$escapedDir" -$itemType -Recurse -Force -ErrorAction SilentlyContinue |
+    Where-Object { \$_.Name -like \$f } |
+    Select-Object -First $maxResults -ExpandProperty FullName
+}
+\$results | Select-Object -First $maxResults -Unique |
+  ForEach-Object { Write-Output \$_.Replace("\$env:USERPROFILE", "~") }
+''';
+
+      lastResult = await _withRetries(
+        () => _executePowerShell(
+          fallbackScript,
+          Duration(seconds: timeoutSeconds),
+        ),
+        maxAttempts: 2,
+      );
+
+      if (lastResult.success && lastResult.stdout.trim().isNotEmpty) {
+        return lastResult;
+      }
+
+      return lastResult;
+    } catch (e) {
+      return CommandResult(
+        command: 'search_windows: $pattern in $directory',
+        stdout: '',
+        stderr: 'Search failed: $e',
+        exitCode: -1,
+        truncated: false,
+      );
+    }
+  }
+
+  /// macOS file search using mdfind (Spotlight) or find
+  Future<CommandResult> _searchMacOSCrossPlatform(
+    String pattern,
+    String directory,
+    bool foldersOnly,
+    int maxResults,
+    int timeoutSeconds,
+  ) async {
+    // First try mdfind (Spotlight) for faster results
+    try {
+      final mdfindPattern = foldersOnly
+          ? 'kMDItemContentType == "public.folder" && name == "$pattern"c'
+          : 'name == "$pattern"c';
+
+      final result = await _runCommand(
+        'mdfind',
+        ['-onlyin', directory, mdfindPattern],
+        timeout: Duration(seconds: timeoutSeconds ~/ 2),
+      );
+
+      if (result.success && result.stdout.trim().isNotEmpty) {
+        // Limit results
+        final lines = result.stdout
+            .split('\n')
+            .where((l) => l.trim().isNotEmpty)
+            .take(maxResults)
+            .toList();
+        return CommandResult(
+          command: 'search_macos: $pattern in $directory',
+          stdout: lines.join('\n'),
+          stderr: '',
+          exitCode: 0,
+          truncated: false,
+        );
+      }
+    } catch (_) {
+      // Fall through to find command
+    }
+
+    // Fallback to find command
+    return _searchUnixFindCrossPlatform(
+      pattern,
+      directory,
+      foldersOnly,
+      maxResults,
+      timeoutSeconds,
+    );
+  }
+
+  /// Linux file search using find or locate
+  Future<CommandResult> _searchLinuxCrossPlatform(
+    String pattern,
+    String directory,
+    bool foldersOnly,
+    int maxResults,
+    int timeoutSeconds,
+  ) async {
+    // First try locate for fast results
+    try {
+      final result = await _runCommand(
+        'locate',
+        ['-i', '-l', '$maxResults', pattern],
+        timeout: Duration(seconds: timeoutSeconds ~/ 3),
+      );
+
+      if (result.success && result.stdout.trim().isNotEmpty) {
+        // Filter to directory if specified
+        final lines = result.stdout
+            .split('\n')
+            .where((l) => l.trim().isNotEmpty)
+            .where((l) => l.startsWith(directory))
+            .take(maxResults)
+            .toList();
+
+        if (lines.isNotEmpty) {
+          return CommandResult(
+            command: 'search_linux: $pattern in $directory',
+            stdout: lines.join('\n'),
+            stderr: '',
+            exitCode: 0,
+            truncated: false,
+          );
+        }
+      }
+    } catch (_) {
+      // Fall through to find
+    }
+
+    return _searchUnixFindCrossPlatform(
+      pattern,
+      directory,
+      foldersOnly,
+      maxResults,
+      timeoutSeconds,
+    );
+  }
+
+  /// Common Unix find command
+  Future<CommandResult> _searchUnixFindCrossPlatform(
+    String pattern,
+    String directory,
+    bool foldersOnly,
+    int maxResults,
+    int timeoutSeconds,
+  ) async {
+    try {
+      final typeArg = foldersOnly ? '-type d' : '-type f';
+      final command =
+          'find "$directory" $typeArg -iname "$pattern" -mount 2>/dev/null | head -n $maxResults';
+
+      return await execute(command, timeout: Duration(seconds: timeoutSeconds));
+    } catch (e) {
+      return CommandResult(
+        command: 'search_unix: $pattern in $directory',
+        stdout: '',
+        stderr: 'Search failed: $e',
+        exitCode: -1,
+        truncated: false,
+      );
+    }
+  }
+
+  /// Execute PowerShell command with proper error handling
+  Future<CommandResult> _executePowerShell(
+    String script,
+    Duration timeout,
+  ) async {
+    try {
+      final process = await Process.start(
+        'powershell.exe',
+        ['-NoProfile', '-NonInteractive', '-Command', script],
+        runInShell: false,
+      );
+
+      final stdoutBuffer = StringBuffer();
+      final stderrBuffer = StringBuffer();
+      var totalSize = 0;
+      var truncated = false;
+
+      final stdoutFuture = process.stdout
+          .transform(const SystemEncoding().decoder)
+          .forEach((chunk) {
+            if (totalSize < maxOutputSize) {
+              final remaining = maxOutputSize - totalSize;
+              if (chunk.length <= remaining) {
+                stdoutBuffer.write(chunk);
+                totalSize += chunk.length;
+              } else {
+                stdoutBuffer.write(chunk.substring(0, remaining));
+                totalSize = maxOutputSize;
+                truncated = true;
+              }
+            }
+          });
+
+      final stderrFuture = process.stderr
+          .transform(const SystemEncoding().decoder)
+          .forEach((chunk) {
+            if (stderrBuffer.length < maxOutputSize) {
+              stderrBuffer.write(chunk);
+            }
+          });
+
+      final exitCode = await process.exitCode.timeout(
+        timeout,
+        onTimeout: () {
+          process.kill(ProcessSignal.sigterm);
+          throw TimeoutException('PowerShell command timed out');
+        },
+      );
+
+      await stdoutFuture;
+      await stderrFuture;
+
+      return CommandResult(
+        command: 'powershell',
+        stdout: stdoutBuffer.toString(),
+        stderr: stderrBuffer.toString(),
+        exitCode: exitCode,
+        truncated: truncated,
+      );
+    } on TimeoutException catch (e) {
+      return CommandResult(
+        command: 'powershell',
+        stdout: '',
+        stderr: 'Timeout: ${e.message}',
+        exitCode: -1,
+        truncated: false,
+        timedOut: true,
+      );
+    } catch (e) {
+      return CommandResult(
+        command: 'powershell',
+        stdout: '',
+        stderr: 'Error: $e',
+        exitCode: -1,
+        truncated: false,
+      );
+    }
+  }
+
+  /// Run a command directly (bypassing shell validation for trusted commands)
+  Future<CommandResult> _runCommand(
+    String command,
+    List<String> args, {
+    Duration? timeout,
+  }) async {
+    final process = await Process.start(
+      command,
+      args,
+      runInShell: false,
+    );
+
+    final stdout = <String>[];
+    final stderr = <String>[];
+
+    final effectiveTimeout = timeout ?? const Duration(seconds: 30);
+    var timedOut = false;
+
+    // Watch for timeout
+    final timer = Timer(effectiveTimeout, () {
+      timedOut = true;
+      process.kill();
+    });
+
+    // Stream subscriptions
+    final sub1 = process.stdout.transform(utf8.decoder).listen(stdout.add);
+    final sub2 = process.stderr.transform(utf8.decoder).listen(stderr.add);
+
+    // Wait for process to complete
+    final exitCode = await process.exitCode;
+
+    timer.cancel();
+    await sub1.cancel();
+    await sub2.cancel();
+
+    if (timedOut) {
+      return CommandResult(
+        command: command,
+        stdout: stdout.join(),
+        stderr: 'Command timed out after ${effectiveTimeout.inSeconds} seconds',
+        exitCode: -1,
+        truncated: false,
+        timedOut: true,
+      );
+    }
+
+    return CommandResult(
+      command: command,
+      stdout: stdout.join(),
+      stderr: stderr.join(),
+      exitCode: exitCode,
+      truncated: false,
+    );
+  }
+
+  /// Get platform-specific special folder paths
+  Map<String, String> getSpecialFolders() {
+    return CrossPlatformPaths.specialFolders;
+  }
+
+  /// Get a specific special folder by name
+  String? getSpecialFolder(String name) {
+    return CrossPlatformPaths.getSpecialFolder(name);
+  }
+
+  /// Check if a path refers to a hidden file/folder
+  bool isHiddenPath(String path) {
+    return CrossPlatformPaths.isHidden(path);
+  }
+
+  /// Resolve a symlink to its target
+  Future<String?> resolveSymlink(String path) async {
+    final expandedPath = CrossPlatformPaths.expand(path);
+    try {
+      final link = Link(expandedPath);
+      if (link.existsSync()) {
+        return await link.target();
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// List hidden files in a directory
+  Future<List<String>> listHiddenFiles(
+    String path, {
+    bool includeSystem = false,
+  }) async {
+    final expandedPath = CrossPlatformPaths.expand(path);
+    final dir = Directory(expandedPath);
+
+    if (!dir.existsSync()) {
+      return [];
+    }
+
+    try {
+      final entities = dir.listSync();
+      final hiddenFiles = <String>[];
+
+      for (final entity in entities) {
+        final name = entity.path.split(RegExp(r'[\\/]')).last;
+
+        // Skip system files unless requested
+        if (!includeSystem) {
+          if (isWindows) {
+            if (name.toLowerCase() == 'system volume information' ||
+                name.toLowerCase().startsWith(r'$')) {
+              continue;
+            }
+          } else {
+            if (name == '.' || name == '..') {
+              continue;
+            }
+          }
+        }
+
+        if (CrossPlatformPaths.isHidden(entity.path)) {
+          hiddenFiles.add(entity.path);
+        }
+      }
+
+      return hiddenFiles.take(100).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
   /// Search file contents for a pattern (grep-like)
   ///
   /// SECURITY: Pattern and path are sanitized to prevent command injection.
@@ -549,9 +1197,14 @@ foreach (\$f in \$filters) {
   }) async {
     final sanitizedPath = _sanitizeArgument(path);
     if (isWindows) {
-      return execute('dir ${detailed ? '' : '/B'} "$sanitizedPath"');
+      return _withRetries(
+        () => execute('dir /A ${detailed ? '' : '/B'} "$sanitizedPath"'),
+      );
     } else {
-      return execute('ls ${detailed ? '-la' : ''} "$sanitizedPath"');
+      final flags = detailed ? '-la' : '-a';
+      return _withRetries(
+        () => execute('ls $flags "$sanitizedPath"'),
+      );
     }
   }
 
@@ -665,6 +1318,56 @@ foreach (\$f in \$filters) {
     }
 
     return sanitized;
+  }
+
+  List<String> _buildSearchPatterns(String pattern) {
+    var sanitizedPattern = pattern.replaceAll(RegExp(r'[^\w\s\-\.\*\?]'), '');
+    if (sanitizedPattern.isEmpty) sanitizedPattern = '*';
+
+    final patterns = <String>{};
+    patterns.add(sanitizedPattern);
+
+    if (!sanitizedPattern.contains('*') && !sanitizedPattern.contains('?')) {
+      patterns.add('*$sanitizedPattern*');
+    }
+
+    final noSpaces = sanitizedPattern.replaceAll(' ', '');
+    if (noSpaces != sanitizedPattern && !noSpaces.contains('*')) {
+      patterns.add('*$noSpaces*');
+    }
+
+    final spacesToWildcards = sanitizedPattern.replaceAll(' ', '*');
+    if (spacesToWildcards != sanitizedPattern) {
+      patterns.add(spacesToWildcards);
+    }
+
+    return patterns.toList();
+  }
+
+  Future<CommandResult> _withRetries(
+    Future<CommandResult> Function() action, {
+    int maxAttempts = 2,
+    Duration delay = const Duration(milliseconds: 350),
+  }) async {
+    CommandResult? lastResult;
+
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      lastResult = await action();
+
+      if (lastResult.success) {
+        return lastResult;
+      }
+
+      if (!lastResult.timedOut && lastResult.exitCode != -1) {
+        return lastResult;
+      }
+
+      if (attempt < maxAttempts) {
+        await Future.delayed(delay * attempt);
+      }
+    }
+
+    return lastResult!;
   }
 }
 

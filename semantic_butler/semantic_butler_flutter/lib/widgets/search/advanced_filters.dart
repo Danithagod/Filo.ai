@@ -107,6 +107,10 @@ class AdvancedFilters extends StatelessWidget {
     if (filters.dateFrom != null) count++;
     if (filters.fileTypes != null && filters.fileTypes!.isNotEmpty) count++;
     if (filters.tags != null && filters.tags!.isNotEmpty) count++;
+    if (filters.minSize != null || filters.maxSize != null) count++;
+    if (filters.locationPaths != null && filters.locationPaths!.isNotEmpty) count++;
+    if (filters.contentTerms != null && filters.contentTerms!.isNotEmpty) count++;
+    if (filters.minCount != null || filters.maxCount != null) count++;
     return count;
   }
 }
@@ -129,6 +133,10 @@ class _FilterDialogState extends State<_FilterDialog> {
   final TextEditingController _tagsController = TextEditingController();
   final TextEditingController _minSizeController = TextEditingController();
   final TextEditingController _maxSizeController = TextEditingController();
+  final TextEditingController _locationPathsController = TextEditingController();
+  final TextEditingController _contentTermsController = TextEditingController();
+  final TextEditingController _minWordCountController = TextEditingController();
+  final TextEditingController _maxWordCountController = TextEditingController();
 
   final List<String> _fileTypes = [
     'pdf',
@@ -150,6 +158,12 @@ class _FilterDialogState extends State<_FilterDialog> {
       tags: widget.initialFilters.tags?.toList(),
       minSize: widget.initialFilters.minSize,
       maxSize: widget.initialFilters.maxSize,
+      semanticWeight: widget.initialFilters.semanticWeight ?? 0.7,
+      keywordWeight: widget.initialFilters.keywordWeight ?? 0.3,
+      locationPaths: widget.initialFilters.locationPaths?.toList(),
+      contentTerms: widget.initialFilters.contentTerms?.toList(),
+      minCount: widget.initialFilters.minCount,
+      maxCount: widget.initialFilters.maxCount,
     );
 
     if (_filters.tags != null) {
@@ -163,6 +177,18 @@ class _FilterDialogState extends State<_FilterDialog> {
       _maxSizeController.text = (_filters.maxSize! / (1024 * 1024))
           .toStringAsFixed(1);
     }
+    if (_filters.locationPaths != null) {
+      _locationPathsController.text = _filters.locationPaths!.join(', ');
+    }
+    if (_filters.contentTerms != null) {
+      _contentTermsController.text = _filters.contentTerms!.join(', ');
+    }
+    if (_filters.minCount != null) {
+      _minWordCountController.text = _filters.minCount.toString();
+    }
+    if (_filters.maxCount != null) {
+      _maxWordCountController.text = _filters.maxCount.toString();
+    }
   }
 
   @override
@@ -170,6 +196,10 @@ class _FilterDialogState extends State<_FilterDialog> {
     _tagsController.dispose();
     _minSizeController.dispose();
     _maxSizeController.dispose();
+    _locationPathsController.dispose();
+    _contentTermsController.dispose();
+    _minWordCountController.dispose();
+    _maxWordCountController.dispose();
     super.dispose();
   }
 
@@ -179,6 +209,10 @@ class _FilterDialogState extends State<_FilterDialog> {
       _tagsController.clear();
       _minSizeController.clear();
       _maxSizeController.clear();
+      _locationPathsController.clear();
+      _contentTermsController.clear();
+      _minWordCountController.clear();
+      _maxWordCountController.clear();
     });
   }
 
@@ -197,6 +231,28 @@ class _FilterDialogState extends State<_FilterDialog> {
 
     final maxMb = double.tryParse(_maxSizeController.text);
     _filters.maxSize = maxMb != null ? (maxMb * 1024 * 1024).toInt() : null;
+
+    // Parse location paths
+    final locationPaths = _locationPathsController.text
+        .split(',')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    _filters.locationPaths = locationPaths.isEmpty ? null : locationPaths;
+
+    // Parse content terms
+    final contentTerms = _contentTermsController.text
+        .split(',')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    _filters.contentTerms = contentTerms.isEmpty ? null : contentTerms;
+
+    // Parse word count
+    final minCount = int.tryParse(_minWordCountController.text);
+    _filters.minCount = minCount;
+    final maxCount = int.tryParse(_maxWordCountController.text);
+    _filters.maxCount = maxCount;
 
     widget.onApply(_filters);
     Navigator.pop(context);
@@ -383,6 +439,176 @@ class _FilterDialogState extends State<_FilterDialog> {
                     ),
                   ),
                 ],
+              ),
+
+              const SizedBox(height: 24),
+
+              // Location Paths
+              _buildSectionHeader(context, 'Search Locations'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _locationPathsController,
+                decoration: InputDecoration(
+                  hintText: 'e.g. C:\\Documents, D:\\Projects',
+                  prefixIcon: const Icon(Icons.folder_outlined, size: 18),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor: colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.3,
+                  ),
+                  isDense: true,
+                  helperText: 'Comma-separated folder paths to search within',
+                ),
+                style: textTheme.bodyMedium,
+              ),
+
+              const SizedBox(height: 24),
+
+              // Content Terms
+              _buildSectionHeader(context, 'Content Contains'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _contentTermsController,
+                decoration: InputDecoration(
+                  hintText: 'e.g. TODO, invoice, meeting notes',
+                  prefixIcon: const Icon(Icons.text_snippet_outlined, size: 18),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor: colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.3,
+                  ),
+                  isDense: true,
+                  helperText: 'Search for files containing these terms',
+                ),
+                style: textTheme.bodyMedium,
+              ),
+
+              const SizedBox(height: 24),
+
+              // Word Count
+              _buildSectionHeader(context, 'Word Count'),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _minWordCountController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Min Words',
+                        hintText: 'e.g. 100',
+                        prefixIcon: const Icon(Icons.format_list_numbered, size: 18),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                        isDense: true,
+                      ),
+                      style: textTheme.bodyMedium,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextField(
+                      controller: _maxWordCountController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Max Words',
+                        hintText: 'e.g. 5000',
+                        prefixIcon: const Icon(Icons.format_list_numbered, size: 18),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                        isDense: true,
+                      ),
+                      style: textTheme.bodyMedium,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 24),
+
+              // Search Weights
+              _buildSectionHeader(context, 'Hybrid Search Relevance'),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: colorScheme.secondaryContainer.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: colorScheme.secondary.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.psychology, size: 18),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'Semantic Ratio',
+                            style: TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                        Text(
+                          '${((_filters.semanticWeight ?? 0.7) * 100).toInt()}%',
+                          style: TextStyle(
+                            color: colorScheme.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Slider(
+                      value: _filters.semanticWeight ?? 0.7,
+                      onChanged: (val) {
+                        setState(() {
+                          _filters.semanticWeight = val;
+                          _filters.keywordWeight = double.parse(
+                            (1.0 - val).toStringAsFixed(2),
+                          );
+                        });
+                      },
+                    ),
+                    Row(
+                      children: [
+                        const Icon(Icons.key, size: 18),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'Keyword Ratio',
+                            style: TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                        Text(
+                          '${((_filters.keywordWeight ?? 0.3) * 100).toInt()}%',
+                          style: TextStyle(
+                            color: colorScheme.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Tinker with these values to balance AI understanding vs. exact matches.',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ),
               ),
 
               const SizedBox(height: 16),

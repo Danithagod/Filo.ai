@@ -10,6 +10,10 @@ class SearchResultCard extends StatelessWidget {
   final List<String> tags;
   final bool isSelected;
   final VoidCallback? onTap;
+  final String? highlightQuery;
+  final bool showCheckbox;
+  final bool isChecked;
+  final ValueChanged<bool?>? onCheckChanged;
 
   const SearchResultCard({
     super.key,
@@ -20,12 +24,75 @@ class SearchResultCard extends StatelessWidget {
     required this.tags,
     this.isSelected = false,
     this.onTap,
+    this.highlightQuery,
+    this.showCheckbox = false,
+    this.isChecked = false,
+    this.onCheckChanged,
   });
+
+  /// Build a TextSpan with highlighted query terms
+  TextSpan _buildHighlightedText(
+    String text,
+    TextStyle? baseStyle,
+    Color highlightColor,
+  ) {
+    if (highlightQuery == null || highlightQuery!.isEmpty) {
+      return TextSpan(text: text, style: baseStyle);
+    }
+
+    // Extract search terms (split by spaces, remove common operators)
+    final terms = highlightQuery!
+        .toLowerCase()
+        .split(RegExp(r'\s+'))
+        .where((t) => t.length > 2 && !{'and', 'or', 'not', 'the', 'for'}.contains(t))
+        .toList();
+
+    if (terms.isEmpty) {
+      return TextSpan(text: text, style: baseStyle);
+    }
+
+    // Build regex pattern for all terms
+    final pattern = terms.map((t) => RegExp.escape(t)).join('|');
+    final regex = RegExp('($pattern)', caseSensitive: false);
+
+    final spans = <TextSpan>[];
+    int lastEnd = 0;
+
+    for (final match in regex.allMatches(text)) {
+      // Add text before match
+      if (match.start > lastEnd) {
+        spans.add(TextSpan(
+          text: text.substring(lastEnd, match.start),
+          style: baseStyle,
+        ));
+      }
+      // Add highlighted match
+      spans.add(TextSpan(
+        text: match.group(0),
+        style: baseStyle?.copyWith(
+          backgroundColor: highlightColor.withValues(alpha: 0.3),
+          fontWeight: FontWeight.w600,
+        ),
+      ));
+      lastEnd = match.end;
+    }
+
+    // Add remaining text
+    if (lastEnd < text.length) {
+      spans.add(TextSpan(
+        text: text.substring(lastEnd),
+        style: baseStyle,
+      ));
+    }
+
+    return TextSpan(children: spans);
+  }
 
   Future<void> _openFile(BuildContext context) async {
     try {
-      final uri = Uri.file(path);
-      // Attempt to launch directly - canLaunchUrl is often unreliable on desktop
+      // Use Uri.file with strict parsing or join to handle special characters (Issue 20)
+      final uri = Uri.file(path, windows: true);
+
       final launched = await launchUrl(uri);
       if (!launched && context.mounted) {
         _showErrorDialog(
@@ -133,6 +200,15 @@ class SearchResultCard extends StatelessWidget {
               // Header row
               Row(
                 children: [
+                  // Checkbox for bulk selection
+                  if (showCheckbox) ...[
+                    Checkbox(
+                      value: isChecked,
+                      onChanged: onCheckChanged,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    const SizedBox(width: 4),
+                  ],
                   // File icon in container
                   Container(
                     padding: const EdgeInsets.all(10),
@@ -173,35 +249,42 @@ class SearchResultCard extends StatelessWidget {
                     ),
                   ),
 
-                  // Relevance badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: scoreColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Text(
-                      '${(relevanceScore * 100).toInt()}%',
-                      style: textTheme.labelMedium?.copyWith(
-                        color: scoreColor,
-                        fontWeight: FontWeight.w600,
+                  // Relevance badge with accessibility label (Issue 19)
+                  Semantics(
+                    label:
+                        'Relevance score: ${(relevanceScore * 100).toInt()}%',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: scoreColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        '${(relevanceScore * 100).toInt()}%',
+                        style: textTheme.labelMedium?.copyWith(
+                          color: scoreColor,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
 
-              // Preview text
+              // Preview text with query highlighting
               if (preview.isNotEmpty) ...[
                 const SizedBox(height: 12),
-                Text(
-                  preview,
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    height: 1.5,
+                RichText(
+                  text: _buildHighlightedText(
+                    preview,
+                    textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      height: 1.5,
+                    ),
+                    colorScheme.primary,
                   ),
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
@@ -253,16 +336,60 @@ class SearchResultCard extends StatelessWidget {
       case 'ts':
       case 'py':
       case 'java':
+      case 'c':
+      case 'cpp':
+      case 'cs':
+      case 'go':
+      case 'rs':
+      case 'swift':
+      case 'kt':
         return Icons.code;
       case 'md':
       case 'txt':
+      case 'log':
         return Icons.article;
       case 'json':
       case 'yaml':
       case 'yml':
+      case 'xml':
+      case 'html':
+      case 'css':
         return Icons.data_object;
       case 'pdf':
         return Icons.picture_as_pdf;
+      case 'doc':
+      case 'docx':
+        return Icons.description;
+      case 'xls':
+      case 'xlsx':
+      case 'csv':
+        return Icons.table_chart;
+      case 'ppt':
+      case 'pptx':
+        return Icons.slideshow;
+      case 'png':
+      case 'jpg':
+      case 'jpeg':
+      case 'gif':
+      case 'svg':
+      case 'webp':
+        return Icons.image;
+      case 'mp3':
+      case 'wav':
+      case 'm4a':
+      case 'ogg':
+        return Icons.audiotrack;
+      case 'mp4':
+      case 'mov':
+      case 'avi':
+      case 'mkv':
+        return Icons.movie;
+      case 'zip':
+      case 'rar':
+      case '7z':
+      case 'tar':
+      case 'gz':
+        return Icons.folder_zip;
       default:
         return Icons.insert_drive_file;
     }

@@ -4,8 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:semantic_butler_client/semantic_butler_client.dart';
 import '../../main.dart';
 import '../../providers/watched_folders_provider.dart';
+import '../../providers/local_indexing_provider.dart';
 import '../../utils/app_logger.dart';
 import '../common/shimmer_effect.dart';
+import '../../theme/app_theme.dart';
+import 'indexing_diagnostics_dialog.dart';
 
 /// Compact card for displaying indexing job in either grid or list mode
 class CompactIndexCard extends ConsumerStatefulWidget {
@@ -39,8 +42,9 @@ class _CompactIndexCardState extends ConsumerState<CompactIndexCard> {
   }
 
   Widget _buildGridLayout() {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
     final job = widget.job;
 
     // Use selector to avoid rebuilds when other folders change
@@ -60,7 +64,7 @@ class _CompactIndexCardState extends ConsumerState<CompactIndexCard> {
 
     final folderName = job.folderPath.split(Platform.pathSeparator).last;
 
-    double progress = 0;
+    double progress = 0.0;
     if (job.totalFiles > 0) {
       progress = (job.processedFiles + job.skippedFiles) / job.totalFiles;
       if (progress > 1.0) progress = 1.0;
@@ -120,7 +124,9 @@ class _CompactIndexCardState extends ConsumerState<CompactIndexCard> {
                                   child: Container(
                                     padding: const EdgeInsets.all(1.5),
                                     decoration: BoxDecoration(
-                                      color: Colors.green,
+                                      color: theme.brightness == Brightness.dark
+                                          ? AppTheme.successColorDark
+                                          : AppTheme.successColor,
                                       shape: BoxShape.circle,
                                       border: Border.all(
                                         color: colorScheme.surface,
@@ -153,10 +159,10 @@ class _CompactIndexCardState extends ConsumerState<CompactIndexCard> {
                                           width: 1.5,
                                         ),
                                       ),
-                                      child: const Icon(
+                                      child: Icon(
                                         Icons.close,
                                         size: 10,
-                                        color: Colors.white,
+                                        color: colorScheme.onError,
                                       ),
                                     ),
                                   ),
@@ -185,13 +191,24 @@ class _CompactIndexCardState extends ConsumerState<CompactIndexCard> {
                           Text(
                             job.totalFiles == 0
                                 ? 'No files'
-                                : '${job.totalFiles} files',
+                                : '${job.processedFiles + job.skippedFiles} / ${job.totalFiles} processed',
                             style: textTheme.labelSmall?.copyWith(
                               color: colorScheme.onSurfaceVariant.withValues(
                                 alpha: 0.7,
                               ),
                             ),
                           ),
+                          if (job.failedFiles > 0)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(
+                                '${job.failedFiles} failed',
+                                style: textTheme.labelSmall?.copyWith(
+                                  color: colorScheme.error,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -323,8 +340,9 @@ class _CompactIndexCardState extends ConsumerState<CompactIndexCard> {
   }
 
   Widget _buildListLayout() {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
     final job = widget.job;
 
     // Use selector to avoid rebuilds when other folders change
@@ -427,7 +445,9 @@ class _CompactIndexCardState extends ConsumerState<CompactIndexCard> {
                               child: Container(
                                 padding: const EdgeInsets.all(1),
                                 decoration: BoxDecoration(
-                                  color: Colors.green,
+                                  color: theme.brightness == Brightness.dark
+                                      ? AppTheme.successColorDark
+                                      : AppTheme.successColor,
                                   shape: BoxShape.circle,
                                   border: Border.all(
                                     color: colorScheme.surface,
@@ -455,10 +475,10 @@ class _CompactIndexCardState extends ConsumerState<CompactIndexCard> {
                                     width: 1,
                                   ),
                                 ),
-                                child: const Icon(
+                                child: Icon(
                                   Icons.close,
                                   size: 8,
-                                  color: Colors.white,
+                                  color: colorScheme.onError,
                                 ),
                               ),
                             ),
@@ -487,12 +507,35 @@ class _CompactIndexCardState extends ConsumerState<CompactIndexCard> {
                               Text(
                                 job.totalFiles == 0
                                     ? 'No files'
-                                    : '${job.totalFiles} files',
+                                    : '${job.processedFiles + job.skippedFiles}/${job.totalFiles} indexed',
                                 style: textTheme.bodySmall?.copyWith(
                                   color: colorScheme.onSurfaceVariant
                                       .withValues(alpha: 0.7),
                                 ),
                               ),
+                              if (job.failedFiles > 0) ...[
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                  ),
+                                  child: Text(
+                                    '•',
+                                    style: TextStyle(
+                                      color: colorScheme.error.withValues(
+                                        alpha: 0.3,
+                                      ),
+                                      fontSize: 8,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  '${job.failedFiles} failed',
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.error,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
                               Padding(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 6,
@@ -721,6 +764,18 @@ class _CompactIndexCardState extends ConsumerState<CompactIndexCard> {
             ),
 
             ListTile(
+              leading: Icon(
+                Icons.analytics_outlined,
+                color: colorScheme.primary,
+              ),
+              title: const Text('Detailed Diagnostics'),
+              onTap: () {
+                Navigator.pop(context);
+                _showDiagnostics();
+              },
+            ),
+
+            ListTile(
               leading: Icon(Icons.delete_outline, color: colorScheme.error),
               title: Text(
                 'Remove from Index',
@@ -768,6 +823,16 @@ class _CompactIndexCardState extends ConsumerState<CompactIndexCard> {
     }
   }
 
+  void _showDiagnostics() {
+    showDialog(
+      context: context,
+      builder: (context) => IndexingDiagnosticsDialog(
+        jobId: widget.job.id!,
+        folderPath: widget.job.folderPath,
+      ),
+    );
+  }
+
   Future<void> _removeFromIndex() async {
     setState(() => _isRefreshing = true);
     try {
@@ -806,8 +871,14 @@ class _CompactIndexCardState extends ConsumerState<CompactIndexCard> {
         'Re-indexing folder: ${widget.job.folderPath}',
         tag: 'CompactIndexCard',
       );
-      final apiClient = ref.read(clientProvider);
-      await apiClient.butler.startIndexing(widget.job.folderPath);
+      // Run indexing in background, don't await completion for UI responsiveness
+      // But _refreshIndex returns future so we can await if logic demands it,
+      // though typically UI refresh happens on stream/polling updates.
+      // Here we await for valid feedback loop as user explicitly requested it.
+      await ref
+          .read(localIndexingServiceProvider)
+          .indexDirectory(widget.job.folderPath);
+
       if (mounted) {
         await widget.onRefresh?.call();
       }

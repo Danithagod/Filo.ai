@@ -1,0 +1,5 @@
+class: FacetEntry
+fields:
+  label: String
+  count: int
+  value: String

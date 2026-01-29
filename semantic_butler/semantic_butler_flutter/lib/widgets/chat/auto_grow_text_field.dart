@@ -105,8 +105,8 @@ class _AutoGrowTextFieldState extends State<AutoGrowTextField> {
             ),
         border: InputBorder.none,
         contentPadding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 14,
+          horizontal: 16,
+          vertical: 12,
         ),
         prefixIcon: widget.prefixIcon,
       ),

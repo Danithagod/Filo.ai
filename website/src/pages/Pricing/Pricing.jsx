@@ -25,16 +25,16 @@ const Pricing = ({ show }) => {
     {
       name: 'Starter',
       price: '$0',
-      description: 'Perfect for personal file organization.',
+      description: 'Perfect for personal file search.',
       icon: <Zap size={24} />,
-      features: ['Up to 5,000 indexed files', 'Standard Semantic Search', 'Community Support', 'Local File Extraction']
+      features: ['Up to 5,000 indexed files', 'Standard Semantic Search', 'AI Chat Assistant', 'Community Support']
     },
     {
       name: 'Pro',
       price: '$12',
       description: 'For power users and professionals.',
       icon: <Shield size={24} />,
-      features: ['Unlimited indexed files', 'Advanced AI Agents', 'Multi-Model Support (OpenRouter)', 'Detailed Cost Dashboard', 'Priority Support'],
+      features: ['Unlimited indexed files', 'Advanced AI Search Modes', 'OpenRouter Multi-Model Support', 'Priority Support'],
       popular: true
     },
     {
@@ -42,7 +42,7 @@ const Pricing = ({ show }) => {
       price: '$39',
       description: 'Advanced features for complex workflows.',
       icon: <Crown size={24} />,
-      features: ['Smart Index Health Monitoring', 'Unlimited Search Presets', 'Custom Tagging Taxonomy', 'Dedicated Local Support']
+      features: ['Smart Index Health Monitoring', 'Unlimited Search History', 'Advanced Filtering Options', 'Dedicated Support']
     }
   ];
 

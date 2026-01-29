@@ -81,85 +81,106 @@ class _ChatInputAreaState extends State<ChatInputArea> {
     final colorScheme = theme.colorScheme;
 
     return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      // Background gradient or transparent to let content show through slightly if needed
+      // But usually just transparent so the floating card stands out
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        border: Border(
-          top: BorderSide(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-          ),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            theme.colorScheme.surface.withValues(alpha: 0.0),
+            theme.colorScheme.surface.withValues(alpha: 0.8),
+            theme.colorScheme.surface,
+          ],
+          stops: const [0.0, 0.4, 1.0],
         ),
       ),
       child: SafeArea(
         top: false,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Reply to bar
-              if (widget.replyToMessage != null)
-                MessageQuoteBar(
-                  quotedContent: widget.replyToMessage!.content,
-                  quotedRole: widget.replyToMessage!.role,
-                  onCancel: widget.onCancelReply ?? () {},
-                ),
+        child: Card(
+          elevation: 4,
+          shadowColor: Theme.of(
+            context,
+          ).colorScheme.shadow.withValues(alpha: 0.1),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+            side: BorderSide(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+            ),
+          ),
+          color:
+              colorScheme.surfaceContainer, // Slightly lighter than background
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Reply to bar
+                if (widget.replyToMessage != null)
+                  MessageQuoteBar(
+                    quotedContent: widget.replyToMessage!.content,
+                    quotedRole: widget.replyToMessage!.role,
+                    onCancel: widget.onCancelReply ?? () {},
+                  ),
 
-              // Attached files preview
-              if (widget.attachedFiles.isNotEmpty) _buildAttachments(context),
+                // Attached files preview
+                if (widget.attachedFiles.isNotEmpty) _buildAttachments(context),
 
-              // Tagged files chips
-              if (widget.taggedFiles.isNotEmpty) _buildTaggedFiles(context),
+                // Tagged files chips
+                if (widget.taggedFiles.isNotEmpty) _buildTaggedFiles(context),
 
-              // Quick actions (controlled externally)
-              if (!widget.isLoading) _buildQuickActions(context),
+                // Quick actions (controlled externally)
+                if (!widget.isLoading) _buildQuickActions(context),
 
-              // Tagging discovery hint
-              if (widget.controller.text.isEmpty &&
-                  widget.focusNode.hasFocus &&
-                  !widget.isLoading)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: colorScheme.secondaryContainer.withValues(
-                          alpha: 0.7,
+                // Tagging discovery hint
+                if (widget.controller.text.isEmpty &&
+                    widget.focusNode.hasFocus &&
+                    !widget.isLoading)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
                         ),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.alternate_email,
-                            size: 14,
-                            color: colorScheme.onSecondaryContainer,
+                        decoration: BoxDecoration(
+                          color: colorScheme.secondaryContainer.withValues(
+                            alpha: 0.7,
                           ),
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Text(
-                              'Type @ to tag files or folders',
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: colorScheme.onSecondaryContainer,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              overflow: TextOverflow.ellipsis,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.alternate_email,
+                              size: 14,
+                              color: colorScheme.onSecondaryContainer,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                'Type @ to tag files or folders',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: colorScheme.onSecondaryContainer,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
 
-              // Input row
-              _buildInputRow(context, colorScheme),
-            ],
+                // Input row
+                _buildInputRow(context, colorScheme),
+              ],
+            ),
           ),
         ),
       ),
@@ -216,6 +237,20 @@ class _ChatInputAreaState extends State<ChatInputArea> {
       }
     } catch (e) {
       AppLogger.error('Failed to pick files: $e');
+    }
+  }
+
+  Future<void> _handleDirectoryPick() async {
+    try {
+      final path = await FilePicker.platform.getDirectoryPath();
+
+      if (path != null) {
+        // We handle directories as File objects for API compatibility
+        // The FileTaggingMixin and ChatAttachment know how to handle them
+        widget.onFilesDropped([File(path)]);
+      }
+    } catch (e) {
+      AppLogger.error('Failed to pick directory: $e');
     }
   }
 
@@ -359,7 +394,7 @@ class _ChatInputAreaState extends State<ChatInputArea> {
         // Quick Actions Toggle
         if (!widget.isLoading)
           Padding(
-            padding: const EdgeInsets.only(bottom: 4, right: 4),
+            padding: const EdgeInsets.only(bottom: 6, right: 8),
             child: IconButton(
               onPressed: () => setState(() {
                 _isQuickActionsExpanded = !_isQuickActionsExpanded;
@@ -368,12 +403,16 @@ class _ChatInputAreaState extends State<ChatInputArea> {
                 _isQuickActionsExpanded
                     ? Icons.close_rounded
                     : Icons.add_circle_outline_rounded,
-                size: 22,
+                size: 24,
                 color: colorScheme.primary,
               ),
               tooltip: _isQuickActionsExpanded
                   ? 'Hide quick actions'
                   : 'Show quick actions',
+              style: IconButton.styleFrom(
+                padding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+              ),
             ),
           ),
 
@@ -385,7 +424,7 @@ class _ChatInputAreaState extends State<ChatInputArea> {
             children: [
               Container(
                 decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
+                  color: colorScheme.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(24),
                 ),
                 child: Row(
@@ -433,14 +472,52 @@ class _ChatInputAreaState extends State<ChatInputArea> {
                         ),
                       ),
                     ),
-                    // Attachment button as trailing icon
+                    // Attachment button as trailing menu
                     if (!widget.isLoading)
                       Padding(
-                        padding: const EdgeInsets.only(bottom: 4, right: 4),
-                        child: IconButton(
-                          onPressed: _handleFilePick,
-                          icon: const Icon(Icons.attach_file, size: 20),
-                          tooltip: 'Attach file',
+                        padding: const EdgeInsets.only(bottom: 5, right: 8),
+                        child: PopupMenuButton<String>(
+                          tooltip: 'Attach...',
+                          icon: Icon(
+                            Icons.attach_file,
+                            size: 20,
+                            color: colorScheme.primary,
+                          ),
+                          style: IconButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          onSelected: (value) {
+                            if (value == 'file') {
+                              _handleFilePick();
+                            } else if (value == 'folder') {
+                              _handleDirectoryPick();
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'file',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.insert_drive_file_outlined,
+                                    size: 20,
+                                  ),
+                                  SizedBox(width: 12),
+                                  Text('Files'),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'folder',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.folder_outlined, size: 20),
+                                  SizedBox(width: 12),
+                                  Text('Folder'),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                   ],
@@ -473,7 +550,7 @@ class _ChatInputAreaState extends State<ChatInputArea> {
         // Send button with animation
         Padding(
           padding: const EdgeInsets.only(
-            bottom: 4,
+            bottom: 2,
           ), // Align with text field better
           child: _SendButton(
             isLoading: widget.isLoading,

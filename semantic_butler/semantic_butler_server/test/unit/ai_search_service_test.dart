@@ -32,6 +32,33 @@ void main() {
         expect(intent.reasoning, isNull);
         expect(intent.isFolderSearch, isFalse);
       });
+
+      test('creates with optional entity fields', () {
+        final intent = SearchIntent(
+          intent: 'mixed',
+          strategy: 'hybrid',
+          searchTerms: [],
+          filePatterns: [],
+          isFolderSearch: false,
+          dateRange: DateExpression(
+            type: DateType.relative,
+            originalText: 'last week',
+          ),
+          sizeRange: SizeExpression(
+            minBytes: 1024,
+            originalText: '>1KB',
+          ),
+          countExpression: CountExpression(
+            minCount: 5,
+            unit: 'pages',
+          ),
+        );
+
+        expect(intent.dateRange, isNotNull);
+        expect(intent.dateRange!.type, equals(DateType.relative));
+        expect(intent.sizeRange!.minBytes, equals(1024));
+        expect(intent.countExpression!.unit, equals('pages'));
+      });
     });
 
     group('SearchStrategy', () {

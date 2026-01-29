@@ -100,11 +100,11 @@ class _CategoryChip extends StatelessWidget {
       case 'CorruptFile':
         return (Icons.broken_image_outlined, cs.error);
       case 'PermissionDenied':
-        return (Icons.lock_outline, Colors.orange);
+        return (Icons.lock_outline, cs.secondary);
       case 'NetworkError':
-        return (Icons.wifi_off_outlined, Colors.orange);
+        return (Icons.wifi_off_outlined, cs.secondary);
       case 'UnsupportedFormat':
-        return (Icons.help_outline, Colors.amber.shade700);
+        return (Icons.help_outline, cs.secondary.withValues(alpha: 0.8));
       case 'InsufficientDiskSpace':
         return (Icons.sd_storage_outlined, cs.error);
       default:

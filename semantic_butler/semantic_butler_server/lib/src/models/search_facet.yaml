@@ -1,0 +1,4 @@
+class: SearchFacet
+fields:
+  facetType: String # 'fileType', 'tag', 'dateRange'
+  entries: List<FacetEntry>

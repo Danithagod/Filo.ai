@@ -85,19 +85,6 @@ class StatusBlock {
     required this.content,
   });
 
-  Color get color {
-    switch (type) {
-      case 'success':
-        return Colors.green;
-      case 'error':
-        return Colors.red;
-      case 'warning':
-        return Colors.orange;
-      default:
-        return Colors.blue;
-    }
-  }
-
   IconData get icon {
     switch (type) {
       case 'success':

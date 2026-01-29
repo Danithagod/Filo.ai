@@ -7,6 +7,7 @@ import 'package:path/path.dart' as path;
 enum AttachmentType {
   image,
   document,
+  folder,
   other,
 }
 
@@ -29,7 +30,24 @@ class ChatAttachment {
   /// Create attachment from file
   factory ChatAttachment.fromFile(File file) {
     final fileName = path.basename(file.path);
-    final fileSize = file.lengthSync();
+    final isDirectory = FileSystemEntity.isDirectorySync(file.path);
+
+    if (isDirectory) {
+      return ChatAttachment(
+        filePath: file.path,
+        fileName: fileName,
+        fileSize: null, // Calculating folder size is expensive/complex here
+        type: AttachmentType.folder,
+      );
+    }
+
+    int? fileSize;
+    try {
+      fileSize = file.lengthSync();
+    } catch (_) {
+      // Ignore size error
+    }
+
     final ext = path.extension(fileName).toLowerCase();
 
     AttachmentType type = AttachmentType.other;
@@ -56,6 +74,7 @@ class ChatAttachment {
       '.bmp',
       '.webp',
       '.svg',
+      '.ico',
     ].contains(ext);
   }
 
@@ -70,6 +89,16 @@ class ChatAttachment {
       '.pptx',
       '.txt',
       '.md',
+      '.json',
+      '.yaml',
+      '.xml',
+      '.csv',
+      '.dart',
+      '.py',
+      '.js',
+      '.ts',
+      '.html',
+      '.css',
     ].contains(ext);
   }
 
@@ -90,6 +119,8 @@ class ChatAttachment {
         return Icons.image;
       case AttachmentType.document:
         return Icons.description;
+      case AttachmentType.folder:
+        return Icons.folder;
       case AttachmentType.other:
         return Icons.insert_drive_file;
     }
@@ -272,13 +303,15 @@ class _ImageAttachmentChipState extends State<_ImageAttachmentChip> {
                 child: Container(
                   padding: const EdgeInsets.all(2),
                   decoration: BoxDecoration(
-                    color: Colors.black54,
+                    color: colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.8,
+                    ),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.close,
                     size: 14,
-                    color: Colors.white,
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -302,6 +335,7 @@ class ImagePreviewDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final file = File(attachment.filePath);
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -323,7 +357,10 @@ class ImagePreviewDialog extends StatelessWidget {
               icon: const Icon(Icons.close),
               onPressed: () => Navigator.pop(context),
               style: IconButton.styleFrom(
-                backgroundColor: Colors.black54,
+                backgroundColor: colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.8,
+                ),
+                foregroundColor: colorScheme.onSurface,
               ),
             ),
           ),
@@ -334,12 +371,14 @@ class ImagePreviewDialog extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.black54,
+                color: colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.8,
+                ),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
                 attachment.fileName,
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(color: colorScheme.onSurface),
               ),
             ),
           ),

@@ -19,8 +19,9 @@ abstract class DocumentEmbedding implements _i1.SerializableModel {
     required this.fileIndexId,
     required this.chunkIndex,
     this.chunkText,
-    required this.embeddingJson,
-    required this.dimensions,
+    required this.embedding,
+    this.embeddingJson,
+    this.dimensions,
   });
 
   factory DocumentEmbedding({
@@ -28,8 +29,9 @@ abstract class DocumentEmbedding implements _i1.SerializableModel {
     required int fileIndexId,
     required int chunkIndex,
     String? chunkText,
-    required String embeddingJson,
-    required int dimensions,
+    required _i1.Vector embedding,
+    String? embeddingJson,
+    int? dimensions,
   }) = _DocumentEmbeddingImpl;
 
   factory DocumentEmbedding.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -38,8 +40,11 @@ abstract class DocumentEmbedding implements _i1.SerializableModel {
       fileIndexId: jsonSerialization['fileIndexId'] as int,
       chunkIndex: jsonSerialization['chunkIndex'] as int,
       chunkText: jsonSerialization['chunkText'] as String?,
-      embeddingJson: jsonSerialization['embeddingJson'] as String,
-      dimensions: jsonSerialization['dimensions'] as int,
+      embedding: _i1.VectorJsonExtension.fromJson(
+        jsonSerialization['embedding'],
+      ),
+      embeddingJson: jsonSerialization['embeddingJson'] as String?,
+      dimensions: jsonSerialization['dimensions'] as int?,
     );
   }
 
@@ -57,11 +62,14 @@ abstract class DocumentEmbedding implements _i1.SerializableModel {
   /// The text chunk that was embedded
   String? chunkText;
 
-  /// JSON encoded embedding vector (will use pgvector in Supabase)
-  String embeddingJson;
+  /// Vector embedding - 768 dimensions for sentence transformers
+  _i1.Vector embedding;
 
-  /// Embedding dimensions (e.g., 768, 1536)
-  int dimensions;
+  /// JSON encoded embedding vector (DEPRECATED: Use native embedding field)
+  String? embeddingJson;
+
+  /// Embedding dimensions (DEPRECATED)
+  int? dimensions;
 
   /// Returns a shallow copy of this [DocumentEmbedding]
   /// with some or all fields replaced by the given arguments.
@@ -71,6 +79,7 @@ abstract class DocumentEmbedding implements _i1.SerializableModel {
     int? fileIndexId,
     int? chunkIndex,
     String? chunkText,
+    _i1.Vector? embedding,
     String? embeddingJson,
     int? dimensions,
   });
@@ -82,8 +91,9 @@ abstract class DocumentEmbedding implements _i1.SerializableModel {
       'fileIndexId': fileIndexId,
       'chunkIndex': chunkIndex,
       if (chunkText != null) 'chunkText': chunkText,
-      'embeddingJson': embeddingJson,
-      'dimensions': dimensions,
+      'embedding': embedding.toJson(),
+      if (embeddingJson != null) 'embeddingJson': embeddingJson,
+      if (dimensions != null) 'dimensions': dimensions,
     };
   }
 
@@ -101,13 +111,15 @@ class _DocumentEmbeddingImpl extends DocumentEmbedding {
     required int fileIndexId,
     required int chunkIndex,
     String? chunkText,
-    required String embeddingJson,
-    required int dimensions,
+    required _i1.Vector embedding,
+    String? embeddingJson,
+    int? dimensions,
   }) : super._(
          id: id,
          fileIndexId: fileIndexId,
          chunkIndex: chunkIndex,
          chunkText: chunkText,
+         embedding: embedding,
          embeddingJson: embeddingJson,
          dimensions: dimensions,
        );
@@ -121,16 +133,20 @@ class _DocumentEmbeddingImpl extends DocumentEmbedding {
     int? fileIndexId,
     int? chunkIndex,
     Object? chunkText = _Undefined,
-    String? embeddingJson,
-    int? dimensions,
+    _i1.Vector? embedding,
+    Object? embeddingJson = _Undefined,
+    Object? dimensions = _Undefined,
   }) {
     return DocumentEmbedding(
       id: id is int? ? id : this.id,
       fileIndexId: fileIndexId ?? this.fileIndexId,
       chunkIndex: chunkIndex ?? this.chunkIndex,
       chunkText: chunkText is String? ? chunkText : this.chunkText,
-      embeddingJson: embeddingJson ?? this.embeddingJson,
-      dimensions: dimensions ?? this.dimensions,
+      embedding: embedding ?? this.embedding.clone(),
+      embeddingJson: embeddingJson is String?
+          ? embeddingJson
+          : this.embeddingJson,
+      dimensions: dimensions is int? ? dimensions : this.dimensions,
     );
   }
 }

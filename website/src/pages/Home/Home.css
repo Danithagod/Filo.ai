@@ -49,14 +49,13 @@
 
 /* Hero Section Refined */
 .hero {
-  min-height: 100vh;
-  padding: clamp(80px, 10vh, 120px) 0 clamp(60px, 8vh, 100px);
+  position: relative;
+  padding: clamp(140px, 20vh, 200px) 0 100px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   text-align: center;
-  position: relative;
+  overflow: hidden;
 }
 
 .hero-badge {
@@ -76,12 +75,45 @@
 
 .hero-title {
   font-size: clamp(3rem, 10vw, 6.5rem);
-  line-height: 0.9;
+  line-height: 1.1;
   margin-bottom: 2rem;
   font-weight: 800;
   letter-spacing: -0.04em;
   color: var(--on-surface);
   opacity: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.title-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  white-space: nowrap;
+  position: relative;
+  width: 100%;
+}
+
+.static-text {
+  margin-right: 0.25em;
+}
+
+.rotating-mask {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  height: 1.2em;
+  overflow: hidden;
+  text-align: left;
+  transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.rotating-word {
+  position: relative;
+  white-space: nowrap;
+  line-height: 1;
+  width: auto;
 }
 
 .hero-subtitle {
@@ -237,7 +269,7 @@
 
 /* Trust Ticker */
 .trust-section {
-  padding: 5rem 0;
+  padding: 8rem 0;
   border-bottom: 1px solid var(--glass-border);
   background: rgba(0, 0, 0, 0.3);
 }
@@ -271,7 +303,7 @@
 
 /* Features Horizontal Scroll */
 .features-section {
-  padding: 10rem 0;
+  padding: 14rem 0;
   overflow: hidden;
   position: relative;
 }
@@ -368,7 +400,7 @@
 
 /* Agent Flow Section */
 .agent-flow-section {
-  padding: 10rem 0;
+  padding: 14rem 0;
   background: radial-gradient(circle at 80% 50%, rgba(103, 80, 164, 0.05) 0%, transparent 60%);
 }
 
@@ -462,9 +494,149 @@
   }
 }
 
+/* Privacy Focus Section */
+.privacy-focus-section {
+  padding: 14rem 0;
+  background: var(--surface);
+  position: relative;
+  overflow: hidden;
+}
+
+.privacy-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 6rem;
+  align-items: center;
+}
+
+.privacy-content h2 {
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  margin: 2rem 0;
+  line-height: 1.1;
+}
+
+.privacy-content>p {
+  font-size: 1.2rem;
+  opacity: 0.7;
+  line-height: 1.6;
+  margin-bottom: 3rem;
+}
+
+.privacy-features {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.p-feat {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
+.p-feat svg {
+  color: var(--primary-light);
+  flex-shrink: 0;
+  margin-top: 0.25rem;
+}
+
+.p-feat h4 {
+  font-size: 1.2rem;
+  margin-bottom: 0.5rem;
+}
+
+.p-feat p {
+  font-size: 0.95rem;
+  opacity: 0.6;
+  line-height: 1.5;
+}
+
+.privacy-visual {
+  height: 500px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  border-radius: 40px;
+  background: radial-gradient(circle at center, rgba(103, 80, 164, 0.15) 0%, transparent 70%);
+}
+
+.shield-icon-large {
+  position: relative;
+  color: var(--primary-light);
+  filter: drop-shadow(0 0 30px rgba(103, 80, 164, 0.4));
+}
+
+.shield-rings {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
+}
+
+.ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--primary-light);
+  border-radius: 50%;
+  opacity: 0.1;
+  animation: ring-pulse 4s infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ring:nth-child(1) {
+  width: 150px;
+  height: 150px;
+  animation-delay: 0s;
+}
+
+.ring:nth-child(2) {
+  width: 250px;
+  height: 250px;
+  animation-delay: 1s;
+}
+
+.ring:nth-child(3) {
+  width: 350px;
+  height: 350px;
+  animation-delay: 2s;
+}
+
+@keyframes ring-pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(0.8);
+    opacity: 0;
+  }
+
+  50% {
+    opacity: 0.2;
+  }
+
+  100% {
+    transform: translate(-50%, -50%) scale(1.2);
+    opacity: 0;
+  }
+}
+
+@media (max-width: 992px) {
+  .privacy-grid {
+    grid-template-columns: 1fr;
+    text-align: center;
+    gap: 4rem;
+  }
+
+  .p-feat {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+
 /* Integration Section */
 .integration-section {
-  padding: 10rem 0 12rem;
+  padding: 14rem 0 16rem;
 }
 
 .integration-content {

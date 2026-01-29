@@ -14,18 +14,17 @@ import '../services/auth_service.dart';
 import '../services/rate_limit_service.dart';
 import '../services/tag_taxonomy_service.dart';
 import '../services/search_preset_service.dart';
-import '../services/ai_cost_service.dart';
 import '../services/index_health_service.dart';
 import '../services/summarization_service.dart';
 import '../services/ai_search_service.dart';
 import '../services/reset_service.dart';
 import '../utils/validation.dart';
-import '../services/duplicate_detector.dart';
 import '../services/suggestion_service.dart';
-import '../services/organization_service.dart';
 import '../services/indexing_service.dart';
-import '../services/naming_analyzer.dart';
-import '../services/similarity_analyzer.dart';
+import '../utils/query_parser.dart';
+import '../services/query_correction_service.dart';
+import '../config/search_config.dart';
+import '../utils/client_identifier.dart';
 
 /// Main endpoint for Semantic Desktop Butler
 /// Handles semantic search, document indexing, and status queries
@@ -38,7 +37,6 @@ class ButlerEndpoint extends Endpoint {
   CachedAIService? _cachedAiService;
   final FileExtractionService _extractionService = FileExtractionService();
   final IndexingService _indexingService = IndexingService();
-  final OrganizationService _organizationService = OrganizationService();
 
   /// Track all OpenRouterClient instances for cleanup
   static final List<OpenRouterClient> _allClients = [];
@@ -109,10 +107,12 @@ class ButlerEndpoint extends Endpoint {
   }
 
   String _getClientIdentifier(Session session) {
-    // Note: Ideally we should use IP address here, but accessing it reliably
-    // via Session/MethodCallSession in current Serverpod version is problematic without
-    // direct httpRequest access. Falling back to session ID.
-    return session.sessionId.toString();
+    return ClientIdentifier.fromSession(session);
+  }
+
+  /// Generate a pagination cursor
+  String _createCursor(double score, int id) {
+    return base64.encode(utf8.encode('$score:$id'));
   }
 
   // ==========================================================================
@@ -126,7 +126,7 @@ class ButlerEndpoint extends Endpoint {
   /// [threshold] - Minimum relevance score (0.0 to 1.0, default: 0.3)
   /// [offset] - Number of results to skip for pagination (default: 0)
   /// Maximum allowed limit for search results to prevent DoS
-  static const int _maxSearchLimit = 100;
+  static const int _maxSearchLimit = SearchConfig.maxSearchLimit;
 
   Future<List<SearchResult>> semanticSearch(
     Session session,
@@ -158,7 +158,7 @@ class ButlerEndpoint extends Endpoint {
     }
 
     // Ensure non-negative offset with reasonable max
-    offset = offset.clamp(0, 10000);
+    offset = offset.clamp(0, SearchConfig.maxPaginationOffset);
 
     if (query.isNotEmpty) {
       InputValidation.validateSearchQuery(query);
@@ -169,7 +169,17 @@ class ButlerEndpoint extends Endpoint {
       query,
       threshold,
       limit,
-      offset,
+      filters?.cursor,
+      dateFrom: filters?.dateFrom,
+      dateTo: filters?.dateTo,
+      fileTypes: filters?.fileTypes,
+      tags: filters?.tags,
+      minSize: filters?.minSize,
+      maxSize: filters?.maxSize,
+      locationPaths: filters?.locationPaths,
+      contentTerms: filters?.contentTerms,
+      minCount: filters?.minCount,
+      maxCount: filters?.maxCount,
     );
 
     try {
@@ -244,194 +254,18 @@ class ButlerEndpoint extends Endpoint {
         return results;
       }
 
-      // 1. Generate embedding for the query using OpenRouter with caching
-      final queryEmbedding = await cachedAiService.generateEmbedding(query);
-
-      // 2. Perform vector search using pgvector
-      final queryEmbeddingJson = jsonEncode(queryEmbedding);
       final results = <_ScoredResult>[];
+      // 1. Perform vector search using improved _performSemanticSearch
+      final semanticResults = await _performSemanticSearch(
+        session,
+        query,
+        threshold: threshold,
+        limit: limit,
+        filters: filters,
+        offset: offset,
+      );
 
-      try {
-        // Use vector cosine similarity operator (<=>)
-        // 1 - (a <=> b) gives cosine similarity
-        // SECURITY: Using parameterized queries to prevent SQL injection
-        // PERFORMANCE: Using JOIN to avoid N+1 query problem
-        // Build dynamic WHERE clause for filters
-        final whereConditions = <String>[
-          '1 - (de.embedding_vector <=> \$1::vector) > \$2',
-        ];
-        final parameters = <dynamic>[queryEmbeddingJson, threshold];
-        // Start parameter index at 3 (since 1 and 2 are used above)
-        int paramIndex = 3;
-
-        if (filters != null) {
-          // Date Range
-          if (filters.dateFrom != null) {
-            whereConditions.add('fi."indexedAt" >= \$$paramIndex');
-            parameters.add(filters.dateFrom);
-            paramIndex++;
-          }
-          if (filters.dateTo != null) {
-            whereConditions.add('fi."indexedAt" <= \$$paramIndex');
-            parameters.add(filters.dateTo);
-            paramIndex++;
-          }
-
-          // File Size
-          if (filters.minSize != null) {
-            whereConditions.add('fi."fileSizeBytes" >= \$$paramIndex');
-            parameters.add(filters.minSize);
-            paramIndex++;
-          }
-          if (filters.maxSize != null) {
-            whereConditions.add('fi."fileSizeBytes" <= \$$paramIndex');
-            parameters.add(filters.maxSize);
-            paramIndex++;
-          }
-
-          // File Types (using OR condition for multiple types)
-          if (filters.fileTypes != null && filters.fileTypes!.isNotEmpty) {
-            final typeConditions = <String>[];
-            for (final type in filters.fileTypes!) {
-              // Simple mapping from UI types to mime/extensions
-              // In reality, this should be more robust
-              if (type == 'pdf') {
-                typeConditions.add('fi."mimeType" ILIKE \$$paramIndex');
-                parameters.add('%pdf%');
-                paramIndex++;
-              } else if (type == 'image') {
-                typeConditions.add('fi."mimeType" ILIKE \$$paramIndex');
-                parameters.add('image/%');
-                paramIndex++;
-              } else if (type == 'doc') {
-                typeConditions.add(
-                  '(fi."mimeType" ILIKE \$$paramIndex OR fi."fileName" ILIKE \$$paramIndex)',
-                );
-                parameters.add('%word%'); // rudimentary check
-                paramIndex++; // Reuse or increment? Need separate params
-                // Actually let's just use simpler Extension check for now if MIME is unreliable
-                // But let's stick to MIME pattern matching for simplicity of this block
-              } else {
-                // Generic fallback
-                typeConditions.add('fi."fileName" ILIKE \$$paramIndex');
-                parameters.add('%.$type%');
-                paramIndex++;
-              }
-            }
-            if (typeConditions.isNotEmpty) {
-              whereConditions.add('(${typeConditions.join(" OR ")})');
-            }
-          }
-
-          // Tags (JSON containment)
-          if (filters.tags != null && filters.tags!.isNotEmpty) {
-            for (final tag in filters.tags!) {
-              // Postgres JSONB containment: tagsJson @> '["tag"]'
-              // But tagsJson is String in Serverpod model, likely text in PG
-              // If it's text, we use ILIKE. If JSONB, we use operator.
-              // Assuming text for compatibility:
-              whereConditions.add('fi."tagsJson" ILIKE \$$paramIndex');
-              parameters.add('%"$tag"%');
-              paramIndex++;
-            }
-          }
-        }
-
-        // Add LIMIT and OFFSET parameters
-        final limitParamIndex = paramIndex;
-        final offsetParamIndex = paramIndex + 1;
-        parameters.add(limit);
-        parameters.add(offset);
-
-        final searchQuery =
-            '''
-          SELECT
-            de."fileIndexId",
-            1 - (de.embedding <=> \$1::vector) as similarity,
-            fi.id, fi.path, fi."fileName", fi."contentPreview",
-            fi."tagsJson", fi."indexedAt", fi."fileSizeBytes", fi."mimeType"
-          FROM document_embedding de
-          JOIN file_index fi ON de."fileIndexId" = fi.id
-          WHERE ${whereConditions.join(" AND ")}
-          ORDER BY de.embedding_vector <=> \$1::vector
-          LIMIT \$$limitParamIndex OFFSET \$$offsetParamIndex
-        ''';
-
-        final rows = await session.db.unsafeQuery(
-          searchQuery,
-          parameters: QueryParameters.positional(parameters),
-        );
-
-        // Map rows directly to results without additional queries (N+1 fix)
-        for (final row in rows) {
-          final similarity = row[1] as double;
-          final doc = FileIndex(
-            id: row[2] as int,
-            path: row[3] as String,
-            fileName: row[4] as String,
-            contentPreview: row[5] as String?,
-            tagsJson: row[6] as String?,
-            indexedAt: row[7] as DateTime?,
-            fileSizeBytes: (row[8] as int?) ?? 0,
-            mimeType: row[9] as String?,
-            // Required fields with defaults
-            contentHash: '',
-            status: 'indexed',
-            embeddingModel: '',
-            isTextContent: true,
-          );
-          results.add(_ScoredResult(doc: doc, score: similarity));
-        }
-      } catch (e) {
-        // Fallback to Dart-based search if pgvector fails (e.g. extension not installed)
-        session.log(
-          'pgvector search failed, falling back to Dart implementation: $e',
-          level: LogLevel.warning,
-        );
-
-        // Batch fetch all embeddings for all documents to avoid N+1 queries
-        final allDocs = await FileIndex.db.find(
-          session,
-          where: (t) => t.status.equals('indexed'),
-        );
-
-        if (allDocs.isNotEmpty) {
-          final docIds = allDocs.map((d) => d.id!).toList();
-          final allEmbeddings = await DocumentEmbedding.db.find(
-            session,
-            where: (t) => t.fileIndexId.inSet(docIds.toSet()),
-          );
-
-          // Group embeddings by fileIndexId
-          final embeddingMap = <int, List<DocumentEmbedding>>{};
-          for (final emb in allEmbeddings) {
-            embeddingMap.putIfAbsent(emb.fileIndexId, () => []).add(emb);
-          }
-
-          for (final doc in allDocs) {
-            final embeddings = embeddingMap[doc.id] ?? [];
-            if (embeddings.isEmpty) continue;
-
-            double maxSimilarity = 0.0;
-            for (final emb in embeddings) {
-              final docEmbedding = _parseEmbedding(emb.embeddingJson);
-              final similarity = _cosineSimilarity(
-                queryEmbedding,
-                docEmbedding,
-              );
-              if (similarity > maxSimilarity) {
-                maxSimilarity = similarity;
-              }
-            }
-
-            if (maxSimilarity >= threshold) {
-              results.add(_ScoredResult(doc: doc, score: maxSimilarity));
-            }
-          }
-        }
-
-        results.sort((a, b) => b.score.compareTo(a.score));
-      }
+      results.addAll(semanticResults);
 
       final topResults = results.take(limit).toList();
 
@@ -457,7 +291,7 @@ class ButlerEndpoint extends Endpoint {
             ? _parseTagList(r.doc.tagsJson!)
             : <String>[];
 
-        return SearchResult(
+        final searchResult = SearchResult(
           id: r.doc.id!,
           path: r.doc.path,
           fileName: r.doc.fileName,
@@ -467,8 +301,52 @@ class ButlerEndpoint extends Endpoint {
           indexedAt: r.doc.indexedAt,
           fileSizeBytes: r.doc.fileSizeBytes,
           mimeType: r.doc.mimeType,
+          // Generate cursor for this result
+          nextCursor: _createCursor(r.score, r.doc.id!),
+          matchedChunkText: r.matchedChunkText,
         );
+        return searchResult;
       }).toList();
+
+      // 7. Check for query suggestions ("Did you mean?")
+      String? suggestedQuery;
+      try {
+        suggestedQuery = await QueryCorrectionService(client: openRouterClient)
+            .getCorrectedQuery(
+              session,
+              query,
+            );
+      } catch (e) {
+        session.log('Query correction failed: $e', level: LogLevel.debug);
+      }
+
+      // Attach suggested query to all results (if any)
+      // Note: For empty results, the suggestion will be returned via the first
+      // result in the list which acts as a metadata carrier. The UI filters
+      // results with id=-1 and empty path, treating them as metadata-only.
+      if (suggestedQuery != null) {
+        if (searchResults.isNotEmpty) {
+          // Attach to all results so any result can provide the suggestion
+          for (var result in searchResults) {
+            result.suggestedQuery = suggestedQuery;
+          }
+        } else {
+          // For empty results, create a metadata-only result to carry the suggestion
+          // This is clearly marked with id=-1 and empty fields
+          searchResults.add(
+            SearchResult(
+              id: -1,
+              path: '',
+              fileName: '',
+              relevanceScore: 0.0,
+              tags: [],
+              fileSizeBytes: 0,
+              suggestedQuery: suggestedQuery,
+              contentPreview: null,
+            ),
+          );
+        }
+      }
 
       // Cache the results for future queries (5 minute TTL)
       CacheService.instance.set(
@@ -490,6 +368,29 @@ class ButlerEndpoint extends Endpoint {
     } catch (e) {
       session.log('Semantic search error: $e', level: LogLevel.error);
       rethrow;
+    }
+  }
+
+  /// Stream semantic search results for better perceived performance (Priority 2)
+  Stream<SearchResult> semanticSearchStream(
+    Session session,
+    String query, {
+    int limit = 10,
+    double threshold = 0.3,
+    int offset = 0,
+    SearchFilters? filters,
+  }) async* {
+    final results = await semanticSearch(
+      session,
+      query,
+      limit: limit,
+      threshold: threshold,
+      offset: offset,
+      filters: filters,
+    );
+
+    for (final result in results) {
+      yield result;
     }
   }
 
@@ -534,6 +435,101 @@ class ButlerEndpoint extends Endpoint {
     int presetId,
   ) async {
     return SearchPresetService.deletePreset(session, presetId);
+  }
+
+  /// Get faceted search counts for filtering
+  Future<List<SearchFacet>> getSearchFacets(
+    Session session,
+    String query, {
+    SearchFilters? filters,
+  }) async {
+    AuthService.requireAuth(session);
+
+    final facets = <SearchFacet>[];
+    if (query.trim().isEmpty) return facets;
+
+    // Use QueryParser for consistent filtering logic
+    final parsedQuery = QueryParser.parse(query);
+    final parameters = <dynamic>[];
+    final keywordCondition = parsedQuery.buildSqlCondition(
+      columnName: 'fi."fileName"',
+      parameters: parameters,
+      nextParamIndex: () => parameters.length + 1,
+    );
+
+    try {
+      // Combined facet query using UNION ALL for better performance
+      // This reduces database round trips from 2 to 1
+      final combinedFacetQuery =
+          '''
+        WITH filtered_files AS (
+          SELECT fi."mimeType", fi."tagsJson"
+          FROM file_index fi
+          WHERE $keywordCondition
+          AND status = 'indexed'
+        ),
+        type_facets AS (
+          SELECT 'fileType' as facet_type, "mimeType" as value, count(*) as cnt
+          FROM filtered_files
+          WHERE "mimeType" IS NOT NULL
+          GROUP BY "mimeType"
+          ORDER BY cnt DESC
+          LIMIT 10
+        ),
+        tag_facets AS (
+          SELECT 'tag' as facet_type, tag as value, count(*) as cnt
+          FROM (
+            SELECT json_array_elements_text(
+              CASE 
+                WHEN "tagsJson" LIKE '[%' THEN "tagsJson"::json 
+                ELSE '[]'::json 
+              END
+            ) as tag
+            FROM filtered_files
+            WHERE "tagsJson" IS NOT NULL
+          ) t
+          GROUP BY tag
+          ORDER BY cnt DESC
+          LIMIT 10
+        )
+        SELECT facet_type, value, cnt FROM type_facets
+        UNION ALL
+        SELECT facet_type, value, cnt FROM tag_facets
+      ''';
+
+      final rows = await session.db.unsafeQuery(
+        combinedFacetQuery,
+        parameters: QueryParameters.positional(parameters),
+      );
+
+      // Group results by facet type
+      final typeEntries = <FacetEntry>[];
+      final tagEntries = <FacetEntry>[];
+
+      for (final row in rows) {
+        final facetType = row[0] as String;
+        final value = (row[1] as String?) ?? 'unknown';
+        final count = row[2] as int;
+
+        final entry = FacetEntry(label: value, value: value, count: count);
+        if (facetType == 'fileType') {
+          typeEntries.add(entry);
+        } else if (facetType == 'tag') {
+          tagEntries.add(entry);
+        }
+      }
+
+      if (typeEntries.isNotEmpty) {
+        facets.add(SearchFacet(facetType: 'fileType', entries: typeEntries));
+      }
+      if (tagEntries.isNotEmpty) {
+        facets.add(SearchFacet(facetType: 'tag', entries: tagEntries));
+      }
+    } catch (e) {
+      session.log('Facet calculation failed: $e', level: LogLevel.warning);
+    }
+
+    return facets;
   }
 
   // ==========================================================================
@@ -636,12 +632,17 @@ class ButlerEndpoint extends Endpoint {
     return await _indexingService.getIndexingStatus(session);
   }
 
+  /// Get error statistics
+  Future<ErrorStats> getErrorStats(Session session) async {
+    return await _indexingService.getErrorStats(session);
+  }
+
   /// Stream indexing progress
   Stream<IndexingProgress> streamIndexingProgress(
     Session session,
     int jobId,
   ) async* {
-    yield* _indexingService.streamProgress(session);
+    yield* _indexingService.streamProgress(session, jobId);
   }
 
   /// Get details of a specific indexing job
@@ -904,12 +905,6 @@ class ButlerEndpoint extends Endpoint {
   // HELPER METHODS
   // ==========================================================================
 
-  /// Parse embedding from JSON string
-  List<double> _parseEmbedding(String json) {
-    final List<dynamic> parsed = jsonDecode(json);
-    return parsed.map((e) => (e as num).toDouble()).toList();
-  }
-
   /// Parse tag list from JSON
   List<String> _parseTagList(String tagsJson) {
     try {
@@ -918,41 +913,6 @@ class ButlerEndpoint extends Endpoint {
     } catch (e) {
       return [];
     }
-  }
-
-  /// Calculate cosine similarity between two vectors
-  double _cosineSimilarity(List<double> a, List<double> b) {
-    if (a.length != b.length) {
-      throw ArgumentError('Vectors must have the same length');
-    }
-
-    double dotProduct = 0.0;
-    double normA = 0.0;
-    double normB = 0.0;
-
-    for (int i = 0; i < a.length; i++) {
-      dotProduct += a[i] * b[i];
-      normA += a[i] * a[i];
-      normB += b[i] * b[i];
-    }
-
-    if (normA == 0.0 || normB == 0.0) {
-      return 0.0;
-    }
-
-    return dotProduct / (_sqrt(normA) * _sqrt(normB));
-  }
-
-  /// Square root helper
-  double _sqrt(double x) {
-    if (x < 0) throw ArgumentError('Cannot compute sqrt of negative number');
-    if (x == 0) return 0;
-
-    double guess = x / 2;
-    for (int i = 0; i < 20; i++) {
-      guess = (guess + x / guess) / 2;
-    }
-    return guess;
   }
 
   /// Estimate database size based on content
@@ -1041,115 +1001,6 @@ class ButlerEndpoint extends Endpoint {
     return stats.map((key, value) => MapEntry(key, value.toJson()));
   }
 
-  /// Get AI cost summary
-  Future<Map<String, dynamic>> getAICostSummary(
-    Session session, {
-    DateTime? startDate,
-    DateTime? endDate,
-  }) async {
-    final summary = await AICostService.getCostSummary(
-      session,
-      startDate: startDate,
-      endDate: endDate,
-    );
-
-    return summary.toJson();
-  }
-
-  /// Check budget status
-  Future<Map<String, dynamic>> checkBudget(
-    Session session, {
-    required double budgetLimit,
-    DateTime? periodStart,
-    DateTime? periodEnd,
-  }) async {
-    final status = await AICostService.checkBudget(
-      session,
-      budgetLimit,
-      periodStart: periodStart,
-      periodEnd: periodEnd,
-    );
-
-    return status.toJson();
-  }
-
-  /// Get projected costs
-  Future<Map<String, dynamic>> getProjectedCosts(
-    Session session, {
-    int? lookbackDays,
-    int? forecastDays,
-  }) async {
-    final projection = await AICostService.getProjectedCosts(
-      session,
-      lookbackDays: lookbackDays ?? 30,
-      forecastDays: forecastDays ?? 30,
-    );
-
-    return projection.toJson();
-  }
-
-  /// Get daily costs
-  Future<List<Map<String, dynamic>>> getDailyCosts(
-    Session session, {
-    required DateTime startDate,
-    required DateTime endDate,
-  }) async {
-    final dailyCosts = await AICostService.getDailyCosts(
-      session,
-      startDate: startDate,
-      endDate: endDate,
-    );
-
-    return dailyCosts.map((d) => d.toJson()).toList();
-  }
-
-  /// Get cost breakdown by feature
-  Future<Map<String, double>> getCostByFeature(
-    Session session, {
-    DateTime? startDate,
-    DateTime? endDate,
-  }) async {
-    return await AICostService.getCostByFeature(
-      session,
-      startDate: startDate,
-      endDate: endDate,
-    );
-  }
-
-  /// Get cost breakdown by model
-  Future<Map<String, double>> getCostByModel(
-    Session session, {
-    DateTime? startDate,
-    DateTime? endDate,
-  }) async {
-    return await AICostService.getCostByModel(
-      session,
-      startDate: startDate,
-      endDate: endDate,
-    );
-  }
-
-  /// Record AI API call cost
-  Future<void> recordAICost(
-    Session session, {
-    required String feature,
-    required String model,
-    required int inputTokens,
-    required int outputTokens,
-    required double cost,
-    Map<String, dynamic>? metadata,
-  }) async {
-    await AICostService.recordCost(
-      session,
-      feature: feature,
-      model: model,
-      inputTokens: inputTokens,
-      outputTokens: outputTokens,
-      cost: cost,
-      metadata: metadata,
-    );
-  }
-
   /// Hybrid search combining semantic and keyword search
   Future<List<SearchResult>> hybridSearch(
     Session session,
@@ -1170,8 +1021,11 @@ class ButlerEndpoint extends Endpoint {
 
     // Validate and sanitize parameters
     final actualThreshold = (threshold ?? 0.3).clamp(0.0, 1.0);
-    final actualLimit = (limit ?? 20).clamp(1, 100); // Enforce max limit
-    final actualOffset = (offset ?? 0).clamp(0, 10000);
+    final actualLimit = (limit ?? 20).clamp(1, SearchConfig.maxSearchLimit);
+    final actualOffset = (offset ?? 0).clamp(
+      0,
+      SearchConfig.maxPaginationOffset,
+    );
     final actualSemanticWeight = (semanticWeight ?? 0.7).clamp(0.0, 1.0);
     final actualKeywordWeight = (keywordWeight ?? 0.3).clamp(0.0, 1.0);
 
@@ -1188,7 +1042,7 @@ class ButlerEndpoint extends Endpoint {
       query,
       actualThreshold,
       actualLimit,
-      actualOffset,
+      filters?.cursor,
       actualSemanticWeight,
       actualKeywordWeight,
     );
@@ -1292,6 +1146,7 @@ class ButlerEndpoint extends Endpoint {
       combined[result.doc.id!] = _ScoredResult(
         doc: result.doc,
         score: normalizedScore * actualSemanticWeight,
+        matchedChunkText: result.matchedChunkText,
       );
     }
 
@@ -1303,16 +1158,18 @@ class ButlerEndpoint extends Endpoint {
       final docId = result.doc.id!;
       final existing = combined[docId];
       if (existing != null) {
-        // Document appears in both - combine scores
+        // Document appears in both - combine scores, keep matchedChunkText from semantic
         combined[docId] = _ScoredResult(
           doc: existing.doc,
           score: existing.score + (normalizedScore * actualKeywordWeight),
+          matchedChunkText: existing.matchedChunkText,
         );
       } else {
         // New document from keyword search only
         combined[docId] = _ScoredResult(
           doc: result.doc,
           score: normalizedScore * actualKeywordWeight,
+          matchedChunkText: result.matchedChunkText,
         );
       }
     }
@@ -1343,6 +1200,7 @@ class ButlerEndpoint extends Endpoint {
         indexedAt: result.doc.indexedAt,
         fileSizeBytes: result.doc.fileSizeBytes,
         mimeType: result.doc.mimeType,
+        matchedChunkText: result.matchedChunkText,
       );
     }).toList();
 
@@ -1413,43 +1271,206 @@ class ButlerEndpoint extends Endpoint {
     return _openRouterClient!;
   }
 
-  /// Perform semantic (vector) search
+  /// Perform semantic (vector) search with filtering and normalization
   Future<List<_ScoredResult>> _performSemanticSearch(
     Session session,
     String query, {
     required double threshold,
     required int limit,
+    int offset = 0,
+    SearchFilters? filters,
   }) async {
-    final aiService = await _getAIService();
-    final queryEmbedding = await aiService.generateEmbedding(query);
-    final queryEmbeddingJson = jsonEncode(queryEmbedding);
     final results = <_ScoredResult>[];
 
     try {
-      final searchQuery = '''
-        SELECT
-          de."fileIndexId",
-          1 - (de.embedding <=> \$1::vector) as similarity,
-          fi.id, fi.path, fi."fileName", fi."contentPreview",
-          fi."tagsJson", fi."indexedAt", fi."fileSizeBytes", fi."mimeType"
-        FROM document_embedding de
-        JOIN file_index fi ON de."fileIndexId" = fi.id
-        WHERE 1 - (de.embedding <=> \$1::vector) > \$2
-        ORDER BY de.embedding <=> \$1::vector
-        LIMIT \$3
+      // 1. Generate/Get embedding for the query
+      final aiService = await _getAIService();
+      final queryEmbedding = await aiService.generateEmbedding(query);
+      final queryEmbeddingJson = jsonEncode(queryEmbedding);
+
+      // 2. Build dynamic where conditions for filters
+      final whereConditions = <String>[
+        '(1 - (de.embedding <=> \$1::vector) > \$2 OR fi."fileName" % \$3)',
+      ];
+      final parameters = <dynamic>[queryEmbeddingJson, threshold, query];
+      int paramIndex = 4;
+
+      final sWeight = filters?.semanticWeight ?? 0.7;
+      final kWeight = filters?.keywordWeight ?? 0.3;
+
+      // Apply boolean query parsing for keyword filtering on filename
+      // QueryParser logic removed to allow natural language queries to work
+      // without strict filename keyword matching.
+      // We rely on vector similarity (de.embedding <=> query) and trigram similarity (fi."fileName" % query)
+      // for relevance instead.
+
+      if (filters != null) {
+        // Date Range
+        if (filters.dateFrom != null) {
+          whereConditions.add('fi."indexedAt" >= \$$paramIndex');
+          parameters.add(filters.dateFrom);
+          paramIndex++;
+        }
+        if (filters.dateTo != null) {
+          whereConditions.add('fi."indexedAt" <= \$$paramIndex');
+          parameters.add(filters.dateTo);
+          paramIndex++;
+        }
+
+        // File Size
+        if (filters.minSize != null) {
+          whereConditions.add('fi."fileSizeBytes" >= \$$paramIndex');
+          parameters.add(filters.minSize);
+          paramIndex++;
+        }
+        if (filters.maxSize != null) {
+          whereConditions.add('fi."fileSizeBytes" <= \$$paramIndex');
+          parameters.add(filters.maxSize);
+          paramIndex++;
+        }
+
+        // File Types
+        if (filters.fileTypes != null && filters.fileTypes!.isNotEmpty) {
+          final typeConditions = <String>[];
+          for (final type in filters.fileTypes!) {
+            if (type == 'pdf') {
+              typeConditions.add('fi."mimeType" ILIKE \$$paramIndex');
+              parameters.add('%pdf%');
+              paramIndex++;
+            } else if (type == 'image') {
+              typeConditions.add('fi."mimeType" ILIKE \$$paramIndex');
+              parameters.add('image/%');
+              paramIndex++;
+            } else if (type == 'doc') {
+              typeConditions.add(
+                '(fi."mimeType" ILIKE \$$paramIndex OR fi."fileName" ILIKE \$$paramIndex)',
+              );
+              parameters.add('%word%');
+              paramIndex++;
+            } else {
+              typeConditions.add('fi."fileName" ILIKE \$$paramIndex');
+              parameters.add('%.$type%');
+              paramIndex++;
+            }
+          }
+          if (typeConditions.isNotEmpty) {
+            whereConditions.add('(${typeConditions.join(" OR ")})');
+          }
+        }
+
+        // Tags - use PostgreSQL JSON containment for proper escaping
+        if (filters.tags != null && filters.tags!.isNotEmpty) {
+          for (final tag in filters.tags!) {
+            whereConditions.add(
+              '''(fi."tagsJson" IS NOT NULL AND fi."tagsJson"::jsonb @> \$$paramIndex::jsonb)''',
+            );
+            parameters.add(
+              '["${tag.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"]',
+            );
+            paramIndex++;
+          }
+        }
+
+        // Content Terms - search in content preview
+        if (filters.contentTerms != null && filters.contentTerms!.isNotEmpty) {
+          final contentConditions = <String>[];
+          for (final term in filters.contentTerms!) {
+            contentConditions.add('fi."contentPreview" ILIKE \$$paramIndex');
+            parameters.add('%$term%');
+            paramIndex++;
+          }
+          if (contentConditions.isNotEmpty) {
+            whereConditions.add('(${contentConditions.join(" AND ")})');
+          }
+        }
+
+        // Location Paths - filter by directory paths
+        if (filters.locationPaths != null &&
+            filters.locationPaths!.isNotEmpty) {
+          final pathConditions = <String>[];
+          for (final locPath in filters.locationPaths!) {
+            // Normalize path for consistent matching (handle both forward and back slashes)
+            final normalizedPath = locPath.replaceAll('\\', '/');
+            pathConditions.add(
+              'REPLACE(fi."path", \'\\\\\', \'/\') ILIKE \$$paramIndex',
+            );
+            parameters.add('$normalizedPath%');
+            paramIndex++;
+          }
+          if (pathConditions.isNotEmpty) {
+            whereConditions.add('(${pathConditions.join(" OR ")})');
+          }
+        }
+
+        // Word Count filters
+        if (filters.minCount != null) {
+          whereConditions.add('fi."wordCount" >= \$$paramIndex');
+          parameters.add(filters.minCount);
+          paramIndex++;
+        }
+        if (filters.maxCount != null) {
+          whereConditions.add('fi."wordCount" <= \$$paramIndex');
+          parameters.add(filters.maxCount);
+          paramIndex++;
+        }
+      }
+
+      // 3. Execute vector search with pgvector using CTE for better performance
+      // Using CTE with ROW_NUMBER() instead of DISTINCT ON for efficiency
+      // UNION with media files (no embeddings) that match by filename/path
+      final searchQuery =
+          '''
+        WITH ranked_embeddings AS (
+          SELECT
+            de."fileIndexId",
+            ((1 - (de.embedding <=> \$1::vector)) * $sWeight + (similarity(fi."fileName", \$3) * $kWeight)) as hybrid_score,
+            fi.id, fi.path, fi."fileName", fi."contentPreview",
+            fi."tagsJson", fi."indexedAt", fi."fileSizeBytes", fi."mimeType",
+            fi."isTextContent", fi."contentHash", fi."embeddingModel", fi."documentCategory",
+            fi."fileModifiedAt", fi."fileCreatedAt", fi."wordCount",
+            de."chunkText" as matched_chunk_text,
+            ROW_NUMBER() OVER (PARTITION BY de."fileIndexId" ORDER BY (1 - (de.embedding <=> \$1::vector)) DESC) as rn
+          FROM document_embedding de
+          JOIN file_index fi ON de."fileIndexId" = fi.id
+          WHERE ${whereConditions.join(" AND ")}
+        ),
+        media_files AS (
+          SELECT
+            fi.id as "fileIndexId",
+            (similarity(fi."fileName", \$3) * 0.9 + similarity(fi.path, \$3) * 0.1) as hybrid_score,
+            fi.id, fi.path, fi."fileName", fi."contentPreview",
+            fi."tagsJson", fi."indexedAt", fi."fileSizeBytes", fi."mimeType",
+            fi."isTextContent", fi."contentHash", fi."embeddingModel", fi."documentCategory",
+            fi."fileModifiedAt", fi."fileCreatedAt", fi."wordCount",
+            NULL::text as matched_chunk_text,
+            1 as rn
+          FROM file_index fi
+          WHERE fi."isTextContent" = false
+            AND (fi."fileName" % \$3 OR fi.path ILIKE '%' || \$3 || '%')
+        )
+        SELECT "fileIndexId", hybrid_score, id, path, "fileName", "contentPreview",
+               "tagsJson", "indexedAt", "fileSizeBytes", "mimeType",
+               "isTextContent", "contentHash", "embeddingModel", "documentCategory",
+               "fileModifiedAt", "fileCreatedAt", "wordCount", matched_chunk_text
+        FROM (
+          SELECT * FROM ranked_embeddings WHERE rn = 1
+          UNION ALL
+          SELECT * FROM media_files
+        ) combined_results
+        ORDER BY hybrid_score DESC
+        LIMIT \$$paramIndex OFFSET \$${paramIndex + 1}
       ''';
+
+      parameters.add(limit);
+      parameters.add(offset);
 
       final rows = await session.db.unsafeQuery(
         searchQuery,
-        parameters: QueryParameters.positional([
-          queryEmbeddingJson,
-          threshold,
-          limit,
-        ]),
+        parameters: QueryParameters.positional(parameters),
       );
 
       for (final row in rows) {
-        final similarity = row[1] as double;
+        final hybridScore = row[1] as double;
         final doc = FileIndex(
           id: row[2] as int,
           path: row[3] as String,
@@ -1459,18 +1480,25 @@ class ButlerEndpoint extends Endpoint {
           indexedAt: row[7] as DateTime?,
           fileSizeBytes: (row[8] as int?) ?? 0,
           mimeType: row[9] as String?,
-          contentHash: '',
+          isTextContent: row[10] as bool,
+          contentHash: row[11] as String,
+          embeddingModel: row[12] as String?,
+          documentCategory: row[13] as String?,
+          fileModifiedAt: row[14] as DateTime?,
+          fileCreatedAt: row[15] as DateTime?,
+          wordCount: row[16] as int?,
           status: 'indexed',
-          embeddingModel: '',
-          isTextContent: true,
         );
-        results.add(_ScoredResult(doc: doc, score: similarity));
+        results.add(
+          _ScoredResult(
+            doc: doc,
+            score: hybridScore,
+            matchedChunkText: row[17] as String?,
+          ),
+        );
       }
     } catch (e) {
-      session.log(
-        'Semantic search failed: $e',
-        level: LogLevel.warning,
-      );
+      session.log('Semantic search failed: $e', level: LogLevel.warning);
     }
 
     return results;
@@ -1576,13 +1604,60 @@ class ButlerEndpoint extends Endpoint {
           }
         }
 
-        // Tags
+        // Tags - use PostgreSQL JSON containment for proper escaping
         if (filters.tags != null && filters.tags!.isNotEmpty) {
           for (final tag in filters.tags!) {
-            whereConditions.add('fi."tagsJson" ILIKE \$$paramIndex');
-            parameters.add('%"$tag"%');
+            whereConditions.add(
+              '''(fi."tagsJson" IS NOT NULL AND fi."tagsJson"::jsonb @> \$$paramIndex::jsonb)''',
+            );
+            parameters.add(
+              '["${tag.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"]',
+            );
             paramIndex++;
           }
+        }
+
+        // Content Terms - search in content preview
+        if (filters.contentTerms != null && filters.contentTerms!.isNotEmpty) {
+          final contentConditions = <String>[];
+          for (final term in filters.contentTerms!) {
+            contentConditions.add('fi."contentPreview" ILIKE \$$paramIndex');
+            parameters.add('%$term%');
+            paramIndex++;
+          }
+          if (contentConditions.isNotEmpty) {
+            whereConditions.add('(${contentConditions.join(" AND ")})');
+          }
+        }
+
+        // Location Paths - filter by directory paths
+        if (filters.locationPaths != null &&
+            filters.locationPaths!.isNotEmpty) {
+          final pathConditions = <String>[];
+          for (final locPath in filters.locationPaths!) {
+            // Normalize path for consistent matching (handle both forward and back slashes)
+            final normalizedPath = locPath.replaceAll('\\', '/');
+            pathConditions.add(
+              'REPLACE(fi."path", \'\\\\\', \'/\') ILIKE \$$paramIndex',
+            );
+            parameters.add('$normalizedPath%');
+            paramIndex++;
+          }
+          if (pathConditions.isNotEmpty) {
+            whereConditions.add('(${pathConditions.join(" OR ")})');
+          }
+        }
+
+        // Word Count filters
+        if (filters.minCount != null) {
+          whereConditions.add('fi."wordCount" >= \$$paramIndex');
+          parameters.add(filters.minCount);
+          paramIndex++;
+        }
+        if (filters.maxCount != null) {
+          whereConditions.add('fi."wordCount" <= \$$paramIndex');
+          parameters.add(filters.maxCount);
+          paramIndex++;
         }
       }
 
@@ -1606,7 +1681,9 @@ class ButlerEndpoint extends Endpoint {
                                     COALESCE(fi."fileName", '') || ' ' ||
                                     COALESCE(fi."tagsJson", '')),
             plainto_tsquery('english', \$1)
-          ) as rank
+          ) as rank,
+          fi."isTextContent", fi."contentHash", fi."embeddingModel", fi."documentCategory",
+          fi."fileModifiedAt", fi."fileCreatedAt", fi."wordCount"
         FROM file_index fi
         WHERE ${whereConditions.join(" AND ")}
         ORDER BY rank DESC
@@ -1629,10 +1706,14 @@ class ButlerEndpoint extends Endpoint {
           indexedAt: row[5] as DateTime?,
           fileSizeBytes: (row[6] as int?) ?? 0,
           mimeType: row[7] as String?,
-          contentHash: '',
+          isTextContent: row[9] as bool,
+          contentHash: row[10] as String,
+          embeddingModel: row[11] as String?,
+          documentCategory: row[12] as String?,
+          fileModifiedAt: row[13] as DateTime?,
+          fileCreatedAt: row[14] as DateTime?,
+          wordCount: row[15] as int?,
           status: 'indexed',
-          embeddingModel: '',
-          isTextContent: true,
         );
         // Normalize rank to 0-1 range (ts_rank_cd typically returns 0-1 but can be higher)
         final normalizedScore = (rank / 1.0).clamp(0.0, 1.0);
@@ -1646,6 +1727,72 @@ class ButlerEndpoint extends Endpoint {
     }
 
     return results;
+  }
+
+  /// Fuzzy filename search using pg_trgm similarity
+  ///
+  /// Handles typos and partial matches in filenames
+  /// [query] - Filename or partial filename to search for
+  /// [limit] - Maximum number of results (default: 10)
+  /// [minSimilarity] - Minimum similarity threshold 0.0-1.0 (default: 0.3)
+  Future<List<SearchResult>> fuzzyFilenameSearch(
+    Session session,
+    String query, {
+    int limit = 10,
+    double minSimilarity = 0.3,
+  }) async {
+    AuthService.requireAuth(session);
+
+    final clientId = _getClientIdentifier(session);
+    RateLimitService.instance.requireRateLimit(clientId, 'fuzzySearch');
+
+    if (query.isEmpty || query.length < 2) {
+      return [];
+    }
+
+    InputValidation.validateSearchQuery(query);
+    limit = limit.clamp(1, _maxSearchLimit);
+    minSimilarity = minSimilarity.clamp(0.0, 1.0);
+
+    try {
+      // Use pg_trgm similarity function for fuzzy matching
+      final searchQuery = '''
+        SELECT 
+          fi.id, fi.path, fi."fileName", fi."contentPreview",
+          fi."tagsJson", fi."indexedAt", fi."fileSizeBytes", fi."mimeType",
+          similarity(fi."fileName", \$1) as sim_score
+        FROM file_index fi
+        WHERE fi.status = 'indexed'
+          AND similarity(fi."fileName", \$1) >= \$2
+        ORDER BY sim_score DESC
+        LIMIT \$3
+      ''';
+
+      final rows = await session.db.unsafeQuery(
+        searchQuery,
+        parameters: QueryParameters.positional([query, minSimilarity, limit]),
+      );
+
+      return rows.map((row) {
+        final tags = row[4] != null
+            ? _parseTagList(row[4] as String)
+            : <String>[];
+        return SearchResult(
+          id: row[0] as int,
+          path: row[1] as String,
+          fileName: row[2] as String,
+          contentPreview: row[3] as String?,
+          tags: tags,
+          indexedAt: row[5] as DateTime?,
+          fileSizeBytes: (row[6] as int?) ?? 0,
+          mimeType: row[7] as String?,
+          relevanceScore: row[8] as double,
+        );
+      }).toList();
+    } catch (e) {
+      session.log('Fuzzy filename search failed: $e', level: LogLevel.warning);
+      return [];
+    }
   }
 
   /// Generate index health report
@@ -1744,7 +1891,7 @@ class ButlerEndpoint extends Endpoint {
         searchStrategy = SearchStrategy.hybrid;
     }
 
-    // Yield progress from the AI search service
+    // Yield progress from the AI search service with graceful fallback
     try {
       yield* aiSearchService.executeSearch(
         session,
@@ -1759,11 +1906,62 @@ class ButlerEndpoint extends Endpoint {
         level: LogLevel.error,
         stackTrace: stackTrace,
       );
+
+      // Graceful fallback to traditional search
       yield AISearchProgress(
-        type: 'error',
-        message: 'Search failed',
-        error: e.toString(),
+        type: 'warning',
+        message: 'AI search failed, falling back to traditional search...',
+        progress: 0.5,
       );
+
+      try {
+        // Attempt hybrid search as fallback
+        final fallbackResults = await hybridSearch(
+          session,
+          query,
+          limit: effectiveMaxResults,
+          threshold: 0.3,
+          filters: filters,
+        );
+
+        // Convert SearchResult to AISearchResult
+        final aiResults = fallbackResults
+            .map(
+              (r) => AISearchResult(
+                path: r.path,
+                fileName: r.fileName,
+                isDirectory: false,
+                source: 'fallback',
+                relevanceScore: r.relevanceScore,
+                contentPreview: r.contentPreview,
+                foundVia: 'hybrid_fallback',
+                matchReason: 'Found via fallback search',
+                fileSizeBytes: r.fileSizeBytes,
+                mimeType: r.mimeType,
+                tags: r.tags,
+                indexedAt: r.indexedAt,
+                suggestedQuery: r.suggestedQuery,
+              ),
+            )
+            .toList();
+
+        yield AISearchProgress(
+          type: 'complete',
+          message: 'Search complete (fallback mode)',
+          results: aiResults,
+          progress: 1.0,
+        );
+      } catch (fallbackError) {
+        session.log(
+          'Fallback search also failed: $fallbackError',
+          level: LogLevel.error,
+        );
+        yield AISearchProgress(
+          type: 'error',
+          message: 'Search failed',
+          error: e.toString(),
+        );
+      }
     }
   }
 
@@ -1845,196 +2043,17 @@ class ButlerEndpoint extends Endpoint {
       rethrow;
     }
   }
-
-  // ==========================================================================
-  // FILE ORGANIZATION ANALYSIS
-  // ==========================================================================
-
-  /// Get file organization suggestions including duplicates, naming issues,
-  /// and semantically similar documents
-  ///
-  /// [rootPath] - Optional root path to limit analysis to a specific folder
-  Future<OrganizationSuggestions> getOrganizationSuggestions(
-    Session session, {
-    String? rootPath,
-  }) async {
-    // Security: Validate authentication
-    AuthService.requireAuth(session);
-
-    session.log(
-      'Starting organization analysis${rootPath != null ? " for $rootPath" : ""}',
-      level: LogLevel.info,
-    );
-
-    // Run all analyses in parallel for performance
-    final duplicateDetector = DuplicateDetector();
-    final namingAnalyzer = NamingAnalyzer();
-    final similarityAnalyzer = SimilarityAnalyzer();
-
-    final results = await Future.wait([
-      duplicateDetector.findDuplicates(session, rootPath: rootPath),
-      namingAnalyzer.detectIssues(session, rootPath: rootPath),
-      similarityAnalyzer.findSimilar(session),
-    ]);
-
-    final duplicates = results[0] as List<DuplicateGroup>;
-    final namingIssues = results[1] as List<NamingIssue>;
-    final similarContent = results[2] as List<SimilarContentGroup>;
-
-    // Calculate total potential savings
-    final potentialSavings = duplicates.fold<int>(
-      0,
-      (sum, g) => sum + g.potentialSavingsBytes,
-    );
-
-    // Get total files analyzed
-    final totalFiles = await FileIndex.db.count(
-      session,
-      where: (t) => t.status.equals('indexed'),
-    );
-
-    session.log(
-      'Organization analysis complete: ${duplicates.length} duplicate groups, '
-      '${namingIssues.length} naming issues, ${similarContent.length} similar groups',
-      level: LogLevel.info,
-    );
-
-    return OrganizationSuggestions(
-      duplicates: duplicates,
-      namingIssues: namingIssues,
-      similarContent: similarContent,
-      analyzedAt: DateTime.now(),
-      totalFilesAnalyzed: totalFiles,
-      potentialSavingsBytes: potentialSavings,
-    );
-  }
-
-  // ==========================================================================
-  // FILE ORGANIZATION ACTIONS
-  // ==========================================================================
-
-  /// Apply an organization action (resolve duplicates, fix naming, organize similar)
-  ///
-  /// [request] - The organization action request with action type and parameters
-  Future<OrganizationActionResult> applyOrganizationAction(
-    Session session,
-    OrganizationActionRequest request,
-  ) async {
-    // Security: Validate authentication
-    AuthService.requireAuth(session);
-
-    session.log(
-      'Applying organization action: ${request.actionType}',
-      level: LogLevel.info,
-    );
-
-    return await _organizationService.applyAction(session, request);
-  }
-
-  /// Apply multiple organization actions as a batch
-  ///
-  /// [request] - The batch organization request with multiple actions
-  Future<BatchOrganizationResult> applyBatchOrganization(
-    Session session,
-    BatchOrganizationRequest request,
-  ) async {
-    // Security: Validate authentication
-    AuthService.requireAuth(session);
-
-    session.log(
-      'Applying batch organization: ${request.actions.length} actions',
-      level: LogLevel.info,
-    );
-
-    return await _organizationService.applyBatch(session, request);
-  }
-
-  /// Resolve duplicate files by keeping one and deleting the rest
-  ///
-  /// Convenience method for duplicate resolution
-  ///
-  /// [contentHash] - Hash identifying the duplicate group
-  /// [keepFilePath] - Path to the file to keep
-  /// [deleteFilePaths] - Paths to duplicate files to delete
-  /// [dryRun] - If true, preview without executing
-  Future<OrganizationActionResult> resolveDuplicates(
-    Session session, {
-    required String contentHash,
-    required String keepFilePath,
-    required List<String> deleteFilePaths,
-    bool dryRun = false,
-  }) async {
-    // Security: Validate authentication
-    AuthService.requireAuth(session);
-
-    final request = OrganizationActionRequest(
-      actionType: 'resolve_duplicates',
-      contentHash: contentHash,
-      keepFilePath: keepFilePath,
-      deleteFilePaths: deleteFilePaths,
-      dryRun: dryRun,
-    );
-
-    return await _organizationService.applyAction(session, request);
-  }
-
-  /// Fix naming issues for multiple files
-  ///
-  /// Convenience method for naming fixes
-  ///
-  /// [renameOldPaths] - List of old file paths
-  /// [renameNewNames] - List of new names (parallel to renameOldPaths)
-  /// [dryRun] - If true, preview without executing
-  Future<OrganizationActionResult> fixNamingIssues(
-    Session session, {
-    required List<String> renameOldPaths,
-    required List<String> renameNewNames,
-    bool dryRun = false,
-  }) async {
-    // Security: Validate authentication
-    AuthService.requireAuth(session);
-
-    final request = OrganizationActionRequest(
-      actionType: 'fix_naming',
-      renameOldPaths: renameOldPaths,
-      renameNewNames: renameNewNames,
-      dryRun: dryRun,
-    );
-
-    return await _organizationService.applyAction(session, request);
-  }
-
-  /// Organize similar files into a target folder
-  ///
-  /// Convenience method for organizing similar content
-  ///
-  /// [filePaths] - Paths to files to organize
-  /// [targetFolder] - Destination folder path
-  /// [dryRun] - If true, preview without executing
-  Future<OrganizationActionResult> organizeSimilarFiles(
-    Session session, {
-    required List<String> filePaths,
-    required String targetFolder,
-    bool dryRun = false,
-  }) async {
-    // Security: Validate authentication
-    AuthService.requireAuth(session);
-
-    final request = OrganizationActionRequest(
-      actionType: 'organize_similar',
-      organizeFilePaths: filePaths,
-      targetFolder: targetFolder,
-      dryRun: dryRun,
-    );
-
-    return await _organizationService.applyAction(session, request);
-  }
 }
 
 /// Helper class for sorting search results by score
 class _ScoredResult {
   final FileIndex doc;
   final double score;
+  final String? matchedChunkText;
 
-  _ScoredResult({required this.doc, required this.score});
+  _ScoredResult({
+    required this.doc,
+    required this.score,
+    this.matchedChunkText,
+  });
 }

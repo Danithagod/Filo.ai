@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../utils/xml_response_parser.dart';
+import '../common/custom_expansion_tile.dart';
 
 /// Widget to display a `<thinking>` block as a collapsible section
 class ThinkingBlockWidget extends StatelessWidget {
@@ -22,7 +23,7 @@ class ThinkingBlockWidget extends StatelessWidget {
       ),
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
+        child: CustomExpansionTile(
           tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
           childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
           leading: Icon(
@@ -207,14 +208,31 @@ class StatusBlockWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    Color color;
+    switch (block.type) {
+      case 'success':
+        color = colorScheme.tertiary;
+        break;
+      case 'error':
+        color = colorScheme.error;
+        break;
+      case 'warning':
+        color = colorScheme.secondary;
+        break;
+      default:
+        color = colorScheme.primary;
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: block.color.withValues(alpha: 0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: block.color.withValues(alpha: 0.3),
+          color: color.withValues(alpha: 0.3),
         ),
       ),
       child: Row(
@@ -223,7 +241,7 @@ class StatusBlockWidget extends StatelessWidget {
           Icon(
             block.icon,
             size: 16,
-            color: block.color,
+            color: color,
           ),
           const SizedBox(width: 8),
           Flexible(
@@ -231,7 +249,7 @@ class StatusBlockWidget extends StatelessWidget {
               block.content,
               style: TextStyle(
                 fontSize: 13,
-                color: block.color,
+                color: color,
                 fontWeight: FontWeight.w500,
               ),
             ),

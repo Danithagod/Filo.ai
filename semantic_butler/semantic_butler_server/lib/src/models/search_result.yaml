@@ -19,3 +19,9 @@ fields:
   fileSizeBytes: int
   ### MIME type
   mimeType: String?
+  ### Suggested query if typos were detected
+  suggestedQuery: String?
+  ### Pagination cursor for the next result set
+  nextCursor: String?
+  ### The specific text chunk that matched the search query
+  matchedChunkText: String?

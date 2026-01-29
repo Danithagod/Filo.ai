@@ -6,8 +6,6 @@ class WindowTitleBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return WindowTitleBarBox(
       child: Row(
         children: [
@@ -17,23 +15,9 @@ class WindowTitleBar extends StatelessWidget {
                 children: [
                   const SizedBox(width: 16),
                   Image.asset(
-                    'assets/app_icon.png', // Assuming we have one, or use Icon
+                    'assets/filo_navbar.png',
                     width: 16,
                     height: 16,
-                    errorBuilder: (context, error, stackTrace) => Icon(
-                      Icons.smart_toy,
-                      size: 16,
-                      color: colorScheme.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Semantic Butler',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
                   ),
                 ],
               ),
@@ -65,7 +49,7 @@ class WindowButtons extends StatelessWidget {
       mouseOver: const Color(0xFFD32F2F),
       mouseDown: const Color(0xFFB71C1C),
       iconNormal: colorScheme.onSurface,
-      iconMouseOver: Colors.white,
+      iconMouseOver: Theme.of(context).colorScheme.onSurface,
     );
 
     return Row(

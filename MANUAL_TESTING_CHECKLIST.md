@@ -141,6 +141,20 @@ This checklist covers manual testing for the Semantic Butler application includi
   - [ ] Check search results update pagination works (if applicable)
   - [ ] Test threshold parameter affects result relevance
 
+- [ ] **Natural Language Query Parsing**
+  - [ ] Test Date Filters: "files from last week", "modified in 2024"
+  - [ ] Test Size Filters: "larger than 10MB", "small files"
+  - [ ] Test Location Filters: "in Documents", "on D drive"
+  - [ ] Test Content Filters: "containing 'invoice'", "mentioning 'budget'"
+  - [ ] Test Count Expressions: "more than 5 pages" (if supported)
+  - [ ] Verify complex combinations: "PDFs in Documents larger than 1MB"
+
+- [ ] **Agentic Search (Proactive Discovery)**
+  - [ ] Test ambiguous query triggers agent: "Where is the quarterly report?"
+  - [ ] Verify agent UI feedback: "Agent executing search_terminal...", "Found X matches"
+  - [ ] Test multi-step reasoning: Agent searches index -> fails -> searches terminal -> finds file
+  - [ ] Verify circuit breaker handling: Disconnect network -> "System is protecting itself..."
+
 ### 2.4 Document Indexing
 - [ ] **Start Indexing**
   - [ ] Test selecting a folder path
@@ -368,6 +382,18 @@ This checklist covers manual testing for the Semantic Butler application includi
 - [ ] Check corrupt file errors
 - [ ] Test network errors
 - [ ] Verify unknown errors categorized properly
+
+### 3.7 Resilience & Circuit Breaker
+- [ ] **Circuit Breaker**
+  - [ ] Simulate API outage (block network/mock 500s)
+  - [ ] Verify circuit opens after threshold (5 failures)
+  - [ ] Check "CircuitBreakerOpenException" is handled gracefully in UI
+  - [ ] Test half-open state (retry after timeout)
+
+- [ ] **Rate Limiting**
+  - [ ] Trigger high-volume search requests
+  - [ ] Verify "Too many requests" user message
+  - [ ] Check exponential backoff in background retries
 
 ---
 

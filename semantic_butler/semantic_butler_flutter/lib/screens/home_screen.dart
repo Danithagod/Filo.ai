@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/home/filo_hero_logo.dart';
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
@@ -7,22 +8,25 @@ import '../main.dart';
 import '../utils/app_logger.dart';
 import '../widgets/search/advanced_search_bar.dart';
 import '../widgets/search/advanced_filters.dart';
-
+import '../widgets/loading_skeletons.dart';
 import '../widgets/recent_searches.dart';
 import '../widgets/app_background.dart';
 import 'search_results_screen.dart';
+import '../providers/search_controller.dart' as sc;
 import 'settings_screen.dart';
 import 'chat_screen.dart';
 import 'file_manager_screen.dart';
-import 'organization_screen.dart';
 import '../widgets/home/stats_card.dart';
 import '../widgets/home/fade_in_animation.dart';
 import '../widgets/home/compact_index_card.dart';
 import '../widgets/home/tag_manager_dialog.dart';
-import '../widgets/home/ai_cost_dashboard.dart';
 import '../widgets/home/index_health_dashboard.dart';
+import '../widgets/home/indexing_progress_overlay.dart';
 import '../providers/indexing_status_provider.dart';
 import '../providers/navigation_provider.dart';
+import '../providers/local_indexing_provider.dart';
+import '../services/settings_service.dart';
+import '../theme/app_theme.dart';
 
 /// Home screen with Material 3 navigation rail
 class HomeScreen extends ConsumerStatefulWidget {
@@ -83,22 +87,14 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
               NavigationRailDestination(
                 icon: Tooltip(
                   message: 'Files (Ctrl+4 / Cmd+4)',
-                  child: Icon(Icons.folder_shared_outlined),
+                  child: Icon(Icons.folder_copy_outlined),
                 ),
-                selectedIcon: Icon(Icons.folder_shared),
+                selectedIcon: Icon(Icons.folder_copy),
                 label: Text('Files'),
               ),
               NavigationRailDestination(
                 icon: Tooltip(
-                  message: 'Organization (Ctrl+5 / Cmd+5)',
-                  child: Icon(Icons.auto_fix_high_outlined),
-                ),
-                selectedIcon: Icon(Icons.auto_fix_high),
-                label: Text('Organization'),
-              ),
-              NavigationRailDestination(
-                icon: Tooltip(
-                  message: 'Settings (Ctrl+6 / Cmd+6)',
+                  message: 'Settings (Ctrl+5 / Cmd+5)',
                   child: Icon(Icons.settings_outlined),
                 ),
                 selectedIcon: Icon(Icons.settings),
@@ -116,8 +112,16 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
 
           // Content area
           Expanded(
-            child: AppBackground(
-              child: _buildContent(),
+            child: Stack(
+              children: [
+                SizedBox.expand(
+                  child: AppBackground(
+                    child: _buildContent(),
+                  ),
+                ),
+                // Floating indexing progress overlay
+                const IndexingProgressOverlay(),
+              ],
             ),
           ),
         ],
@@ -148,14 +152,10 @@ class HomeScreenState extends ConsumerState<HomeScreen> {
       case 1:
         return const IndexingScreen(key: PageStorageKey('indexing_screen'));
       case 2:
-        return const ChatScreen(key: PageStorageKey('chat_screen'));
+        return ChatScreen(key: PageStorageKey('chat_screen'));
       case 3:
         return const FileManagerScreen(key: PageStorageKey('file_manager'));
       case 4:
-        return const OrganizationScreen(
-          key: PageStorageKey('organization_screen'),
-        );
-      case 5:
         return const SettingsScreen(key: PageStorageKey('settings_screen'));
       default:
         return const SearchDashboard(key: PageStorageKey('search_dashboard'));
@@ -241,7 +241,7 @@ class _SearchDashboardState extends ConsumerState<SearchDashboard>
       MaterialPageRoute(
         builder: (context) => SearchResultsScreen(
           query: query,
-          initialMode: SearchMode.hybrid,
+          initialMode: sc.SearchMode.hybrid,
           initialFilters: _searchFilters,
         ),
       ),
@@ -255,8 +255,8 @@ class _SearchDashboardState extends ConsumerState<SearchDashboard>
       MaterialPageRoute(
         builder: (context) => SearchResultsScreen(
           query: query,
-          initialMode: SearchMode.ai,
-          // AI Search doesn't support filters yet in this implementation
+          initialMode: sc.SearchMode.ai,
+          initialFilters: _searchFilters,
         ),
       ),
     );
@@ -269,13 +269,6 @@ class _SearchDashboardState extends ConsumerState<SearchDashboard>
     );
   }
 
-  void _showCostDashboard(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => const AICostDashboard(),
-    );
-  }
-
   void _showIndexHealth(BuildContext context) {
     showDialog(
       context: context,
@@ -283,291 +276,352 @@ class _SearchDashboardState extends ConsumerState<SearchDashboard>
     );
   }
 
+  String _getWelcomeMessage(WidgetRef ref) {
+    final settings = ref.watch(settingsProvider).value;
+    final name = settings?.userName;
+    if (name != null && name.isNotEmpty) {
+      return 'Welcome back, $name';
+    }
+    return 'Welcome back,';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final status = ref.watch(indexingStatusProvider).value;
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final indexingStatus = ref.watch(indexingStatusProvider);
+    final status = indexingStatus.value;
+    final isLoadingStatus = indexingStatus.isLoading && status == null;
 
-    return SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 48),
-      child: Center(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 900),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Welcome header with modern look
-              const FadeInAnimation(
-                delay: Duration(milliseconds: 100),
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: constraints.maxHeight - 96,
+            ), // Subtract padding
+            child: Center(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 1000),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Text(
-                      'Welcome back,',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: 1.1,
-                        color: Colors.white70,
+                    // Welcome header with centered animated logo
+                    Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          FadeInAnimation(
+                            delay: const Duration(milliseconds: 100),
+                            child: Text(
+                              _getWelcomeMessage(ref),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                letterSpacing: 0.5,
+                                color: colorScheme.onSurfaceVariant.withValues(
+                                  alpha: 0.7,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          FadeInAnimation(
+                            delay: const Duration(milliseconds: 200),
+                            child: FiloHeroLogo(),
+                          ),
+                          const SizedBox(height: 24),
+                          FadeInAnimation(
+                            delay: const Duration(milliseconds: 300),
+                            child: Text(
+                              'Search your files using natural language',
+                              textAlign: TextAlign.center,
+                              style: textTheme.bodyLarge?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                                fontSize: 18,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    SizedBox(height: 12),
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Semantic Butler',
-                        style: TextStyle(
-                          fontSize: 56,
-                          fontWeight: FontWeight.w900,
-                          height: 1.0,
-                          letterSpacing: -1,
+
+                    const SizedBox(height: 48),
+
+                    // Enhanced Search bar
+                    FadeInAnimation(
+                      delay: const Duration(milliseconds: 300),
+                      child: Container(
+                        constraints: const BoxConstraints(maxWidth: 800),
+                        width: double.infinity,
+                        child: AdvancedSearchBar(
+                          controller: _searchController,
+                          onSearch: _performSearch,
+                          onAISearch: _performAISearch,
+                          hintText: 'Search your files using natural language',
+                          trailing: [
+                            AdvancedFilters(
+                              initialFilters: _searchFilters,
+                              onFiltersChanged: (filters) {
+                                setState(() {
+                                  _searchFilters = filters;
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 60),
+
+                    // Stats section
+                    FadeInAnimation(
+                      delay: const Duration(milliseconds: 400),
+                      child: Container(
+                        constraints: const BoxConstraints(maxWidth: 800),
+                        width: double.infinity,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  'Overview',
+                                  style: textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Divider(
+                                    color: colorScheme.outlineVariant
+                                        .withValues(
+                                          alpha: 0.5,
+                                        ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            isLoadingStatus
+                                ? Wrap(
+                                    spacing: 24,
+                                    runSpacing: 24,
+                                    children: List.generate(
+                                      3,
+                                      (index) => ConstrainedBox(
+                                        constraints: const BoxConstraints(
+                                          minWidth:
+                                              240, // Slightly reduced min width
+                                          maxWidth:
+                                              250, // Fixed width cards for grid look
+                                        ),
+                                        child: StatsCardSkeleton(),
+                                      ),
+                                    ),
+                                  )
+                                : Wrap(
+                                    spacing: 24,
+                                    runSpacing: 24,
+                                    alignment: WrapAlignment
+                                        .spaceBetween, // Distribute cards
+                                    children: [
+                                      ConstrainedBox(
+                                        constraints: const BoxConstraints(
+                                          minWidth: 240,
+                                          maxWidth: 250,
+                                        ),
+                                        child: StatsCard(
+                                          title: 'Documents',
+                                          numericValue:
+                                              (status?.totalDocuments ?? 0)
+                                                  .toDouble(),
+                                          icon: Icons.description_rounded,
+                                          color: colorScheme.primary,
+                                        ),
+                                      ),
+                                      ConstrainedBox(
+                                        constraints: const BoxConstraints(
+                                          minWidth: 240,
+                                          maxWidth: 250,
+                                        ),
+                                        child: StatsCard(
+                                          title: 'Indexed',
+                                          numericValue:
+                                              status != null &&
+                                                  status.totalDocuments > 0
+                                              ? (status.indexedDocuments /
+                                                    status.totalDocuments *
+                                                    100)
+                                              : 0,
+                                          suffix: '%',
+                                          progress:
+                                              status != null &&
+                                                  status.totalDocuments > 0
+                                              ? (status.indexedDocuments /
+                                                    status.totalDocuments)
+                                              : 0,
+                                          icon: Icons.check_circle_rounded,
+                                          color:
+                                              theme.brightness ==
+                                                  Brightness.dark
+                                              ? AppTheme.successColorDark
+                                              : AppTheme.successColor,
+                                        ),
+                                      ),
+                                      ConstrainedBox(
+                                        constraints: const BoxConstraints(
+                                          minWidth: 240,
+                                          maxWidth: 250,
+                                        ),
+                                        child: StatsCard(
+                                          title: 'Activity',
+                                          numericValue:
+                                              (status?.activeJobs ?? 0)
+                                                  .toDouble(),
+                                          suffix:
+                                              status != null &&
+                                                  status.activeJobs > 0
+                                              ? ' Active'
+                                              : ' Jobs',
+                                          isPulse:
+                                              status != null &&
+                                              status.activeJobs > 0,
+                                          icon: Icons.trending_up_rounded,
+                                          color: colorScheme.secondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 40),
+
+                    // Quick actions section
+                    FadeInAnimation(
+                      delay: const Duration(milliseconds: 450),
+                      child: Container(
+                        constraints: const BoxConstraints(maxWidth: 800),
+                        width: double.infinity,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  'Quick actions',
+                                  style: textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Divider(
+                                    color: colorScheme.outlineVariant
+                                        .withValues(
+                                          alpha: 0.5,
+                                        ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 12,
+                              children: [
+                                OutlinedButton.icon(
+                                  onPressed: () => _showTagManager(context),
+                                  icon: const Icon(
+                                    Icons.label_outline,
+                                    size: 20,
+                                  ),
+                                  label: const Text('Manage Tags'),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                      vertical: 16,
+                                    ),
+                                  ),
+                                ),
+                                OutlinedButton.icon(
+                                  onPressed: () => _showIndexHealth(context),
+                                  icon: const Icon(
+                                    Icons.health_and_safety,
+                                    size: 20,
+                                  ),
+                                  label: const Text('Index Health'),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 20,
+                                      vertical: 16,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 40),
+
+                    // Recent searches section
+                    FadeInAnimation(
+                      delay: const Duration(milliseconds: 500),
+                      child: Container(
+                        constraints: const BoxConstraints(maxWidth: 800),
+                        width: double.infinity,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  'Recent activity',
+                                  style: textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Divider(
+                                    color: colorScheme.outlineVariant
+                                        .withValues(
+                                          alpha: 0.5,
+                                        ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            RecentSearches(
+                              onSearchTap: _performSearch,
+                            ),
+                          ],
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
-              FadeInAnimation(
-                delay: const Duration(milliseconds: 200),
-                child: Text(
-                  'Search your files using natural language',
-                  style: textTheme.bodyLarge?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    fontSize: 18,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 48),
-
-              // Enhanced Search bar
-              FadeInAnimation(
-                delay: const Duration(milliseconds: 300),
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 800),
-                  child: AdvancedSearchBar(
-                    controller: _searchController,
-                    onSearch: _performSearch,
-                    onAISearch: _performAISearch,
-                    hintText: 'Search your files using natural language',
-                    trailing: [
-                      AdvancedFilters(
-                        initialFilters: _searchFilters,
-                        onFiltersChanged: (filters) {
-                          setState(() {
-                            _searchFilters = filters;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 60),
-
-              // Stats section
-              FadeInAnimation(
-                delay: const Duration(milliseconds: 400),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          'Overview',
-                          style: textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Divider(
-                            color: colorScheme.outlineVariant.withValues(
-                              alpha: 0.5,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    Wrap(
-                      spacing: 24,
-                      runSpacing: 24,
-                      children: [
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(
-                            minWidth: 300,
-                            maxWidth: 800,
-                          ),
-                          child: StatsCard(
-                            title: 'Documents',
-                            numericValue: (status?.totalDocuments ?? 0)
-                                .toDouble(),
-                            icon: Icons.description_rounded,
-                            color: colorScheme.primary,
-                          ),
-                        ),
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(
-                            minWidth: 300,
-                            maxWidth: 800,
-                          ),
-                          child: StatsCard(
-                            title: 'Indexed',
-                            numericValue:
-                                status != null && status.totalDocuments > 0
-                                ? (status.indexedDocuments /
-                                      status.totalDocuments *
-                                      100)
-                                : 0,
-                            suffix: '%',
-                            progress:
-                                status != null && status.totalDocuments > 0
-                                ? (status.indexedDocuments /
-                                      status.totalDocuments)
-                                : 0,
-                            icon: Icons.check_circle_rounded,
-                            color: colorScheme.tertiary,
-                          ),
-                        ),
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(
-                            minWidth: 300,
-                            maxWidth: 800,
-                          ),
-                          child: StatsCard(
-                            title: 'Activity',
-                            numericValue: (status?.activeJobs ?? 0).toDouble(),
-                            suffix: status != null && status.activeJobs > 0
-                                ? ' Active'
-                                : ' Jobs',
-                            isPulse: status != null && status.activeJobs > 0,
-                            icon: Icons.trending_up_rounded,
-                            color: colorScheme.secondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 40),
-
-              // Quick actions section
-              FadeInAnimation(
-                delay: const Duration(milliseconds: 450),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          'Quick actions',
-                          style: textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Divider(
-                            color: colorScheme.outlineVariant.withValues(
-                              alpha: 0.5,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: [
-                        OutlinedButton.icon(
-                          onPressed: () => _showTagManager(context),
-                          icon: const Icon(Icons.label_outline, size: 20),
-                          label: const Text('Manage Tags'),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 16,
-                            ),
-                          ),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () => _showCostDashboard(context),
-                          icon: const Icon(Icons.analytics_outlined, size: 20),
-                          label: const Text('Cost Dashboard'),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 16,
-                            ),
-                          ),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () => _showIndexHealth(context),
-                          icon: const Icon(Icons.health_and_safety, size: 20),
-                          label: const Text('Index Health'),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 16,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 40),
-
-              // Recent searches section
-              FadeInAnimation(
-                delay: const Duration(milliseconds: 500),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          'Recent activity',
-                          style: textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Divider(
-                            color: colorScheme.outlineVariant.withValues(
-                              alpha: 0.5,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    RecentSearches(
-                      onSearchTap: _performSearch,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 40),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -598,6 +652,7 @@ class _IndexingScreenState extends ConsumerState<IndexingScreen> {
   }
 
   Future<void> _pickFolder() async {
+    final colorScheme = Theme.of(context).colorScheme;
     AppLogger.info('Opening folder picker...', tag: 'Indexing');
     try {
       String? selectedDirectory = await FilePicker.platform.getDirectoryPath();
@@ -612,13 +667,60 @@ class _IndexingScreenState extends ConsumerState<IndexingScreen> {
           ),
         );
 
-        // Call the server to start indexing
-        AppLogger.info('Calling startIndexing API...', tag: 'Indexing');
-        final apiClient = ref.read(clientProvider);
-        await apiClient.butler.startIndexing(selectedDirectory);
-        AppLogger.info('startIndexing API call completed', tag: 'Indexing');
+        // Call LocalIndexingService (Hybrid Architecture)
+        AppLogger.info('Calling LocalIndexingService...', tag: 'Indexing');
 
-        // Refresh global provider immediately
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Starting background indexing...')),
+        );
+
+        // Run in background
+        ref
+            .read(localIndexingServiceProvider)
+            .indexDirectory(selectedDirectory)
+            .then((stats) {
+              AppLogger.info(
+                'Local indexing completed: ${stats.processed} processed, ${stats.failed} failed, ${stats.skipped} skipped',
+                tag: 'Indexing',
+              );
+              ref.read(indexingStatusProvider.notifier).refresh();
+              if (mounted) {
+                String message;
+                if (stats.isEmpty) {
+                  message = 'No indexable files found in folder';
+                } else {
+                  message =
+                      'Indexing complete: ${stats.processed} files indexed';
+                  if (stats.skipped > 0) {
+                    message += ' (${stats.skipped} skipped)';
+                  }
+                  if (stats.failed > 0) {
+                    message += ' (${stats.failed} failed)';
+                  }
+                }
+
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(message),
+                    backgroundColor: stats.hasFailures
+                        ? colorScheme.error
+                        : colorScheme.secondary,
+                  ),
+                );
+              }
+            })
+            .catchError((e) {
+              AppLogger.error('Local indexing failed: $e', tag: 'Indexing');
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Indexing failed: $e')),
+                );
+              }
+              return null;
+            });
+
+        // Refresh immediately to show "Active" if we track local jobs (future improvement)
         ref.read(indexingStatusProvider.notifier).refresh();
       } else {
         AppLogger.debug('Folder picker cancelled', tag: 'Indexing');
@@ -640,309 +742,349 @@ class _IndexingScreenState extends ConsumerState<IndexingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final status = ref.watch(indexingStatusProvider).value;
+    final indexingStatus = ref.watch(indexingStatusProvider);
+    final status = indexingStatus.value;
+    final isStatusLoadingInProgress =
+        (indexingStatus.isLoading && status == null) || _isStatusLoading;
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final recentJobs = status?.recentJobs ?? [];
     final isIndexing = (status?.activeJobs ?? 0) > 0;
 
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(24, 48, 24, 48),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1000),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Index Files',
-                style: textTheme.headlineLarge?.copyWith(
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Add folders to index for semantic search',
-                style: textTheme.bodyLarge?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 48),
-
-              Wrap(
-                spacing: 16,
-                runSpacing: 16,
-                children: [
-                  _StatCard(
-                    label: 'TOTAL DOCUMENTS',
-                    numericValue: (status?.totalDocuments ?? 0).toDouble(),
-                    icon: Icons.description_outlined,
-                    color: colorScheme.primary,
-                  ),
-                  _StatCard(
-                    label: 'INDEXED',
-                    numericValue: (status?.indexedDocuments ?? 0).toDouble(),
-                    icon: Icons.check_circle_outline,
-                    color: colorScheme.tertiary,
-                  ),
-                  _StatCard(
-                    label: 'PENDING',
-                    numericValue: (status?.pendingDocuments ?? 0).toDouble(),
-                    icon: Icons.pending_outlined,
-                    color: colorScheme.secondary,
-                  ),
-                  if ((status?.failedDocuments ?? 0) > 0)
-                    _StatCard(
-                      label: 'FAILED',
-                      numericValue: (status?.failedDocuments ?? 0).toDouble(),
-                      icon: Icons.error_outline,
-                      color: colorScheme.error,
-                    ),
-                ],
-              ),
-
-              const SizedBox(height: 32),
-
-              // Add Folder Action
-              Align(
-                alignment: Alignment.centerLeft,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(minWidth: 200),
-                  child: FilledButton.icon(
-                    onPressed: isIndexing ? null : _pickFolder,
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 16,
-                        horizontal: 24,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(24, 48, 24, 48),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: constraints.maxHeight - 96, // Subtract padding
+            ),
+            child: Center(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 1000),
+                child: Column(
+                  mainAxisAlignment:
+                      MainAxisAlignment.center, // Center content vertically
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Index Files',
+                      style: textTheme.headlineLarge?.copyWith(
+                        fontWeight: FontWeight.w400,
                       ),
                     ),
-                    icon: (status?.activeJobs ?? 0) > 0
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.create_new_folder_outlined),
-                    label: Text(
-                      (status?.activeJobs ?? 0) > 0
-                          ? 'Indexing in Progress...'
-                          : 'Index New Folder',
+                    const SizedBox(height: 8),
+                    Text(
+                      'Add folders to index for semantic search',
+                      style: textTheme.bodyLarge?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                  ),
-                ),
-              ),
+                    const SizedBox(height: 48),
 
-              const SizedBox(height: 32),
-
-              // Recent Jobs Section Header
-              Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      'Indexed Folders',
-                      style: textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer.withValues(
-                        alpha: 0.4,
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${recentJobs.length}',
-                      style: textTheme.labelSmall?.copyWith(
-                        color: colorScheme.onPrimaryContainer,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  // View Toggle
-                  Container(
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest.withValues(
-                        alpha: 0.2,
-                      ),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                    Wrap(
+                      spacing: 16,
+                      runSpacing: 16,
                       children: [
-                        IconButton(
-                          icon: const Icon(Icons.grid_view_rounded, size: 18),
-                          onPressed: () => setState(() => _isGridView = true),
-                          color: _isGridView
-                              ? colorScheme.primary
-                              : colorScheme.onSurfaceVariant,
-                          style: IconButton.styleFrom(
-                            backgroundColor: _isGridView
-                                ? colorScheme.primaryContainer.withValues(
-                                    alpha: 0.6,
-                                  )
-                                : null,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
+                        _StatCard(
+                          label: 'TOTAL DOCUMENTS',
+                          numericValue: (status?.totalDocuments ?? 0)
+                              .toDouble(),
+                          icon: Icons.description_outlined,
+                          color: colorScheme.primary,
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.view_list_rounded, size: 18),
-                          onPressed: () => setState(() => _isGridView = false),
-                          color: !_isGridView
-                              ? colorScheme.primary
-                              : colorScheme.onSurfaceVariant,
-                          style: IconButton.styleFrom(
-                            backgroundColor: !_isGridView
-                                ? colorScheme.primaryContainer.withValues(
-                                    alpha: 0.6,
-                                  )
-                                : null,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
+                        _StatCard(
+                          label: 'INDEXED',
+                          numericValue: (status?.indexedDocuments ?? 0)
+                              .toDouble(),
+                          icon: Icons.check_circle_outline,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? AppTheme.successColorDark
+                              : AppTheme.successColor,
                         ),
+                        _StatCard(
+                          label: 'PENDING',
+                          numericValue: (status?.pendingDocuments ?? 0)
+                              .toDouble(),
+                          icon: Icons.pending_outlined,
+                          color: colorScheme.secondary,
+                        ),
+                        if ((status?.failedDocuments ?? 0) > 0)
+                          _StatCard(
+                            label: 'FAILED',
+                            numericValue: (status?.failedDocuments ?? 0)
+                                .toDouble(),
+                            icon: Icons.error_outline,
+                            color: colorScheme.error,
+                          ),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  if (recentJobs.isNotEmpty)
-                    TextButton.icon(
-                      onPressed:
-                          ((status?.activeJobs ?? 0) > 0 || _isStatusLoading)
-                          ? null
-                          : _loadIndexingStatus,
-                      icon: _isStatusLoading
-                          ? const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                strokeCap: StrokeCap.round,
-                              ),
-                            )
-                          : const Icon(Icons.refresh_rounded, size: 18),
-                      label: Text(_isStatusLoading ? '' : 'Refresh'),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 16),
 
-              if (_isStatusLoading && recentJobs.isEmpty)
-                if (_isGridView)
-                  GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(16),
-                    gridDelegate:
-                        const SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: 180,
-                          childAspectRatio: 0.85,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
-                        ),
-                    itemCount: 8,
-                    itemBuilder: (context, index) => CompactIndexCard.skeleton(
-                      isListView: false,
-                    ),
-                  )
-                else
-                  ListView.separated(
-                    physics: const NeverScrollableScrollPhysics(),
-                    shrinkWrap: true,
-                    padding: const EdgeInsets.all(16),
-                    itemCount: 8,
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 8),
-                    itemBuilder: (context, index) => CompactIndexCard.skeleton(
-                      isListView: true,
-                    ),
-                  )
-              else if (recentJobs.isEmpty)
-                _buildEmptyState(colorScheme, textTheme)
-              else if (_isGridView)
-                Stack(
-                  children: [
-                    GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      padding: const EdgeInsets.all(16),
-                      gridDelegate:
-                          const SliverGridDelegateWithMaxCrossAxisExtent(
-                            maxCrossAxisExtent: 180,
-                            childAspectRatio: 0.85,
-                            crossAxisSpacing: 16,
-                            mainAxisSpacing: 16,
+                    const SizedBox(height: 32),
+
+                    // Add Folder Action
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(minWidth: 200),
+                        child: FilledButton.icon(
+                          onPressed: isIndexing ? null : _pickFolder,
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 16,
+                              horizontal: 24,
+                            ),
                           ),
-                      itemCount: recentJobs.length,
-                      itemBuilder: (context, index) {
-                        final job = recentJobs[index];
-                        return CompactIndexCard(
-                          job: job,
-                          onRefresh: _loadIndexingStatus,
-                          isListView: false,
-                        );
-                      },
-                    ),
-                    if (_isStatusLoading)
-                      Positioned.fill(
-                        child: Container(
-                          color: colorScheme.surface.withValues(alpha: 0.3),
+                          icon: (status?.activeJobs ?? 0) > 0
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.create_new_folder_outlined),
+                          label: Text(
+                            (status?.activeJobs ?? 0) > 0
+                                ? 'Indexing in Progress...'
+                                : 'Index New Folder',
+                          ),
                         ),
                       ),
-                  ],
-                )
-              else
-                Stack(
-                  children: [
-                    ListView.separated(
-                      physics: const NeverScrollableScrollPhysics(),
-                      shrinkWrap: true,
-                      padding: const EdgeInsets.all(16),
-                      itemCount: recentJobs.length,
-                      separatorBuilder: (context, index) =>
-                          const SizedBox(height: 8),
-                      itemBuilder: (context, index) {
-                        final job = recentJobs[index];
-                        return CompactIndexCard(
-                          job: job,
-                          onRefresh: _loadIndexingStatus,
-                          isListView: true,
-                        );
-                      },
                     ),
-                    if (_isStatusLoading)
-                      Positioned.fill(
-                        child: Container(
-                          color: colorScheme.surface.withValues(alpha: 0.3),
+
+                    const SizedBox(height: 32),
+
+                    // Recent Jobs Section Header
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            'Indexed Folders',
+                            style: textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primaryContainer.withValues(
+                              alpha: 0.4,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '${recentJobs.length}',
+                            style: textTheme.labelSmall?.copyWith(
+                              color: colorScheme.onPrimaryContainer,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        // View Toggle
+                        Container(
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerHighest
+                                .withValues(
+                                  alpha: 0.2,
+                                ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.grid_view_rounded,
+                                  size: 18,
+                                ),
+                                onPressed: () =>
+                                    setState(() => _isGridView = true),
+                                color: _isGridView
+                                    ? colorScheme.primary
+                                    : colorScheme.onSurfaceVariant,
+                                style: IconButton.styleFrom(
+                                  backgroundColor: _isGridView
+                                      ? colorScheme.primaryContainer.withValues(
+                                          alpha: 0.6,
+                                        )
+                                      : null,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.view_list_rounded,
+                                  size: 18,
+                                ),
+                                onPressed: () =>
+                                    setState(() => _isGridView = false),
+                                color: !_isGridView
+                                    ? colorScheme.primary
+                                    : colorScheme.onSurfaceVariant,
+                                style: IconButton.styleFrom(
+                                  backgroundColor: !_isGridView
+                                      ? colorScheme.primaryContainer.withValues(
+                                          alpha: 0.6,
+                                        )
+                                      : null,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        if (recentJobs.isNotEmpty)
+                          TextButton.icon(
+                            onPressed:
+                                ((status?.activeJobs ?? 0) > 0 ||
+                                    isStatusLoadingInProgress)
+                                ? null
+                                : _loadIndexingStatus,
+                            icon: isStatusLoadingInProgress
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      strokeCap: StrokeCap.round,
+                                    ),
+                                  )
+                                : const Icon(Icons.refresh_rounded, size: 18),
+                            label: Text(
+                              isStatusLoadingInProgress ? '' : 'Refresh',
+                            ),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    if (isStatusLoadingInProgress && recentJobs.isEmpty)
+                      if (_isGridView)
+                        GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(16),
+                          gridDelegate:
+                              const SliverGridDelegateWithMaxCrossAxisExtent(
+                                maxCrossAxisExtent: 180,
+                                childAspectRatio: 0.85,
+                                crossAxisSpacing: 16,
+                                mainAxisSpacing: 16,
+                              ),
+                          itemCount: 8,
+                          itemBuilder: (context, index) =>
+                              CompactIndexCard.skeleton(
+                                isListView: false,
+                              ),
+                        )
+                      else
+                        ListView.separated(
+                          physics: const NeverScrollableScrollPhysics(),
+                          shrinkWrap: true,
+                          padding: const EdgeInsets.all(16),
+                          itemCount: 8,
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(height: 8),
+                          itemBuilder: (context, index) =>
+                              CompactIndexCard.skeleton(
+                                isListView: true,
+                              ),
+                        )
+                    else if (recentJobs.isEmpty)
+                      _buildEmptyState(colorScheme, textTheme)
+                    else if (_isGridView)
+                      Stack(
+                        children: [
+                          GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            padding: const EdgeInsets.all(16),
+                            gridDelegate:
+                                const SliverGridDelegateWithMaxCrossAxisExtent(
+                                  maxCrossAxisExtent: 180,
+                                  childAspectRatio: 0.85,
+                                  crossAxisSpacing: 16,
+                                  mainAxisSpacing: 16,
+                                ),
+                            itemCount: recentJobs.length,
+                            itemBuilder: (context, index) {
+                              final job = recentJobs[index];
+                              return CompactIndexCard(
+                                job: job,
+                                onRefresh: _loadIndexingStatus,
+                                isListView: false,
+                              );
+                            },
+                          ),
+                          if (isStatusLoadingInProgress)
+                            Positioned.fill(
+                              child: Container(
+                                color: colorScheme.surface.withValues(
+                                  alpha: 0.3,
+                                ),
+                              ),
+                            ),
+                        ],
+                      )
+                    else
+                      Stack(
+                        children: [
+                          ListView.separated(
+                            physics: const NeverScrollableScrollPhysics(),
+                            shrinkWrap: true,
+                            padding: const EdgeInsets.all(16),
+                            itemCount: recentJobs.length,
+                            separatorBuilder: (context, index) =>
+                                const SizedBox(height: 8),
+                            itemBuilder: (context, index) {
+                              final job = recentJobs[index];
+                              return CompactIndexCard(
+                                job: job,
+                                onRefresh: _loadIndexingStatus,
+                                isListView: true,
+                              );
+                            },
+                          ),
+                          if (isStatusLoadingInProgress)
+                            Positioned.fill(
+                              child: Container(
+                                color: colorScheme.surface.withValues(
+                                  alpha: 0.3,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
+
+                    // Bottom spacer
+                    const SizedBox(height: 48),
                   ],
                 ),
-
-              // Bottom spacer
-              const SizedBox(height: 48),
-            ],
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 

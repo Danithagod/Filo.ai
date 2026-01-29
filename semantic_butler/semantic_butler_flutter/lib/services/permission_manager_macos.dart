@@ -73,7 +73,7 @@ class PermissionManagerMacOS {
       return const PermissionResult(
         status: PermissionStatus.partial,
         message:
-            'System Settings opened. Please enable Full Disk Access for Semantic Butler and restart the app.',
+            'System Settings opened. Please enable Full Disk Access for Filo and restart the app.',
       );
     } catch (e) {
       return PermissionResult(

@@ -168,15 +168,12 @@ class _QuickActionChip extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(100),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.3),
-          ),
+          borderRadius: BorderRadius.circular(100),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

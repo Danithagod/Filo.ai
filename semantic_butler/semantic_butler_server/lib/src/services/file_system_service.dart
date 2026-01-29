@@ -1,8 +1,11 @@
 import 'dart:io';
-import 'dart:convert';
-import 'package:path/path.dart' as path;
+import 'package:path/path.dart' as p;
 import 'package:serverpod/serverpod.dart';
 import '../generated/protocol.dart';
+import '../utils/cross_platform_paths.dart';
+import '../utils/path_utils.dart';
+import '../utils/validation.dart';
+import 'file_operations_service.dart';
 
 /// Service for exploring the local filesystem
 class FileSystemService {
@@ -11,71 +14,59 @@ class FileSystemService {
     Session session,
     String dirPath,
   ) async {
-    final dir = Directory(dirPath);
+    InputValidation.validateFilePath(dirPath);
+    final resolvedPath = FileOperationsService.resolvePath(dirPath);
+    final dir = Directory(resolvedPath);
+
     if (!await dir.exists()) {
       throw Exception('Directory not found: $dirPath');
     }
 
-    final entries = <FileSystemEntry>[];
+    final entities = await dir.list(followLinks: false).toList();
+    final entityPaths = entities.map((entity) => entity.path).toList();
 
-    // Get all indexed paths in this directory to avoid per-file DB queries
-    Set<String> indexedPaths = {};
-    try {
-      final indexedEntries = await FileIndex.db.find(
+    final indexedPaths = <String>{};
+    if (entityPaths.isNotEmpty) {
+      final indexed = await FileIndex.db.find(
         session,
-        where: (t) => t.path.like('$dirPath%'),
+        where: (t) => t.path.inSet(entityPaths.toSet()),
       );
-      indexedPaths = indexedEntries.map((e) => e.path).toSet();
-    } catch (e, stack) {
-      session.log(
-        'Error querying file index: $e',
-        level: LogLevel.warning,
-        exception: e,
-        stackTrace: stack,
+      indexedPaths.addAll(
+        indexed.map((entry) => PathUtils.normalize(entry.path)),
       );
-      // Continue without index status if DB fails
     }
 
-    try {
-      await for (final entity in dir.list()) {
-        try {
-          final stat = await entity.stat();
-          final isDirectory = entity is Directory;
-          final name = path.basename(entity.path);
+    final entries = <FileSystemEntry>[];
+    for (final entity in entities) {
+      try {
+        final stat = await entity.stat();
+        final name = p.basename(entity.path);
+        final isDirectory = entity is Directory;
+        final extension = isDirectory ? '' : p.extension(name);
 
-          entries.add(
-            FileSystemEntry(
-              name: name,
-              path: entity.path,
-              isDirectory: isDirectory,
-              size: stat.size,
-              modifiedAt: stat.modified,
-              fileExtension: isDirectory ? null : path.extension(entity.path),
-              isIndexed: indexedPaths.contains(entity.path),
-            ),
-          );
-        } catch (e) {
-          // Skip individual files specifically if we can't stat them (Access Denied etc)
-          session.log(
-            'Skipping file ${entity.path}: $e',
-            level: LogLevel.debug,
-          );
-        }
+        entries.add(
+          FileSystemEntry(
+            name: name,
+            path: entity.path,
+            isDirectory: isDirectory,
+            size: isDirectory ? 0 : stat.size,
+            modifiedAt: stat.modified,
+            fileExtension: extension.isNotEmpty ? extension.substring(1) : null,
+            isIndexed: indexedPaths.contains(PathUtils.normalize(entity.path)),
+          ),
+        );
+      } catch (e) {
+        session.log(
+          'Failed to stat entry ${entity.path}: $e',
+          level: LogLevel.debug,
+        );
       }
-    } catch (e, stack) {
-      session.log(
-        'Error listing directory $dirPath: $e',
-        level: LogLevel.error,
-        exception: e,
-        stackTrace: stack,
-      );
-      rethrow; // Rethrow to let endpoint handle it, but now we have logs
     }
 
-    // Sort: Directories first, then alphabetically
     entries.sort((a, b) {
-      if (a.isDirectory && !b.isDirectory) return -1;
-      if (!a.isDirectory && b.isDirectory) return 1;
+      if (a.isDirectory != b.isDirectory) {
+        return a.isDirectory ? -1 : 1;
+      }
       return a.name.toLowerCase().compareTo(b.name.toLowerCase());
     });
 
@@ -84,60 +75,27 @@ class FileSystemService {
 
   /// List available drives on the system
   Future<List<DriveInfo>> listDrives() async {
-    final drives = <DriveInfo>[];
+    final rootPaths = await CrossPlatformPaths.getRootPaths();
 
+    return rootPaths.map((path) {
+      final displayName = _driveDisplayName(path);
+      return DriveInfo(
+        name: displayName,
+        path: path,
+        driveType: Platform.isWindows ? 'local' : 'mount',
+      );
+    }).toList();
+  }
+
+  String _driveDisplayName(String path) {
     if (Platform.isWindows) {
-      // Use PowerShell to get logical disks as JSON. wmic is deprecated/unreliable
-      try {
-        final result = await Process.run('powershell', [
-          '-Command',
-          'Get-CimInstance Win32_LogicalDisk | Select-Object Name, VolumeName, Size, FreeSpace | ConvertTo-Json',
-        ]);
-
-        if (result.exitCode == 0) {
-          final output = result.stdout.toString().trim();
-          if (output.isNotEmpty) {
-            // ConvertTo-Json returns a single object if only one drive, or a list if multiple.
-            // We need to handle both cases.
-            var data = jsonDecode(output);
-            if (data is Map) {
-              data = [data];
-            }
-
-            if (data is List) {
-              for (final item in data) {
-                final name = item['Name'] as String?;
-                final volumeName = item['VolumeName'] as String?;
-                final size = item['Size'] as int?;
-                final freeSpace = item['FreeSpace'] as int?;
-
-                if (name != null) {
-                  drives.add(
-                    DriveInfo(
-                      name: volumeName != null && volumeName.isNotEmpty
-                          ? '$volumeName ($name)'
-                          : 'Local Disk ($name)',
-                      path: '$name\\',
-                      totalSpace: size,
-                      availableSpace: freeSpace,
-                      driveType: 'Fixed',
-                    ),
-                  );
-                }
-              }
-            }
-          }
-        }
-      } catch (e) {
-        stderr.writeln('Error listing drives: $e');
-        // Fallback to at least C:\ if everything fails
-        drives.add(DriveInfo(name: 'Local Disk (C:)', path: 'C:\\'));
-      }
-    } else {
-      // Unix-like: just show root as a drive
-      drives.add(DriveInfo(name: 'Root /', path: '/', driveType: 'Root'));
+      final trimmed = path.replaceAll('\\', '');
+      return trimmed.isEmpty ? path : trimmed;
     }
-
-    return drives;
+    if (path == '/') {
+      return 'Root';
+    }
+    final parts = path.split(RegExp(r'[\\/]'));
+    return parts.where((part) => part.isNotEmpty).last;
   }
 }

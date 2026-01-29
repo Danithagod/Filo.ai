@@ -6,3 +6,12 @@ fields:
   tags: List<String>?
   minSize: int?
   maxSize: int?
+  minCount: int?
+  maxCount: int?
+  countUnit: String?
+  locationPaths: List<String>?
+  cursor: String?
+  semanticWeight: double?
+  keywordWeight: double?
+  sessionId: String?
+  contentTerms: List<String>?

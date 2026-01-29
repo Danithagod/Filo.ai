@@ -19,6 +19,11 @@ const Background = () => {
             canvas.height = window.innerHeight;
         };
 
+        const handleMouseMove = (e) => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+        };
+
         window.addEventListener('resize', resize);
         window.addEventListener('mousemove', handleMouseMove);
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../common/custom_expansion_tile.dart';
 
 class AgentThoughtExpander extends StatefulWidget {
   final List<String> thoughts;
@@ -41,7 +42,7 @@ class _AgentThoughtExpanderState extends State<AgentThoughtExpander> {
       clipBehavior: Clip.antiAlias,
       child: Theme(
         data: theme.copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
+        child: CustomExpansionTile(
           title: Row(
             children: [
               Icon(
@@ -81,7 +82,6 @@ class _AgentThoughtExpanderState extends State<AgentThoughtExpander> {
           initiallyExpanded: _isExpanded,
           onExpansionChanged: (value) => setState(() => _isExpanded = value),
           visualDensity: VisualDensity.compact,
-          dense: true,
           shape: const Border(), // Remove default borders
           children: [
             ...widget.thoughts.map(

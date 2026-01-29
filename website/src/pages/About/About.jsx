@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { gsap } from 'gsap';
-import { Users, Heart, ShieldCheck, Globe } from 'lucide-react';
+import { Users, Zap, Search, Lock } from 'lucide-react';
 import './About.css';
 
 const About = ({ show }) => {
@@ -32,26 +32,26 @@ const About = ({ show }) => {
       <section className="about-hero">
         <div className="container">
           <h1 className="hero-title">Our <span className="text-gradient">Mission</span></h1>
-          <p className="hero-subtitle">Empowering users with intelligent desktop assistance through local-first file management and modern AI integration.</p>
+          <p className="hero-subtitle">Redefining desktop productivity through AI-powered semantic search, local-first architecture, and intelligent file discovery.</p>
         </div>
       </section>
 
       <section className="about-content-section container">
         <div className="about-glass glass-card">
           <div className="about-text">
-            <h2>The Desktop AI Gap</h2>
-            <p>In an era dominated by cloud-based AI, we believe your personal data management should be local and secure. Semantic Butler was built to bridge the gap between powerful AI reasoning and local file organization, ensuring your document structure remains private while leveraging the best available language models.</p>
+            <h2>Privacy by Design</h2>
+            <p>We believe your digital workspace should be your own. Filo takes a local-first approach to file search. Your file index and document metadata stay on your machine, while only your search queries are sent to AI models for processing.</p>
           </div>
           <div className="about-stats">
             <div className="stat-card glass-card">
-              <ShieldCheck size={32} />
+              <Lock size={32} />
               <h4>Local-First</h4>
-              <p>File extraction and indexing happens on your device.</p>
+              <p>Your file index stays on your machine.</p>
             </div>
             <div className="stat-card glass-card">
-              <Globe size={32} />
-              <h4>Multi-Model</h4>
-              <p>Choose the best AI for the job via OpenRouter.</p>
+              <Zap size={32} />
+              <h4>High Performance</h4>
+              <p>Optimized for rapid desktop search.</p>
             </div>
           </div>
         </div>
@@ -61,18 +61,18 @@ const About = ({ show }) => {
         <div className="team-grid">
           <div className="team-header">
             <h2>Built for <span className="text-gradient">Efficiency</span></h2>
-            <p>We're dedicated to building tools that respect user privacy and system performance.</p>
+            <p>We&apos;re dedicated to building tools that help you find what you need instantly while respecting your privacy.</p>
           </div>
           <div className="about-features-grid">
             <div className="about-feature-item glass-card">
-              <Users size={24} className="text-gradient-icon" />
-              <h3>User Centric</h3>
-              <p>Designed to fit naturally into existing desktop workflows.</p>
+              <Search size={24} className="text-gradient-icon" />
+              <h3>Semantic Discovery</h3>
+              <p>Find files by meaning and context, not just exact keywords.</p>
             </div>
             <div className="about-feature-item glass-card">
-              <Heart size={24} className="text-gradient-icon" />
-              <h3>Passion for UX</h3>
-              <p>We believe utility shouldn't come at the cost of a beautiful experience.</p>
+              <Users size={24} className="text-gradient-icon" />
+              <h3>User Centric</h3>
+              <p>Designed to fit naturally into your desktop workflow.</p>
             </div>
           </div>
         </div>

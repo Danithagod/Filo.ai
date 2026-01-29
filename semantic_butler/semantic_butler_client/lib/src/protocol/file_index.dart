@@ -28,6 +28,7 @@ abstract class FileIndex implements _i1.SerializableModel {
     this.fileCreatedAt,
     this.fileModifiedAt,
     this.wordCount,
+    this.pageCount,
     required this.isTextContent,
     required this.status,
     this.errorMessage,
@@ -49,6 +50,7 @@ abstract class FileIndex implements _i1.SerializableModel {
     DateTime? fileCreatedAt,
     DateTime? fileModifiedAt,
     int? wordCount,
+    int? pageCount,
     required bool isTextContent,
     required String status,
     String? errorMessage,
@@ -79,6 +81,7 @@ abstract class FileIndex implements _i1.SerializableModel {
               jsonSerialization['fileModifiedAt'],
             ),
       wordCount: jsonSerialization['wordCount'] as int?,
+      pageCount: jsonSerialization['pageCount'] as int?,
       isTextContent: jsonSerialization['isTextContent'] as bool,
       status: jsonSerialization['status'] as String,
       errorMessage: jsonSerialization['errorMessage'] as String?,
@@ -130,6 +133,9 @@ abstract class FileIndex implements _i1.SerializableModel {
   /// Number of words in the document
   int? wordCount;
 
+  /// Number of pages in the document (for PDFs/DOCX)
+  int? pageCount;
+
   /// Whether this file contains readable text content
   bool isTextContent;
 
@@ -162,6 +168,7 @@ abstract class FileIndex implements _i1.SerializableModel {
     DateTime? fileCreatedAt,
     DateTime? fileModifiedAt,
     int? wordCount,
+    int? pageCount,
     bool? isTextContent,
     String? status,
     String? errorMessage,
@@ -185,6 +192,7 @@ abstract class FileIndex implements _i1.SerializableModel {
       if (fileCreatedAt != null) 'fileCreatedAt': fileCreatedAt?.toJson(),
       if (fileModifiedAt != null) 'fileModifiedAt': fileModifiedAt?.toJson(),
       if (wordCount != null) 'wordCount': wordCount,
+      if (pageCount != null) 'pageCount': pageCount,
       'isTextContent': isTextContent,
       'status': status,
       if (errorMessage != null) 'errorMessage': errorMessage,
@@ -216,6 +224,7 @@ class _FileIndexImpl extends FileIndex {
     DateTime? fileCreatedAt,
     DateTime? fileModifiedAt,
     int? wordCount,
+    int? pageCount,
     required bool isTextContent,
     required String status,
     String? errorMessage,
@@ -235,6 +244,7 @@ class _FileIndexImpl extends FileIndex {
          fileCreatedAt: fileCreatedAt,
          fileModifiedAt: fileModifiedAt,
          wordCount: wordCount,
+         pageCount: pageCount,
          isTextContent: isTextContent,
          status: status,
          errorMessage: errorMessage,
@@ -260,6 +270,7 @@ class _FileIndexImpl extends FileIndex {
     Object? fileCreatedAt = _Undefined,
     Object? fileModifiedAt = _Undefined,
     Object? wordCount = _Undefined,
+    Object? pageCount = _Undefined,
     bool? isTextContent,
     String? status,
     Object? errorMessage = _Undefined,
@@ -288,6 +299,7 @@ class _FileIndexImpl extends FileIndex {
           ? fileModifiedAt
           : this.fileModifiedAt,
       wordCount: wordCount is int? ? wordCount : this.wordCount,
+      pageCount: pageCount is int? ? pageCount : this.pageCount,
       isTextContent: isTextContent ?? this.isTextContent,
       status: status ?? this.status,
       errorMessage: errorMessage is String? ? errorMessage : this.errorMessage,

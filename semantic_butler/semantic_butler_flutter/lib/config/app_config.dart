@@ -1,26 +1,26 @@
-import 'dart:convert';
-
-import 'package:flutter/services.dart';
-
 class AppConfig {
-  final String? apiUrl;
-
-  AppConfig({
-    required this.apiUrl,
-  });
-
-  static Future<AppConfig> loadConfig() async {
-    final config = await _loadJsonConfig();
-    final String? apiUrl = config['apiUrl'];
-
-    return AppConfig(apiUrl: apiUrl);
-  }
-
-  static Future<Map<String, dynamic>> _loadJsonConfig() async {
-    final data = await rootBundle.loadString(
-      'assets/config.json',
+  static String get apiBaseUrl {
+    const env = String.fromEnvironment(
+      'ENVIRONMENT',
+      defaultValue: 'development',
     );
 
-    return jsonDecode(data);
+    switch (env) {
+      case 'production':
+        return 'https://semantic-butler-api.serverpod.space/';
+      case 'staging':
+        return 'https://semantic-butler-staging-api.serverpod.space/';
+      default:
+        return 'http://127.0.0.1:8080/';
+    }
   }
+
+  // Backward compatibility wrapper
+  static Future<AppConfig> loadConfig() async {
+    return AppConfig();
+  }
+
+  final String apiUrl;
+
+  AppConfig() : apiUrl = apiBaseUrl;
 }

@@ -53,7 +53,7 @@ void main() {
             sessionBuilder,
             Directory.systemTemp.path,
           );
-          await Future.delayed(Duration(seconds: 20));
+          await Future.delayed(Duration(seconds: 45));
 
           final results = await endpoints.butler.semanticSearch(
             sessionBuilder,

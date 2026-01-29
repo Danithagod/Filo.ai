@@ -46,7 +46,7 @@ class SearchHistoryNotifier extends Notifier<SearchHistoryState> {
   SearchHistoryState build() {
     // Auto-load history on initialization
     Future.microtask(() => loadHistory());
-    return SearchHistoryState();
+    return const SearchHistoryState(isLoading: true);
   }
 
   /// Load search history from server
@@ -91,7 +91,10 @@ class SearchHistoryNotifier extends Notifier<SearchHistoryState> {
 
       if (loadMore) _currentLimit += _pageSize;
     } catch (e) {
-      AppLogger.error('Failed to load search history: $e', tag: 'SearchHistoryProvider');
+      AppLogger.error(
+        'Failed to load search history: $e',
+        tag: 'SearchHistoryProvider',
+      );
       state = state.copyWith(
         isLoading: false,
         isLoadingMore: false,
@@ -118,7 +121,10 @@ class SearchHistoryNotifier extends Notifier<SearchHistoryState> {
         tag: 'SearchHistoryProvider',
       );
     } catch (e) {
-      AppLogger.warning('Failed to delete search item: $e', tag: 'SearchHistoryProvider');
+      AppLogger.warning(
+        'Failed to delete search item: $e',
+        tag: 'SearchHistoryProvider',
+      );
       // Revert on error
       state = state.copyWith(searches: backup);
       rethrow;
@@ -140,7 +146,10 @@ class SearchHistoryNotifier extends Notifier<SearchHistoryState> {
         tag: 'SearchHistoryProvider',
       );
     } catch (e) {
-      AppLogger.error('Failed to clear search history: $e', tag: 'SearchHistoryProvider');
+      AppLogger.error(
+        'Failed to clear search history: $e',
+        tag: 'SearchHistoryProvider',
+      );
       // Revert on error
       state = state.copyWith(searches: backup);
       rethrow;

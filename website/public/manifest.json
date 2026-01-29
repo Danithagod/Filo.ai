@@ -1,7 +1,7 @@
 {
-  "name": "Semantic Butler",
-  "short_name": "Semantic Butler",
-  "description": "Private AI for your local data",
+  "name": "Filo",
+  "short_name": "Filo",
+  "description": "AI-powered semantic search for your local files",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f0e13",
@@ -15,6 +15,9 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["productivity", "utilities"],
+  "categories": [
+    "productivity",
+    "utilities"
+  ],
   "screenshots": []
 }

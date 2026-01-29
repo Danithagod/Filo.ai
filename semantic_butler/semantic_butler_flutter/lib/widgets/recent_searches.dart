@@ -32,7 +32,7 @@ class RecentSearches extends ConsumerWidget {
     final historyState = ref.watch(searchHistoryProvider);
 
     if (historyState.isLoading) {
-      return const RecentSearchesSkeleton(itemCount: 3);
+      return RecentSearchesSkeleton(itemCount: 3);
     }
 
     // Show error state with retry button
@@ -67,7 +67,8 @@ class RecentSearches extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
               FilledButton.tonal(
-                onPressed: () => ref.read(searchHistoryProvider.notifier).refresh(),
+                onPressed: () =>
+                    ref.read(searchHistoryProvider.notifier).refresh(),
                 child: const Text('Retry'),
               ),
             ],
@@ -142,7 +143,8 @@ class RecentSearches extends ConsumerWidget {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.refresh, size: 18),
-                    onPressed: () => ref.read(searchHistoryProvider.notifier).refresh(),
+                    onPressed: () =>
+                        ref.read(searchHistoryProvider.notifier).refresh(),
                     visualDensity: VisualDensity.compact,
                     tooltip: 'Refresh history',
                   ),
@@ -183,8 +185,9 @@ class RecentSearches extends ConsumerWidget {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : TextButton.icon(
-                      onPressed: () =>
-                          ref.read(searchHistoryProvider.notifier).loadHistory(loadMore: true),
+                      onPressed: () => ref
+                          .read(searchHistoryProvider.notifier)
+                          .loadHistory(loadMore: true),
                       icon: const Icon(Icons.expand_more, size: 18),
                       label: const Text('Show More'),
                     ),
@@ -245,7 +248,11 @@ class RecentSearches extends ConsumerWidget {
     }
   }
 
-  Future<void> _deleteItem(BuildContext context, WidgetRef ref, SearchHistory item) async {
+  Future<void> _deleteItem(
+    BuildContext context,
+    WidgetRef ref,
+    SearchHistory item,
+  ) async {
     try {
       await ref.read(searchHistoryProvider.notifier).deleteItem(item);
       if (context.mounted) {

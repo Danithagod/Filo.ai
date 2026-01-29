@@ -15,13 +15,11 @@ void main() async {
   print('Connected to database');
 
   try {
-    final results = await connection.execute(
-      "SELECT column_name FROM information_schema.columns WHERE table_name = 'saved_search_preset'",
+    print('\nDropping document_vector_store...');
+    await connection.execute(
+      "DROP TABLE IF EXISTS document_vector_store CASCADE",
     );
-    print('Columns in saved_search_preset:');
-    for (final row in results) {
-      print(' - ${row[0]}');
-    }
+    print('Dropped document_vector_store.');
 
     final allTables = await connection.execute(
       "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'",

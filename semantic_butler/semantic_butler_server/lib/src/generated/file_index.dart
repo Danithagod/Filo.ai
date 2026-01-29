@@ -29,6 +29,7 @@ abstract class FileIndex
     this.fileCreatedAt,
     this.fileModifiedAt,
     this.wordCount,
+    this.pageCount,
     required this.isTextContent,
     required this.status,
     this.errorMessage,
@@ -50,6 +51,7 @@ abstract class FileIndex
     DateTime? fileCreatedAt,
     DateTime? fileModifiedAt,
     int? wordCount,
+    int? pageCount,
     required bool isTextContent,
     required String status,
     String? errorMessage,
@@ -80,6 +82,7 @@ abstract class FileIndex
               jsonSerialization['fileModifiedAt'],
             ),
       wordCount: jsonSerialization['wordCount'] as int?,
+      pageCount: jsonSerialization['pageCount'] as int?,
       isTextContent: jsonSerialization['isTextContent'] as bool,
       status: jsonSerialization['status'] as String,
       errorMessage: jsonSerialization['errorMessage'] as String?,
@@ -133,6 +136,9 @@ abstract class FileIndex
   /// Number of words in the document
   int? wordCount;
 
+  /// Number of pages in the document (for PDFs/DOCX)
+  int? pageCount;
+
   /// Whether this file contains readable text content
   bool isTextContent;
 
@@ -168,6 +174,7 @@ abstract class FileIndex
     DateTime? fileCreatedAt,
     DateTime? fileModifiedAt,
     int? wordCount,
+    int? pageCount,
     bool? isTextContent,
     String? status,
     String? errorMessage,
@@ -191,6 +198,7 @@ abstract class FileIndex
       if (fileCreatedAt != null) 'fileCreatedAt': fileCreatedAt?.toJson(),
       if (fileModifiedAt != null) 'fileModifiedAt': fileModifiedAt?.toJson(),
       if (wordCount != null) 'wordCount': wordCount,
+      if (pageCount != null) 'pageCount': pageCount,
       'isTextContent': isTextContent,
       'status': status,
       if (errorMessage != null) 'errorMessage': errorMessage,
@@ -216,6 +224,7 @@ abstract class FileIndex
       if (fileCreatedAt != null) 'fileCreatedAt': fileCreatedAt?.toJson(),
       if (fileModifiedAt != null) 'fileModifiedAt': fileModifiedAt?.toJson(),
       if (wordCount != null) 'wordCount': wordCount,
+      if (pageCount != null) 'pageCount': pageCount,
       'isTextContent': isTextContent,
       'status': status,
       if (errorMessage != null) 'errorMessage': errorMessage,
@@ -271,6 +280,7 @@ class _FileIndexImpl extends FileIndex {
     DateTime? fileCreatedAt,
     DateTime? fileModifiedAt,
     int? wordCount,
+    int? pageCount,
     required bool isTextContent,
     required String status,
     String? errorMessage,
@@ -290,6 +300,7 @@ class _FileIndexImpl extends FileIndex {
          fileCreatedAt: fileCreatedAt,
          fileModifiedAt: fileModifiedAt,
          wordCount: wordCount,
+         pageCount: pageCount,
          isTextContent: isTextContent,
          status: status,
          errorMessage: errorMessage,
@@ -315,6 +326,7 @@ class _FileIndexImpl extends FileIndex {
     Object? fileCreatedAt = _Undefined,
     Object? fileModifiedAt = _Undefined,
     Object? wordCount = _Undefined,
+    Object? pageCount = _Undefined,
     bool? isTextContent,
     String? status,
     Object? errorMessage = _Undefined,
@@ -343,6 +355,7 @@ class _FileIndexImpl extends FileIndex {
           ? fileModifiedAt
           : this.fileModifiedAt,
       wordCount: wordCount is int? ? wordCount : this.wordCount,
+      pageCount: pageCount is int? ? pageCount : this.pageCount,
       isTextContent: isTextContent ?? this.isTextContent,
       status: status ?? this.status,
       errorMessage: errorMessage is String? ? errorMessage : this.errorMessage,
@@ -418,6 +431,11 @@ class FileIndexUpdateTable extends _i1.UpdateTable<FileIndexTable> {
 
   _i1.ColumnValue<int, int> wordCount(int? value) => _i1.ColumnValue(
     table.wordCount,
+    value,
+  );
+
+  _i1.ColumnValue<int, int> pageCount(int? value) => _i1.ColumnValue(
+    table.pageCount,
     value,
   );
 
@@ -501,6 +519,10 @@ class FileIndexTable extends _i1.Table<int?> {
       'wordCount',
       this,
     );
+    pageCount = _i1.ColumnInt(
+      'pageCount',
+      this,
+    );
     isTextContent = _i1.ColumnBool(
       'isTextContent',
       this,
@@ -561,6 +583,9 @@ class FileIndexTable extends _i1.Table<int?> {
   /// Number of words in the document
   late final _i1.ColumnInt wordCount;
 
+  /// Number of pages in the document (for PDFs/DOCX)
+  late final _i1.ColumnInt pageCount;
+
   /// Whether this file contains readable text content
   late final _i1.ColumnBool isTextContent;
 
@@ -591,6 +616,7 @@ class FileIndexTable extends _i1.Table<int?> {
     fileCreatedAt,
     fileModifiedAt,
     wordCount,
+    pageCount,
     isTextContent,
     status,
     errorMessage,

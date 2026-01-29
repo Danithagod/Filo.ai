@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../models/chat/chat_message.dart';
 import '../models/chat/conversation.dart';
 import '../services/chat_storage_service.dart';
+import '../utils/app_logger.dart';
 
 final chatStorageServiceProvider = Provider<ChatStorageService>((ref) {
   return ChatStorageService();
@@ -118,6 +119,10 @@ class ChatHistoryNotifier extends AsyncNotifier<ChatHistoryState> {
     );
 
     await _storageService.saveConversation(newConversation);
+    AppLogger.info(
+      'Created and saved new conversation: $newId',
+      tag: 'ChatHistory',
+    );
     await _storageService.setCurrentConversationId(newId);
 
     final newConversations = [newConversation, ...state.conversations];
@@ -223,6 +228,10 @@ class ChatHistoryNotifier extends AsyncNotifier<ChatHistoryState> {
     final state = await future;
 
     if (state.currentConversation == null) {
+      AppLogger.info(
+        'No current conversation, creating one before adding message',
+        tag: 'ChatHistory',
+      );
       await createNewConversation();
     }
 

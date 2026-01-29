@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../models/chat/tool_result.dart';
+import 'tool_results/generic_tool_result.dart';
+import 'tool_results/search_tool_result.dart';
+import 'tool_results/file_op_tool_result.dart';
+import '../common/custom_expansion_tile.dart';
 
 /// Card displaying tool execution result
 class ToolResultCard extends StatelessWidget {
@@ -28,117 +32,53 @@ class ToolResultCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: result.success
-            ? (isUser
-                  ? colorScheme.onPrimary.withValues(alpha: 0.05)
-                  : colorScheme.surfaceContainerHigh)
-            : colorScheme.errorContainer.withValues(alpha: 0.2),
+        color: colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: result.success
-              ? (isUser
-                    ? colorScheme.onPrimary.withValues(alpha: 0.1)
-                    : colorScheme.outlineVariant.withValues(alpha: 0.5))
-              : colorScheme.error.withValues(alpha: 0.3),
+              ? colorScheme.outlineVariant.withValues(alpha: 0.5)
+              : colorScheme.error.withValues(alpha: 0.2),
         ),
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: ExpansionTile(
-          clipBehavior: Clip.none,
-          leading: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: itemColor.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              result.success
-                  ? Icons.check_circle_outline_rounded
-                  : Icons.error_outline_rounded,
-              size: 16,
-              color: itemColor,
-            ),
+      child: CustomExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: itemColor.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
           ),
-          title: Text(
-            friendlyDescription,
-            style: theme.textTheme.labelMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: result.success
-                  ? (isUser ? colorScheme.onPrimary : colorScheme.onSurface)
-                  : colorScheme.error,
-            ),
+          child: Icon(
+            result.success
+                ? Icons.check_circle_outline_rounded
+                : Icons.error_outline_rounded,
+            size: 16,
+            color: itemColor,
           ),
-          trailing: Icon(
-            Icons.unfold_more_rounded,
-            size: 18,
-            color: result.success
-                ? (isUser
-                      ? colorScheme.onPrimary.withValues(alpha: 0.5)
-                      : colorScheme.onSurfaceVariant.withValues(alpha: 0.5))
-                : colorScheme.error.withValues(alpha: 0.5),
-          ),
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              margin: const EdgeInsets.only(left: 12, right: 12, bottom: 12),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.terminal_rounded,
-                        size: 12,
-                        color: Colors.white70,
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          'Technical Output (${result.tool})',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: Colors.white70,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        _formatTime(result.timestamp),
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: Colors.white38,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  SelectableText(
-                    result.result,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontFamily: 'monospace',
-                      fontSize: 10,
-                      color: Colors.white.withValues(alpha: 0.9),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ),
+        title: Text(
+          friendlyDescription,
+          style: theme.textTheme.labelMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: result.success
+                ? (isUser ? colorScheme.onPrimary : colorScheme.onSurface)
+                : colorScheme.error,
+          ),
+        ),
+        trailing: Icon(
+          Icons.unfold_more_rounded,
+          size: 18,
+          color: result.success
+              ? (isUser
+                    ? colorScheme.onPrimary.withValues(alpha: 0.5)
+                    : colorScheme.onSurfaceVariant.withValues(alpha: 0.5))
+              : colorScheme.error.withValues(alpha: 0.5),
+        ),
+        children: [
+          _buildResultContent(result, theme),
+        ],
       ),
     );
-  }
-
-  static String _formatTime(DateTime time) {
-    final hour = time.hour.toString().padLeft(2, '0');
-    final minute = time.minute.toString().padLeft(2, '0');
-    return '$hour:$minute';
   }
 
   static String _getFriendlyToolDescription(
@@ -201,5 +141,38 @@ class ToolResultCard extends StatelessWidget {
       default:
         return 'Action completed';
     }
+  }
+
+  Widget _buildResultContent(ToolResult result, ThemeData theme) {
+    if (!result.success) {
+      return GenericToolResult(
+        tool: result.tool,
+        result: result.result,
+        success: false,
+      );
+    }
+
+    final tool = result.tool;
+
+    if (tool == 'search_files' ||
+        tool == 'grep_search' ||
+        tool == 'find_files' ||
+        tool == 'searchTags' ||
+        tool == 'find_related') {
+      return SearchToolResult(result: result, theme: theme);
+    }
+
+    if (tool.contains('rename') ||
+        tool.contains('move') ||
+        tool.contains('delete') ||
+        tool.contains('copy')) {
+      return FileOpToolResult(result: result, theme: theme);
+    }
+
+    return GenericToolResult(
+      tool: result.tool,
+      result: result.result,
+      success: result.success,
+    );
   }
 }

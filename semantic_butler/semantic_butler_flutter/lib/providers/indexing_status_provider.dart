@@ -176,4 +176,77 @@ class IndexingStatusNotifier extends AsyncNotifier<IndexingStatus?> {
 
     state = AsyncData(currentData.copyWith(recentJobs: updatedJobs));
   }
+
+  /// Optimistically update a job's status in the UI before server confirms
+  /// Returns the previous state for rollback if needed
+  IndexingStatus? optimisticUpdateJobStatus(int jobId, String newStatus) {
+    final currentData = state.value;
+    if (currentData == null || currentData.recentJobs == null) return null;
+
+    final previousState = currentData;
+
+    final updatedJobs = currentData.recentJobs!.map((job) {
+      if (job.id == jobId) {
+        return job.copyWith(status: newStatus);
+      }
+      return job;
+    }).toList();
+
+    // Update active jobs count if status changed to/from active
+    int activeJobs = currentData.activeJobs;
+    final job = currentData.recentJobs!.firstWhere(
+      (j) => j.id == jobId,
+      orElse: () => IndexingJob(
+        folderPath: '',
+        status: '',
+        totalFiles: 0,
+        processedFiles: 0,
+        failedFiles: 0,
+        skippedFiles: 0,
+        startedAt: DateTime.now(),
+      ),
+    );
+
+    final wasActive = job.status == 'running' || job.status == 'queued';
+    final isActive = newStatus == 'running' || newStatus == 'queued';
+
+    if (wasActive && !isActive) {
+      activeJobs = (activeJobs - 1).clamp(0, activeJobs);
+    } else if (!wasActive && isActive) {
+      activeJobs++;
+    }
+
+    state = AsyncData(currentData.copyWith(
+      recentJobs: updatedJobs,
+      activeJobs: activeJobs,
+    ));
+
+    return previousState;
+  }
+
+  /// Rollback to a previous state (used when optimistic update fails)
+  void rollback(IndexingStatus? previousState) {
+    if (previousState != null) {
+      state = AsyncData(previousState);
+    }
+  }
+
+  /// Optimistically remove a job from the list (e.g., after cancellation)
+  IndexingStatus? optimisticRemoveJob(int jobId) {
+    final currentData = state.value;
+    if (currentData == null || currentData.recentJobs == null) return null;
+
+    final previousState = currentData;
+
+    final updatedJobs = currentData.recentJobs!
+        .where((job) => job.id != jobId)
+        .toList();
+
+    state = AsyncData(currentData.copyWith(
+      recentJobs: updatedJobs,
+      activeJobs: (currentData.activeJobs - 1).clamp(0, currentData.activeJobs),
+    ));
+
+    return previousState;
+  }
 }

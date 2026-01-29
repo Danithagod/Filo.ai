@@ -252,15 +252,15 @@ class _IndexHealthDashboardState extends ConsumerState<IndexHealthDashboard> {
     String scoreLabel;
 
     if (healthScore >= 90) {
-      scoreColor = Colors.green;
+      scoreColor = colorScheme.tertiary;
       scoreIcon = Icons.check_circle;
       scoreLabel = 'Excellent';
     } else if (healthScore >= 70) {
-      scoreColor = Colors.orange;
+      scoreColor = colorScheme.secondary;
       scoreIcon = Icons.warning;
       scoreLabel = 'Good';
     } else if (healthScore >= 50) {
-      scoreColor = Colors.deepOrange;
+      scoreColor = colorScheme.secondary.withValues(alpha: 0.8);
       scoreIcon = Icons.error_outline;
       scoreLabel = 'Fair';
     } else {
@@ -347,7 +347,7 @@ class _IndexHealthDashboardState extends ConsumerState<IndexHealthDashboard> {
             ),
             const SizedBox(width: 16),
             Expanded(
-              child: _buildStatCard('Failed', report.totalFailed, Icons.error)
+              child: _buildStatCard('Failed', report.totalFailed, Icons.error),
             ),
             const SizedBox(width: 16),
             Expanded(

@@ -26,3 +26,5 @@ fields:
   tags: List<String>?
   ### Date indexed or found (if available)
   indexedAt: DateTime?
+  ### Suggested query if typos were detected
+  suggestedQuery: String?

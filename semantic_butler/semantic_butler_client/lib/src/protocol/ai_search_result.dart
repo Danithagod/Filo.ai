@@ -29,6 +29,7 @@ abstract class AISearchResult implements _i1.SerializableModel {
     this.mimeType,
     this.tags,
     this.indexedAt,
+    this.suggestedQuery,
   });
 
   factory AISearchResult({
@@ -44,6 +45,7 @@ abstract class AISearchResult implements _i1.SerializableModel {
     String? mimeType,
     List<String>? tags,
     DateTime? indexedAt,
+    String? suggestedQuery,
   }) = _AISearchResultImpl;
 
   factory AISearchResult.fromJson(Map<String, dynamic> jsonSerialization) {
@@ -64,6 +66,7 @@ abstract class AISearchResult implements _i1.SerializableModel {
       indexedAt: jsonSerialization['indexedAt'] == null
           ? null
           : _i1.DateTimeJsonExtension.fromJson(jsonSerialization['indexedAt']),
+      suggestedQuery: jsonSerialization['suggestedQuery'] as String?,
     );
   }
 
@@ -103,6 +106,9 @@ abstract class AISearchResult implements _i1.SerializableModel {
   /// Date indexed or found (if available)
   DateTime? indexedAt;
 
+  /// Suggested query if typos were detected
+  String? suggestedQuery;
+
   /// Returns a shallow copy of this [AISearchResult]
   /// with some or all fields replaced by the given arguments.
   @_i1.useResult
@@ -119,6 +125,7 @@ abstract class AISearchResult implements _i1.SerializableModel {
     String? mimeType,
     List<String>? tags,
     DateTime? indexedAt,
+    String? suggestedQuery,
   });
   @override
   Map<String, dynamic> toJson() {
@@ -136,6 +143,7 @@ abstract class AISearchResult implements _i1.SerializableModel {
       if (mimeType != null) 'mimeType': mimeType,
       if (tags != null) 'tags': tags?.toJson(),
       if (indexedAt != null) 'indexedAt': indexedAt?.toJson(),
+      if (suggestedQuery != null) 'suggestedQuery': suggestedQuery,
     };
   }
 
@@ -161,6 +169,7 @@ class _AISearchResultImpl extends AISearchResult {
     String? mimeType,
     List<String>? tags,
     DateTime? indexedAt,
+    String? suggestedQuery,
   }) : super._(
          path: path,
          fileName: fileName,
@@ -174,6 +183,7 @@ class _AISearchResultImpl extends AISearchResult {
          mimeType: mimeType,
          tags: tags,
          indexedAt: indexedAt,
+         suggestedQuery: suggestedQuery,
        );
 
   /// Returns a shallow copy of this [AISearchResult]
@@ -193,6 +203,7 @@ class _AISearchResultImpl extends AISearchResult {
     Object? mimeType = _Undefined,
     Object? tags = _Undefined,
     Object? indexedAt = _Undefined,
+    Object? suggestedQuery = _Undefined,
   }) {
     return AISearchResult(
       path: path ?? this.path,
@@ -211,6 +222,9 @@ class _AISearchResultImpl extends AISearchResult {
       mimeType: mimeType is String? ? mimeType : this.mimeType,
       tags: tags is List<String>? ? tags : this.tags?.map((e0) => e0).toList(),
       indexedAt: indexedAt is DateTime? ? indexedAt : this.indexedAt,
+      suggestedQuery: suggestedQuery is String?
+          ? suggestedQuery
+          : this.suggestedQuery,
     );
   }
 }

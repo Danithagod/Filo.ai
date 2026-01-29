@@ -1,10 +1,10 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { gsap } from 'gsap';
-import { Search, Cpu, Shield, Zap, Database, Tags, ChevronRight, Layout, Lock, Code } from 'lucide-react';
+import { Cpu, Shield, ChevronRight, Search, Zap, Tag, FolderTree } from 'lucide-react';
 import './Features.css';
 
-    const Features = ({ show }) => {
+const Features = ({ show }) => {
     useEffect(() => {
         if (show) {
             const tl = gsap.timeline({ defaults: { ease: 'power3.out', duration: 1 } });
@@ -30,30 +30,57 @@ import './Features.css';
 
     const featureGroups = [
         {
-            title: "Intelligent Search",
+            title: "AI-Powered Search",
             icon: <Search size={40} />,
             features: [
-                { name: "Semantic Embedding", desc: "Files are converted into high-dimensional vectors for meaning-based retrieval via pgvector." },
-                { name: "Hybrid Search", desc: "Combines keyword matching with semantic intent for superior retrieval accuracy." },
-                { name: "Contextual Awareness", desc: "Butler understands the relationship between your documents and their categories." }
+                { name: "Semantic Search", desc: "Find files by meaning, not just keywords. Our neural index understands context and intent." },
+                { name: "Hybrid Search Mode", desc: "Combine semantic understanding with traditional keyword matching for comprehensive results." },
+                { name: "AI Conversational Search", desc: "Ask questions in natural language and get intelligent, contextual answers about your files." }
             ]
         },
         {
-            title: "AI Orchestration",
-            icon: <Cpu size={40} />,
+            title: "Tag Management",
+            icon: <Tag size={40} />,
             features: [
-                { name: "Task Automation", desc: "Natural language commands translate into complex, multi-step file operations." },
-                { name: "Multi-Model Inference", desc: "Access 200+ models including GPT-4o, Claude 3.5, and Gemini Pro via OpenRouter." },
-                { name: "Local-First Processing", desc: "All file extraction, indexing, and management happens on your local hardware." }
+                { name: "Smart Tagging System", desc: "Organize files with tags grouped by topics, entities, and keywords. Full tag manager with merge and rename capabilities." },
+                { name: "@-Mention File Tagging", desc: "Tag files directly in chat using @-mentions. Quick file attachment as you compose your queries." },
+                { name: "Related Tags Discovery", desc: "Explore tag relationships and co-occurrences to discover connections in your file system." }
             ]
         },
         {
-            title: "Security & Performance",
+            title: "Local-First Architecture",
             icon: <Shield size={40} />,
             features: [
-                { name: "Serverpod Backend", desc: "High-performance Dart-based server ensures rapid indexing and low latency." },
-                { name: "Privacy-Focused", desc: "Your document structure and sensitive file content are managed locally." },
-                { name: "Hardware Optimized", desc: "Designed for desktop platforms with native support for Windows, macOS, and Linux." }
+                { name: "Privacy Respecting", desc: "Your file index and metadata stay on your machine. Only queries are sent to AI models." },
+                { name: "Cross-Platform Desktop", desc: "Native Windows, macOS, and Linux support with optimized performance for each platform." },
+                { name: "Real-Time Indexing", desc: "Automatic file indexing with progress tracking and comprehensive content extraction." }
+            ]
+        },
+        {
+            title: "Intelligent Assistance",
+            icon: <Cpu size={40} />,
+            features: [
+                { name: "AI Chat Interface", desc: "Interact with your files through conversation. Ask questions, get summaries, and find what you need." },
+                { name: "Multi-Model Support", desc: "Access 200+ AI models via OpenRouter including GPT-4, Claude, and Gemini." },
+                { name: "Advanced Filtering", desc: "Refine searches by file type, date range, tags, and search facets for precise results." }
+            ]
+        },
+        {
+            title: "File Management",
+            icon: <FolderTree size={40} />,
+            features: [
+                { name: "Full File Browser", desc: "Navigate your entire file system with an integrated file manager supporting multiple views." },
+                { name: "Document Preview", desc: "Preview files with extracted content, metadata, and AI-generated snippets." },
+                { name: "Search History", desc: "Access recent searches and continue where you left off." }
+            ]
+        },
+        {
+            title: "Index Management",
+            icon: <Zap size={40} />,
+            features: [
+                { name: "Health Dashboard", desc: "Monitor index status with comprehensive health metrics and error reporting." },
+                { name: "Progress Tracking", desc: "Real-time indexing progress with detailed status updates for each job." },
+                { name: "Multiple File Types", desc: "Support for documents, PDFs, markdown, code, and many other file formats." }
             ]
         }
     ];
@@ -63,7 +90,7 @@ import './Features.css';
             <section className="features-hero">
                 <div className="container">
                     <h1 className="hero-title">Powerful <span className="text-gradient">Capabilities</span></h1>
-                    <p className="hero-subtitle">Deep dive into the technology that powers your intelligent desktop assistant.</p>
+                    <p className="hero-subtitle">Deep dive into the technology that powers your intelligent desktop search assistant.</p>
                 </div>
             </section>
 
@@ -86,9 +113,9 @@ import './Features.css';
 
             <section className="features-cta container">
                 <div className="cta-glass glass-card">
-                    <h2>Ready to transform your workflow?</h2>
-                    <p>Download Semantic Butler today and experience true desktop intelligence.</p>
-                    <Link to="/pricing" className="btn-primary-large">Get Started Now <ChevronRight size={20} /></Link>
+                    <h2>Ready to transform your file search?</h2>
+                    <p>Download Filo today and experience true desktop intelligence.</p>
+                    <Link to="/download" className="btn-primary-large">Get Started Now <ChevronRight size={20} /></Link>
                 </div>
             </section>
         </div>

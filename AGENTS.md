@@ -167,7 +167,6 @@ desk-sense/
 │   │   │   │   ├── terminal_service.dart     # Shell command execution
 │   │   │   │   ├── tag_taxonomy_service.dart # Tag management
 │   │   │   │   ├── search_preset_service.dart # Saved searches
-│   │   │   │   ├── ai_cost_service.dart      # AI cost tracking and budgeting
 │   │   │   │   ├── index_health_service.dart # Index health monitoring
 │   │   │   │   ├── summarization_service.dart # Document summarization
 │   │   │   │   ├── ai_search_service.dart    # AI-powered search
@@ -248,7 +247,6 @@ desk-sense/
 │   │   │   │   │   └── typing_indicator.dart
 │   │   │   │   ├── home/            # Home dashboard widgets
 │   │   │   │   │   ├── stats_card.dart
-│   │   │   │   │   ├── ai_cost_dashboard.dart      # AI cost tracking dashboard
 │   │   │   │   │   ├── index_health_dashboard.dart   # Index health monitoring
 │   │   │   │   │   ├── compact_index_card.dart
 │   │   │   │   │   ├── indexing_job_card.dart

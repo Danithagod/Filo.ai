@@ -10,7 +10,7 @@ import NavLoader from './components/NavLoader/NavLoader';
 import Home from './pages/Home/Home';
 import Features from './pages/Features/Features';
 import About from './pages/About/About';
-import Pricing from './pages/Pricing/Pricing';
+import Download from './pages/Download/Download';
 import NotFound from './pages/NotFound/NotFound';
 import './App.css';
 
@@ -91,7 +91,7 @@ function App() {
             <Route path="/" element={<Home show={!loading} />} />
             <Route path="/features" element={<Features show={!loading} />} />
             <Route path="/about" element={<About show={!loading} />} />
-            <Route path="/pricing" element={<Pricing show={!loading} />} />
+            <Route path="/download" element={<Download show={!loading} />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
@@ -99,31 +99,25 @@ function App() {
         <footer className="footer" role="contentinfo">
           <div className="container footer-grid">
             <div className="footer-brand">
-              <div className="logo">Semantic Butler</div>
-              <p>Private AI for your local data.</p>
+              <div className="logo">Filo</div>
+              <p>AI-powered semantic search for your local files.</p>
             </div>
             <nav className="footer-links" aria-label="Footer navigation">
               <div className="link-group">
                 <h4>Product</h4>
                 <Link to="/features">Features</Link>
-                <Link to="/pricing">Pricing</Link>
+                <Link to="/download">Download</Link>
                 <Link to="/about">About</Link>
               </div>
               <div className="link-group">
                 <h4>Resources</h4>
                 <a href="https://github.com" target="_blank" rel="noopener noreferrer">GitHub</a>
-                <a href="https://docs.semanticbutler.com" target="_blank" rel="noopener noreferrer">Documentation</a>
-              </div>
-              <div className="link-group">
-                <h4>Legal</h4>
-                <a href="/about#privacy">Privacy</a>
-                <a href="/about#terms">Terms</a>
               </div>
             </nav>
           </div>
           <div className="footer-bottom">
             <div className="container">
-              <p>© 2026 Semantic Butler. All rights reserved.</p>
+              <p>© 2026 Filo. All rights reserved.</p>
             </div>
           </div>
         </footer>
