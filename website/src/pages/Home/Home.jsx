@@ -281,7 +281,7 @@ const Home = ({ show }) => {
           </p>
           <div className="hero-actions">
             <Link to="/download" className="btn-primary-large" aria-label="Get started with Filo for free">Download Now <ChevronRight size={20} /></Link>
-            <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="btn-secondary-large" aria-label="View Filo on GitHub">View GitHub</a>
+            <a href="https://github.com/Danithagod/Filo.ai.git" target="_blank" rel="noopener noreferrer" className="btn-secondary-large" aria-label="View Filo on GitHub">View GitHub</a>
           </div>
         </div>
 

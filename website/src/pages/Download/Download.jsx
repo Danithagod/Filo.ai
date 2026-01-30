@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { gsap } from 'gsap';
-import { Monitor } from 'lucide-react';
+import { Monitor, Server } from 'lucide-react';
 import Logo from '../../components/Logo/Logo';
 import './Download.css';
 
@@ -41,7 +41,7 @@ const Download = ({ show }) => {
     {
       id: 'backend',
       name: 'Backend Server',
-      icon: <Monitor size={48} />,
+      icon: <Server size={48} />,
       desc: 'Local server required for full AI features. Includes semantic search, file indexing, and chat capabilities. Extract and run run.bat to start.',
       version: 'v1.0.0-stable',
       href: '/downloads/semantic-butler-backend.zip',
@@ -69,11 +69,13 @@ const Download = ({ show }) => {
             <div key={platform.id} className="download-section glass-card">
               <div className="platform-header">
                 <div className="platform-icon">{platform.icon}</div>
-                <div>
+                <div className="platform-title-group">
                   <h2>{platform.name}</h2>
-                  {platform.category && <span className="category-badge">{platform.category}</span>}
+                  <div className="badge-group">
+                    {platform.category && <span className="category-badge">{platform.category}</span>}
+                    <span className="version-badge">{platform.version}</span>
+                  </div>
                 </div>
-                <span className="version-badge">{platform.version}</span>
               </div>
 
               <p className="platform-desc">{platform.desc}</p>

@@ -111,7 +111,7 @@ function App() {
               </div>
               <div className="link-group">
                 <h4>Resources</h4>
-                <a href="https://github.com" target="_blank" rel="noopener noreferrer">GitHub</a>
+                <a href="https://github.com/Danithagod/Filo.ai.git" target="_blank" rel="noopener noreferrer">GitHub</a>
               </div>
             </nav>
           </div>

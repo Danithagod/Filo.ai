@@ -130,7 +130,7 @@
   justify-content: center;
   align-items: center;
   gap: 1.5rem;
-  margin-bottom: 8rem;
+  margin-bottom: 3rem;
   width: 100%;
   opacity: 0;
 }
@@ -141,11 +141,7 @@
   padding: 0 2rem;
   perspective: 2000px;
   opacity: 0;
-}
-
-/* Main Visual Section */
-.hero-visual-container {
-  margin-top: 4rem;
+  margin-top: 2rem;
 }
 
 /* Main Visual Stack - Obsolete */
