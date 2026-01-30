@@ -33,21 +33,25 @@ bin/migrate_*.dart
 bin/check_*.dart
 bin/direct_*.dart
 
-# SQL and database files
-*.sql
+# SQL and database files (but NOT migrations - those are needed!)
+# Exclude top-level SQL files and backups
+/*.sql
 *.sql.backup
 *.db
 *.sqlite
+
+# Re-include all migration SQL files (critical for database setup)
+!migrations/**/*.sql
 
 # Logs
 *.log
 logs/
 
-# Docker files (not needed for cloud deployment)
+# Docker files (compose not needed, but Dockerfile IS needed for cloud builds!)
 docker-compose.yaml
 docker-compose.*.yaml
-Dockerfile
-Dockerfile.*
+# Dockerfile - DO NOT IGNORE! Serverpod Cloud uses this for builds
+# Dockerfile.*
 
 # CI/CD
 .github/

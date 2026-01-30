@@ -1,15 +1,406 @@
-# semantic_butler_server
+# Filo Server
 
-This is the starting point for your Serverpod server.
+Serverpod backend for Filo. Handles semantic search, document indexing, AI agent operations, and file system management.
 
-To run your server, you first need to start Postgres and Redis. It's easiest to do with Docker.
+## Overview
 
-    docker compose up --build --detach
+Filo Server is built with Serverpod 3.1.0 and provides a type-safe API for the Flutter desktop application. It integrates with OpenRouter for AI operations and PostgreSQL with pgvector for semantic search.
 
-Then you can start the Serverpod server.
+## Features
 
-    dart bin/main.dart
+- **Semantic Search** — Vector similarity search with ranking and filtering
+- **Document Indexing** — Async file processing with text extraction and embedding
+- **AI Agent** — Conversational interface with tool calling
+- **File System Operations** — Safe file browsing and manipulation
+- **Health Monitoring** — Database stats, error tracking, and diagnostics
+- **Rate Limiting** — Configurable API rate limiting and circuit breaking
 
-When you are finished, you can shut down Serverpod with `Ctrl-C`, then stop Postgres and Redis.
+## Prerequisites
 
-    docker compose stop
+- **Dart 3.5+**
+- **PostgreSQL 14+** with **pgvector** extension
+- **Redis** (for caching and sessions)
+- **OpenRouter API key** — [Get API key](https://openrouter.ai/keys)
+
+## Getting Started
+
+### 1. Install Dependencies
+
+```bash
+dart pub get
+```
+
+### 2. Configure Environment
+
+Copy the example environment file and fill in your values:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env`:
+
+```bash
+# Required
+OPENROUTER_API_KEY=your-openrouter-api-key-here
+
+# Optional
+OPENROUTER_SITE_URL=https://your-app.com
+OPENROUTER_SITE_NAME=Filo
+LOG_LEVEL=info
+MAX_PARALLEL_INDEXING=5
+EMBEDDING_BATCH_SIZE=20
+```
+
+### 3. Configure Database
+
+Edit `config/development.yaml` with your database credentials:
+
+```yaml
+database:
+  host: localhost
+  port: 5432
+  name: semantic_butler
+  user: postgres
+```
+
+Create `config/passwords.yaml`:
+
+```yaml
+database: your-db-password
+redis: your-redis-password
+```
+
+### 4. Enable pgvector Extension
+
+Connect to your PostgreSQL database and run:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;
+```
+
+### 5. Run Migrations
+
+```bash
+dart run bin/main.dart --apply-migrations
+```
+
+### 6. Start the Server
+
+#### Development (with Docker Compose)
+
+Start PostgreSQL and Redis:
+
+```bash
+docker compose up --build --detach
+```
+
+Run the server:
+
+```bash
+dart run bin/main.dart
+```
+
+When finished, stop the services:
+
+```bash
+dart run bin/main.dart --stop  # Stops Serverpod
+docker compose stop            # Stops Postgres and Redis
+```
+
+#### Production
+
+```bash
+dart compile exe bin/main.dart -o bin/filo-server
+./bin/filo-server
+```
+
+## Project Structure
+
+```
+lib/src/
+├── endpoints/                 # API endpoint definitions
+│   ├── butler_endpoint.dart         # Semantic search & indexing
+│   ├── agent_endpoint.dart          # AI chat agent
+│   ├── indexing_endpoint.dart       # Indexing management
+│   ├── file_system_endpoint.dart    # File operations
+│   ├── health_endpoint.dart         # Health checks
+│   └── greeting_endpoint.dart       # Hello world example
+├── services/                 # Business logic
+│   ├── ai_service.dart              # Unified AI operations
+│   ├── cached_ai_service.dart       # AI with caching
+│   ├── openrouter_client.dart       # OpenRouter API client
+│   ├── indexing_service.dart        # Document indexing
+│   ├── file_extraction_service.dart # Text extraction
+│   ├── file_watcher_service.dart    # File monitoring
+│   ├── ai_search_service.dart       # Conversational search
+│   ├── file_system_service.dart     # File operations
+│   ├── cache_service.dart           # Caching layer
+│   ├── tag_taxonomy_service.dart    # Tag management
+│   ├── sumarization_service.dart    # Document summarization
+│   ├── search_preset_service.dart   # Saved searches
+│   ├── suggestion_service.dart      # Query suggestions
+│   ├── metrics_service.dart         # Usage metrics
+│   ├── reset_service.dart           # Data reset
+│   ├── circuit_breaker.dart         # Fault tolerance
+│   ├── rate_limit_service.dart      # API rate limiting
+│   └── smart_rate_limiter.dart      # Adaptive rate limiting
+├── config/                   # Configuration
+│   ├── ai_models.dart               # AI model routing
+│   └── search_config.dart           # Search settings
+├── prompts/                  # AI prompts
+│   └── agent_system_prompt.dart     # Agent behavior
+├── utils/                    # Utility functions
+│   ├── path_validator.dart          # Path security
+│   ├── query_parser.dart            # Search query parsing
+│   ├── encoding_detector.dart       # File encoding detection
+│   ├── error_sanitizer.dart         # Error message sanitization
+│   └── tool_result_limiter.dart     # Result size limits
+├── constants/                # Constants
+│   ├── error_categories.dart        # Error type definitions
+│   └── indexing_status.dart         # Status values
+├── generated/                # Generated by Serverpod
+│   ├── protocol.dart               # Protocol definitions
+│   ├── endpoints.dart               # Endpoint signatures
+│   └── *.dart                       # Protocol classes
+└── web/                      # Optional web UI
+    ├── routes/                      # Web routes
+    └── widgets/                     # Web widgets
+```
+
+## API Endpoints
+
+### Butler Endpoint (`butler`)
+
+Core semantic search and indexing operations.
+
+| Method | Description |
+|--------|-------------|
+| `semanticSearch(query, limit, threshold, filters)` | Search by semantic similarity |
+| `startIndexing(folderPaths, options)` | Start folder indexing |
+| `getIndexingStatus()` | Get current indexing status |
+| `getDatabaseStats()` | Database statistics |
+| `clearIndex(confirm)` | Clear all indexed data |
+| `getSearchHistory(limit)` | Get recent searches |
+
+### Agent Endpoint (`agent`)
+
+AI-powered conversational search.
+
+| Method | Description |
+|--------|-------------|
+| `chat(message, conversationId)` | Send chat message (streaming) |
+| `getConversationHistory()` | Get conversation list |
+| `deleteConversation(id)` | Delete a conversation |
+
+### Indexing Endpoint (`indexing`)
+
+Indexing management and diagnostics.
+
+| Method | Description |
+|--------|-------------|
+| `getHealthReport()` | Index health diagnostics |
+| `getErrorBreakdown()` | Categorized error counts |
+| `getDuplicateFiles()` | Find duplicate content |
+| `getSimilarContent()` | Find similar documents |
+| `getWatchedFolders()` | Get indexed folders |
+| `addWatchedFolder(path)` | Add folder to watch list |
+| `removeWatchedFolder(id)` | Remove from watch list |
+
+### File System Endpoint (`fileSystem`)
+
+Safe file system operations.
+
+| Method | Description |
+|--------|-------------|
+| `listDirectory(path)` | List directory contents |
+| `searchFiles(query, path)` | Search by filename |
+| `readFile(path, maxLength)` | Read file contents |
+| `getFileMetadata(path)` | Get file info |
+| `deleteFile(path)` | Delete a file |
+| `moveFile(source, destination)` | Move/rename file |
+
+### Health Endpoint (`health`)
+
+System health checks.
+
+| Method | Description |
+|--------|-------------|
+| `check()` | Overall health status |
+| `database()` | Database connectivity |
+| `redis()` | Redis connectivity |
+| `openrouter()` | AI service availability |
+
+## AI Models (via OpenRouter)
+
+Models are configured in `config/ai_models.dart`:
+
+| Task | Default Model | Alternative |
+|------|---------------|-------------|
+| Embeddings | `openai/text-embedding-3-small` | `openai/text-embedding-3-large` |
+| Fast Generation | `google/gemini-flash-1.5` | `openai/gpt-4o-mini` |
+| Complex Tasks | `anthropic/claude-3.5-sonnet` | `openai/gpt-4o` |
+
+## Database Schema
+
+Key tables (defined in `models/`):
+
+| Table | Purpose |
+|-------|---------|
+| `file_index` | Indexed documents with embeddings |
+| `indexing_job` | Background job tracking |
+| `watched_folder` | Folders being indexed |
+| `search_history` | Search query log |
+| `error_stats` | Indexing error tracking |
+| `tag_taxonomy` | Tag reference data |
+
+## Configuration
+
+### Server Settings (`config/development.yaml`)
+
+```yaml
+# API server
+api: 8080
+
+# Web server (optional)
+web: 8081
+
+# Logging
+log:
+  level: info
+  console: true
+  file: true
+
+# Feature flags
+features:
+  realtimeIndexing: true
+  cachingEnabled: true
+  metricsEnabled: true
+```
+
+### Search Settings (`config/search_config.dart`)
+
+```dart
+class SearchConfig {
+  static const int defaultLimit = 10;
+  static const double defaultThreshold = 0.5;
+  static const int maxResults = 100;
+  static const Duration cacheTimeout = Duration(minutes: 5);
+}
+```
+
+## Development
+
+### Running Tests
+
+```bash
+dart test
+```
+
+### Code Generation
+
+After modifying protocol classes (in `models/`):
+
+```bash
+dart run serverpod generate
+```
+
+### Database Migrations
+
+Create a new migration:
+
+```bash
+dart run serverpod create-migration my_migration
+```
+
+Apply pending migrations:
+
+```bash
+dart run bin/main.dart --apply-migrations
+```
+
+## Services Overview
+
+### AIService
+Unified interface for AI operations (embeddings, chat, completions).
+
+### IndexingService
+Manages document indexing pipeline:
+1. File discovery
+2. Text extraction
+3. Embedding generation
+4. Database storage
+5. Tag generation
+
+### FileSystemService
+Safe file system access with path validation and sandboxing.
+
+### CacheService
+Redis-backed caching for embeddings and search results.
+
+### CircuitBreaker
+Fault tolerance for external API calls with automatic recovery.
+
+## Security
+
+- **Path Validation** — All file paths are validated to prevent directory traversal
+- **Tool Result Limiting** — Output size limits to prevent memory issues
+- **Error Sanitization** — Sensitive info removed from error messages
+- **Rate Limiting** — Configurable per-client rate limits
+
+## Deployment
+
+### Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `OPENROUTER_API_KEY` | Yes | OpenRouter API key |
+| `DATABASE_HOST` | No | Database host (default: localhost) |
+| `DATABASE_PORT` | No | Database port (default: 5432) |
+| `LOG_LEVEL` | No | Logging level (default: info) |
+
+### Docker Deployment
+
+```bash
+docker build -t filo-server .
+docker run -p 8080:8080 --env-file .env filo-server
+```
+
+## Monitoring
+
+### Health Check
+
+```bash
+curl http://localhost:8080/health
+```
+
+### Metrics Endpoint
+
+```bash
+curl http://localhost:8080/metrics
+```
+
+## Troubleshooting
+
+### "pgvector extension not found"
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;
+```
+
+### "Connection refused" on port 5432
+- Ensure PostgreSQL is running
+- Check `config/development.yaml` connection settings
+
+### OpenRouter rate limit errors
+- Check `OPENROUTER_API_KEY` is valid
+- Adjust `MAX_PARALLEL_INDEXING` in `.env`
+
+## Related Documentation
+
+- [Product Requirements Document](../../../.plan/semantic-desktop-butler-prd.md)
+- [Flutter App README](../semantic_butler_flutter/README.md)
+- [Serverpod Documentation](https://docs.serverpod.dev)
+
+## License
+
+MIT

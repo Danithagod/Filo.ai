@@ -7,7 +7,7 @@ build/
 
 # Ignore the flutter web app directory
 web/app
-
+db/
 # Directory created by dartdoc
 doc/api/
 
