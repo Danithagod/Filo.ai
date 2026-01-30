@@ -606,6 +606,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           error: error,
           timestamp: DateTime.now(),
         );
+        await ref.read(chatHistoryProvider.notifier).setStreamingMessage(null);
         await ref.read(chatHistoryProvider.notifier).addMessage(errorMsg);
         setState(() {
           _isLoading = false;
@@ -632,7 +633,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   void _updateStreamingMessage(ChatMessage message, {bool scroll = false}) {
     _streamDebouncer.debounce(message.content, () {
       if (mounted) {
-        ref.read(chatHistoryProvider.notifier).setStreamingMessage(message);
+        final conversationId =
+            ref.read(chatHistoryProvider).value?.currentConversationId;
+        ref.read(chatHistoryProvider.notifier).setStreamingMessage(
+              message,
+              conversationId: conversationId,
+            );
         if (scroll) {
           _scrollToBottom();
         }
@@ -914,7 +920,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                                     16,
                                   ),
                                   itemCount: messages.length +
-                                      (streaming != null ? 1 : 0) +
+                                      (streaming != null &&
+                                              state.streamingConversationId ==
+                                                  state.currentConversationId
+                                          ? 1
+                                          : 0) +
                                       (hasMore ? 1 : 0),
                                   itemBuilder: (context, index) {
                                     if (hasMore && index == 0) {
@@ -925,10 +935,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                                         hasMore ? index - 1 : index;
 
                                     if (streaming != null &&
+                                        state.streamingConversationId ==
+                                            state.currentConversationId &&
                                         messageIndex == messages.length) {
                                       return ChatMessageBubble(
                                         key: ValueKey(
-                                          'streaming_${streaming.id ?? 'stream'}',
+                                          'streaming_${streaming.id ?? 'stream'}_${state.currentConversationId}',
                                         ),
                                         message: streaming,
                                         index: messageIndex,

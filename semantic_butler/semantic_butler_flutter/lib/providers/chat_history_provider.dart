@@ -12,8 +12,8 @@ final chatStorageServiceProvider = Provider<ChatStorageService>((ref) {
 
 final chatHistoryProvider =
     AsyncNotifierProvider<ChatHistoryNotifier, ChatHistoryState>(
-      ChatHistoryNotifier.new,
-    );
+  ChatHistoryNotifier.new,
+);
 
 class ChatHistoryState {
   final List<Conversation> conversations;
@@ -23,6 +23,7 @@ class ChatHistoryState {
   final bool hasMoreMessages;
   final int currentOffset;
   final ChatMessage? streamingMessage;
+  final String? streamingConversationId;
 
   ChatHistoryState({
     required this.conversations,
@@ -32,6 +33,7 @@ class ChatHistoryState {
     this.hasMoreMessages = false,
     this.currentOffset = 0,
     this.streamingMessage,
+    this.streamingConversationId,
   });
 
   ChatHistoryState copyWith({
@@ -42,6 +44,7 @@ class ChatHistoryState {
     bool? hasMoreMessages,
     int? currentOffset,
     ChatMessage? streamingMessage,
+    String? streamingConversationId,
     bool clearStreamingMessage = false,
   }) {
     return ChatHistoryState(
@@ -55,6 +58,9 @@ class ChatHistoryState {
       streamingMessage: clearStreamingMessage
           ? null
           : (streamingMessage ?? this.streamingMessage),
+      streamingConversationId: clearStreamingMessage
+          ? null
+          : (streamingConversationId ?? this.streamingConversationId),
     );
   }
 }
@@ -184,10 +190,14 @@ class ChatHistoryNotifier extends AsyncNotifier<ChatHistoryState> {
     }
   }
 
-  Future<void> setStreamingMessage(ChatMessage? message) async {
+  Future<void> setStreamingMessage(
+    ChatMessage? message, {
+    String? conversationId,
+  }) async {
     update(
       (state) => state.copyWith(
         streamingMessage: message,
+        streamingConversationId: conversationId,
         clearStreamingMessage: message == null,
       ),
     );
