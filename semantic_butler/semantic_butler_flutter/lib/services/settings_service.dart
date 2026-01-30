@@ -83,12 +83,12 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
     final aiProvider = _prefs.getString(_keyAiProvider) ?? 'OpenRouter';
     final openRouterKey = _prefs.getString(_keyOpenRouterKey);
 
-    // Load default serverUrl from config.json if not already stored in preferences
-    // Also migrate from localhost to production URL for existing users
+    // Always use the bundled config.json URL as the default
+    // This ensures the app uses the correct server URL on fresh installs
+    // and also correctly updates when a new build is deployed
     String serverUrl;
-    final storedServerUrl = _prefs.getString(_keyServerUrl);
 
-    // Load config.json to get the bundled production URL
+    // Load config.json to get the bundled server URL
     String configUrl;
     try {
       final config = await AppConfig.loadConfig();
@@ -97,23 +97,33 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
       configUrl = 'http://127.0.0.1:8080/';
     }
 
-    if (storedServerUrl == null) {
-      // First run: use URL from config.json
-      serverUrl = configUrl;
-      await _prefs.setString(_keyServerUrl, serverUrl);
-    } else if (storedServerUrl.contains('127.0.0.1') ||
-        storedServerUrl.contains('localhost')) {
-      // Migration: existing users with localhost should switch to production URL
-      // Only migrate if config.json has a non-localhost URL
-      if (!configUrl.contains('127.0.0.1') &&
-          !configUrl.contains('localhost')) {
-        serverUrl = configUrl;
-        await _prefs.setString(_keyServerUrl, serverUrl);
-      } else {
-        serverUrl = storedServerUrl;
-      }
-    } else {
+    // Check if user has manually set a custom URL (different from any known default)
+    final storedServerUrl = _prefs.getString(_keyServerUrl);
+
+    // Normalize URL by removing trailing slash for comparison
+    String normalizeUrl(String url) =>
+        url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+
+    final knownDefaults = [
+      'http://127.0.0.1:8080',
+      'http://localhost:8080',
+      'https://filo-file-manager.api.serverpod.space',
+      'https://semantic-butler-staging-api.serverpod.space',
+    ];
+
+    // Use stored URL only if it's a custom one set by the user
+    // Otherwise, always use the config.json URL
+    final normalizedStored =
+        storedServerUrl != null ? normalizeUrl(storedServerUrl) : null;
+    final isKnownDefault =
+        normalizedStored != null && knownDefaults.contains(normalizedStored);
+
+    if (storedServerUrl != null && !isKnownDefault) {
       serverUrl = storedServerUrl;
+    } else {
+      serverUrl = configUrl;
+      // Update stored preference to match config
+      await _prefs.setString(_keyServerUrl, serverUrl);
     }
 
     final hasSeenOnboarding = _prefs.getBool(_keyHasSeenOnboarding) ?? false;

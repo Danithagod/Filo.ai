@@ -46,7 +46,9 @@
       "Bash(do git show:*)",
       "Bash(done)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(cmd.exe:*)",
+      "Bash(copy:*)"
     ]
   },
   "outputStyle": "default"

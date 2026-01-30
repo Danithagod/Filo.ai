@@ -35,7 +35,17 @@ const Download = ({ show }) => {
       icon: <Monitor size={48} />,
       desc: 'Native performance for Windows 10 & 11. Optimized for modern multi-core CPUs.',
       version: 'v1.0.4-stable',
-      href: '/downloads/filo-windows.msix'
+      href: '/downloads/filo-windows.msix',
+      category: 'Desktop App'
+    },
+    {
+      id: 'backend',
+      name: 'Backend Server',
+      icon: <Monitor size={48} />,
+      desc: 'Local server required for full AI features. Includes semantic search, file indexing, and chat capabilities. Extract and run run.bat to start.',
+      version: 'v1.0.0-stable',
+      href: '/downloads/semantic-butler-backend.zip',
+      category: 'Required for AI'
     }
   ];
 
@@ -59,7 +69,10 @@ const Download = ({ show }) => {
             <div key={platform.id} className="download-section glass-card">
               <div className="platform-header">
                 <div className="platform-icon">{platform.icon}</div>
-                <h2>{platform.name}</h2>
+                <div>
+                  <h2>{platform.name}</h2>
+                  {platform.category && <span className="category-badge">{platform.category}</span>}
+                </div>
                 <span className="version-badge">{platform.version}</span>
               </div>
 

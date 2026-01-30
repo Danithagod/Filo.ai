@@ -15,6 +15,9 @@ class AuthService {
   /// Environment variable to enable authentication in development
   static const String forceAuthEnvVar = 'FORCE_AUTH';
 
+  /// Track if we've already logged the dev mode warning (to avoid spam)
+  static bool _hasLoggedDevModeWarning = false;
+
   /// Validate API key from session
   ///
   /// Returns true ONLY if:
@@ -29,10 +32,14 @@ class AuthService {
 
     // If no API key is configured and FORCE_AUTH is not set, allow (dev mode only)
     if (expectedKey.isEmpty && !forceAuth) {
-      session.log(
-        'API key not configured - running in development mode. Set API_KEY for production.',
-        level: LogLevel.warning,
-      );
+      // Only log this warning once to avoid spam
+      if (!_hasLoggedDevModeWarning) {
+        _hasLoggedDevModeWarning = true;
+        session.log(
+          'API key not configured - running in development mode. Set API_KEY for production.',
+          level: LogLevel.warning,
+        );
+      }
       return true;
     }
 

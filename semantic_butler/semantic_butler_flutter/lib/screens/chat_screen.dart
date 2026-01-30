@@ -537,15 +537,34 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             break;
 
           case 'error':
-            final errorMessage = ChatMessage(
-              id: const Uuid().v4(),
-              role: MessageRole.assistant,
-              content: contentBuffer.isNotEmpty
-                  ? contentBuffer.toString()
-                  : (event.content ?? 'An error occurred'),
-              isError: true,
-              timestamp: DateTime.now(),
-            );
+            // Detect API authentication errors (401, missing API key)
+            final errorContent = event.content ?? 'An error occurred';
+            final isAuthError = errorContent.contains('401') ||
+                errorContent.contains('auth') ||
+                errorContent.contains('credentials') ||
+                errorContent.contains('API key');
+
+            ChatMessage errorMessage;
+            if (isAuthError) {
+              // Show a user-friendly error about the missing API key
+              errorMessage = ChatMessage(
+                id: const Uuid().v4(),
+                role: MessageRole.assistant,
+                content: '',
+                error: ChatError.auth(errorContent),
+                timestamp: DateTime.now(),
+              );
+            } else {
+              errorMessage = ChatMessage(
+                id: const Uuid().v4(),
+                role: MessageRole.assistant,
+                content: contentBuffer.isNotEmpty
+                    ? contentBuffer.toString()
+                    : errorContent,
+                isError: true,
+                timestamp: DateTime.now(),
+              );
+            }
 
             await ref
                 .read(chatHistoryProvider.notifier)
@@ -564,13 +583,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       AppLogger.error('Chat error: $e', tag: 'Chat');
 
       ChatError error;
-      if (e.toString().contains('SocketException') ||
-          e.toString().contains('Connection')) {
-        error = ChatError.network(e.toString());
-      } else if (e.toString().contains('TimeoutException')) {
+      final errorString = e.toString();
+      if (errorString.contains('SocketException') ||
+          errorString.contains('Connection')) {
+        error = ChatError.network(errorString);
+      } else if (errorString.contains('TimeoutException')) {
         error = ChatError.timeout();
+      } else if (errorString.contains('401') ||
+          errorString.contains('auth') ||
+          errorString.contains('credentials') ||
+          errorString.contains('API key')) {
+        error = ChatError.auth(errorString);
       } else {
-        error = ChatError.unknown(e.toString());
+        error = ChatError.unknown(errorString);
       }
 
       if (mounted) {

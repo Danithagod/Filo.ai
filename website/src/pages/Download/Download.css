@@ -95,6 +95,17 @@
   opacity: 0.8;
 }
 
+.category-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+  padding: 0.2rem 0.6rem;
+  border-radius: 100px;
+  margin-top: 0.5rem;
+  font-weight: 500;
+}
+
 .platform-desc {
   font-size: 1.15rem;
   opacity: 0.6;

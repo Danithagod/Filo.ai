@@ -31,3 +31,7 @@ Thumbs.db
 build/
 dist/
 node_modules/
+semantic_butler/build/
+semantic_butler/semantic_butler_server/dist/
+semantic_butler/semantic_butler_flutter/build/
+/website/.next/

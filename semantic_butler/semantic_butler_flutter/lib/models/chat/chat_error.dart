@@ -111,7 +111,7 @@ class ChatError {
       case ChatErrorType.apiRateLimit:
         return 'Too many requests. Please wait a moment before trying again.';
       case ChatErrorType.apiAuth:
-        return 'Authentication failed. Please check your API key in settings.';
+        return 'AI features require an API key. Please add your OpenRouter API key to the .env file in the server folder.';
       case ChatErrorType.apiServer:
         return 'Server error. Please try again later.';
       case ChatErrorType.streamingLost:
@@ -131,7 +131,7 @@ class ChatError {
       case ChatErrorType.apiRateLimit:
         return ['Wait', 'Retry'];
       case ChatErrorType.apiAuth:
-        return ['Check API key', 'Settings'];
+        return ['Add API key to .env', 'Restart server'];
       case ChatErrorType.apiServer:
         return ['Retry', 'Contact support'];
       case ChatErrorType.streamingLost:

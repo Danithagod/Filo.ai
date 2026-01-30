@@ -1,10 +1,32 @@
-# Filo Desktop Application
+# Semantic Butler Desktop Application
 
-The cross-platform Flutter desktop application for Filo. Provides a native interface for semantic search, AI chat, file management, and indexing dashboard.
+The Flutter desktop application for Semantic Butler (Filo). Provides a native interface for semantic search, AI chat, file management, and indexing dashboard.
+
+## Quick Start - For Users
+
+### Option 1: Use Pre-built Installer
+
+1. Download **Filo Desktop App** from the [website](../../../website)
+2. Install the MSIX package
+3. Download and run the **Backend Server** package
+4. Launch Filo - it connects to `http://localhost:8080` automatically
+
+### Option 2: Build from Source
+
+```bash
+# Install dependencies
+flutter pub get
+
+# Run (requires backend server running on localhost:8080)
+flutter run -d windows
+
+# Build for release
+flutter build windows --release
+```
 
 ## Overview
 
-Filo Desktop is built with Flutter 3.24+ and uses Riverpod for state management. It communicates with the Serverpod backend via the generated client library. The app supports Windows, macOS, and Linux.
+Built with Flutter 3.24+ using Riverpod for state management. Communicates with the local Serverpod backend via the generated client library. Supports Windows, macOS, and Linux.
 
 ## Features
 
@@ -16,55 +38,16 @@ Filo Desktop is built with Flutter 3.24+ and uses Riverpod for state management.
 - **Advanced Filters** — Filter by file type, date range, tags, and more
 - **Keyboard Shortcuts** — Power-user friendly command palette (`Ctrl+K`)
 
-## Prerequisites
+## Server Connection
 
-- **Flutter 3.24+**
-- **Dart 3.5+**
-- **Serverpod backend** running (see [`../semantic_butler_server/`](../semantic_butler_server/))
-
-## Getting Started
-
-### 1. Install Dependencies
-
-```bash
-flutter pub get
-```
-
-### 2. Configure Server Connection
-
-Edit `lib/config/app_config.dart` or set environment variables to connect to your Serverpod backend:
+The app connects to a local Serverpod backend. To configure:
 
 ```dart
-const String serverUrl = String.fromEnvironment(
-  'SERVER_URL',
-  defaultValue: 'http://localhost:8080',
-);
-```
+// Set environment variable
+flutter run -d windows --dart-define=SERVER_URL=http://localhost:8080
 
-### 3. Run the Application
-
-```bash
-# Windows
-flutter run -d windows
-
-# macOS
-flutter run -d macos
-
-# Linux
-flutter run -d linux
-```
-
-### 4. Build for Release
-
-```bash
-# Windows (MSIX installer)
-flutter build windows --release
-
-# macOS
-flutter build macos --release
-
-# Linux
-flutter build linux --release
+// Or edit lib/config/app_config.dart
+const String serverUrl = 'http://localhost:8080';
 ```
 
 ## Project Structure
@@ -116,32 +99,30 @@ lib/
 ## Key Screens
 
 ### Home / Dashboard
-- **Index Health Dashboard** — Shows document count, database size, recent activity
-- **Indexing Progress** — Real-time indexing status with progress bars
-- **Error Breakdown** — Categorized indexing errors with diagnostics
-- **Compact Index Cards** — Quick overview of indexed folders
+- Index Health Dashboard — Shows document count, database size, recent activity
+- Indexing Progress — Real-time indexing status with progress bars
+- Error Breakdown — Categorized indexing errors with diagnostics
+- Compact Index Cards — Quick overview of indexed folders
 
 ### Search Results
-- **Advanced Search Bar** — Natural language query input with autocomplete
-- **Search Result Cards** — Rich previews with tags, scores, and snippets
-- **Bulk Actions** — Select multiple results for batch operations
-- **Filter Panel** — Filter by type, date, tags, and custom facets
+- Advanced Search Bar — Natural language query input with autocomplete
+- Search Result Cards — Rich previews with tags, scores, and snippets
+- Bulk Actions — Select multiple results for batch operations
+- Filter Panel — Filter by type, date, tags, and custom facets
 
 ### Chat Interface
-- **Message Bubbles** — Rendered markdown with syntax highlighting
-- **Agent Thoughts** — Expandable AI reasoning steps
-- **Tool Results** — Structured display of search/file operations
-- **File Drop Zone** — Attach files directly to conversations
+- Message Bubbles — Rendered markdown with syntax highlighting
+- Agent Thoughts — Expandable AI reasoning steps
+- Tool Results — Structured display of search/file operations
+- File Drop Zone — Attach files directly to conversations
 
 ### File Manager
-- **Breadcrumb Navigation** — Easy path traversal
-- **Grid/List Views** — Toggle between visual layouts
-- **Summary Dialog** — Quick file content preview
-- **Sidebar Navigation** — Quick access to watched folders
+- Breadcrumb Navigation — Easy path traversal
+- Grid/List Views — Toggle between visual layouts
+- Summary Dialog — Quick file content preview
+- Sidebar Navigation — Quick access to watched folders
 
 ## State Management
-
-Filo uses Riverpod for reactive state management:
 
 | Provider | Purpose |
 |----------|---------|
@@ -179,42 +160,7 @@ Filo uses Riverpod for reactive state management:
 - Uses `file_picker` package for folder selection
 - Creates `.desktop` entry on installation
 
-## Development Tips
-
-### Hot Reload
-
-The app supports Flutter's hot reload:
-
-```bash
-# Press 'r' in the terminal while the app is running
-# Or use Ctrl+\ in VS Code
-```
-
-### Debug Mode
-
-Enable verbose logging:
-
-```dart
-// In main.dart
-void main() {
-  Logger.root.level = Level.ALL;
-  runApp(MyApp());
-}
-```
-
-### Testing
-
-```bash
-# Run all tests
-flutter test
-
-# Run with coverage
-flutter test --coverage
-```
-
 ## Dependencies
-
-Key packages used:
 
 | Package | Purpose |
 |---------|---------|
@@ -230,23 +176,17 @@ Key packages used:
 
 ## Troubleshooting
 
-### "Connection refused" error
-- Ensure the Serverpod backend is running on port 8080
-- Check firewall settings
-
-### Indexing stuck at 0%
-- Verify database has `pgvector` extension enabled
-- Check server logs for errors
-
-### File picker not working
-- On macOS: Check Sandbox entitlements
-- On Windows: Run as administrator if accessing system folders
+| Issue | Solution |
+|-------|----------|
+| "Connection refused" | Ensure backend server is running on port 8080 |
+| Indexing stuck at 0% | Verify database has `pgvector` extension enabled |
+| File picker not working (macOS) | Check Sandbox entitlements |
+| File picker not working (Windows) | Run as administrator for system folders |
 
 ## Related Documentation
 
-- [Product Requirements Document](../../../.plan/semantic-desktop-butler-prd.md)
 - [Server README](../semantic_butler_server/README.md)
-- [Serverpod Documentation](https://docs.serverpod.dev)
+- [Main Project README](../README.md)
 
 ## License
 

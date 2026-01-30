@@ -1,75 +1,58 @@
 # ===========================================
-# ServerPod Cloud Production Configuration
+# Semantic Butler - Local Demo Configuration
 # ===========================================
-# This file is configured for ServerPod Cloud deployment
-# After deployment, update these values with your actual Serverpod Cloud URLs
+# For hackathon demos - server runs locally, database is Neon Cloud
 
 # Configuration for the main API server.
 apiServer:
   port: 8080
-  # UPDATE AFTER DEPLOYMENT: Replace with your actual Serverpod Cloud domain
-  # Format: <project-id>.api.serverpod.space
-  publicHost: filo-file-manager.api.serverpod.space
-  publicPort: 443
-  publicScheme: https
+  publicHost: localhost
+  publicPort: 8080
+  publicScheme: http
 
 # Configuration for the Insights server.
 insightsServer:
   port: 8081
-  # UPDATE AFTER DEPLOYMENT: Replace with your actual Serverpod Cloud domain
-  # Format: <project-id>.insights.serverpod.space
-  publicHost: filo-file-manager.insights.serverpod.space
-  publicPort: 443
-  publicScheme: https
+  publicHost: localhost
+  publicPort: 8081
+  publicScheme: http
 
 # Configuration for the web server.
 webServer:
   port: 8082
-  # UPDATE AFTER DEPLOYMENT: Replace with your actual Serverpod Cloud domain
-  # Format: <project-id>.serverpod.space
-  publicHost: filo-file-manager.serverpod.space
-  publicPort: 443
-  publicScheme: https
+  publicHost: localhost
+  publicPort: 8082
+  publicScheme: http
 
 # ===========================================
-# DATABASE
+# DATABASE - Neon Cloud
 # ===========================================
-# Serverpod Cloud provides a managed PostgreSQL database.
-# Connection details are automatically configured by the cloud platform.
-# The password should be set via scloud secrets, not in this file.
+# Shared Neon database with pg_trgm and pgvector support
 database:
-  # Database host is managed by Serverpod Cloud
-  # Update after deployment with actual cloud database host
-  host: database.serverpod.cloud
+  host: ep-purple-block-ahv7qmg4-pooler.c-3.us-east-1.aws.neon.tech
   port: 5432
-  name: semantic_butler
-  user: serverpod
+  name: neondb
+  user: neondb_owner
   requireSsl: true
   # maxConnectionCount: 10
 
 # ===========================================
 # REDIS (Optional)
 # ===========================================
-# Serverpod Cloud provides managed Redis.
-# Enable this if you need caching functionality.
 redis:
-  enabled: false  # Set to true to enable Redis caching
-  host: redis.serverpod.cloud
-  port: 6379
-  # requireSsl: true
+  enabled: false
 
 # ===========================================
 # SERVICE SETTINGS
 # ===========================================
-maxRequestSize: 524288  # 512KB - Adjust based on file upload needs
+maxRequestSize: 524288
 
 sessionLogs:
   consoleEnabled: true
   persistentEnabled: true
-  consoleLogFormat: text  # Options: text, json
+  consoleLogFormat: text
 
-# Future calls (background tasks)
 futureCallExecutionEnabled: true
 futureCall:
   concurrencyLimit: 1
-  scanInterval: 5000  # milliseconds
+  scanInterval: 5000
